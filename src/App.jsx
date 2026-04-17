@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { LayoutDashboard, Users, Activity, FileText } from 'lucide-react';
 import PatientList from './pages/PatientList';
 import LiveMonitoring from './pages/LiveMonitoring';
+import Reports from './pages/Reports';
 
 // ส่วนของแถบเมนูด้านซ้าย (Sidebar)
 const Sidebar = () => (
@@ -16,6 +17,10 @@ const Sidebar = () => (
       {/* ลิงก์ไปหน้ามอนิเตอร์ที่มีหัวใจ 3D */}
       <Link to="/monitoring" className="flex items-center space-x-3 text-gray-400 hover:text-white transition-colors group">
         <Activity size={20} className="group-hover:text-[#4FD1C5]" /> <span>Live Monitoring</span>
+      </Link>
+      {/* ลิงก์ไปหน้า Reports */}
+      <Link to="/reports" className="flex items-center space-x-3 text-gray-400 hover:text-white transition-colors group">
+        <FileText size={20} className="group-hover:text-[#4FD1C5]" /> <span>Reports</span>
       </Link>
     </nav>
   </div>
@@ -31,6 +36,7 @@ function App() {
           <Routes>
             <Route path="/" element={<PatientList />} />
             <Route path="/monitoring" element={<LiveMonitoring />} />
+            <Route path="/reports" element={<Reports />} />
           </Routes>
         </main>
       </div>
