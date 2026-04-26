@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { ChevronDown, User, Search, SlidersHorizontal } from 'lucide-react';
-import { usePatients } from '../../hooks/usePatients';
+import { usePatient } from '../../context/PatientContext';
 
 const PatientSelector = () => {
-  const { patients, currentPatient, setCurrentPatient } = usePatients();
+  const { patients, selectedPatient, setSelectedPatient } = usePatient();
   const [showSelector, setShowSelector] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredPatients = patients.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (!selectedPatient) return null;
 
   return (
     <div className="relative">
@@ -24,9 +26,9 @@ const PatientSelector = () => {
            <User className="text-[#8e95a5]" size={28} />
         </div>
         <div className="flex-1">
-          <p className="text-white text-sm font-bold leading-tight">{currentPatient.name}</p>
+          <p className="text-white text-sm font-bold leading-tight">{selectedPatient.name}</p>
           <p className="text-[#8e95a5] text-[10px] mt-1 uppercase tracking-tighter">
-            Age : {currentPatient.age} , Height : {currentPatient.height} , Weight : {currentPatient.weight}
+            Age : {selectedPatient.age}y , H : {selectedPatient.height}cm , W : {selectedPatient.weight}kg
           </p>
         </div>
         <ChevronDown size={14} className={`text-white transition-transform ${showSelector ? 'rotate-180' : ''}`} />
@@ -59,7 +61,7 @@ const PatientSelector = () => {
               <div 
                 key={p.id}
                 onClick={() => {
-                  setCurrentPatient(p);
+                  setSelectedPatient(p);
                   setShowSelector(false);
                   setSearchTerm('');
                 }}

@@ -1,50 +1,65 @@
-import React, { useRef } from 'react';
+import React, { Suspense, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Float } from '@react-three/drei';
+import { useGLTF, OrbitControls, Stage, Html } from '@react-three/drei';
+import { useStream } from '../../context/StreamContext';
 
-const HeartShape = () => {
-  const meshRef = useRef();
-
+function Heart() {
   const { scene } = useGLTF('/models/heart.glb');
+  return <primitive object={scene} scale={1.5} />;
+}
 
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-    const scale = 1 + Math.sin(t * 3) * 0.05;
-    if (meshRef.current) {
-      meshRef.current.scale.set(scale, scale, scale);
+function Hotspot() {
+  const meshRef = useRef();
+  const { events } = useStream();
+
+  useEffect(() => {
+    const handleData = (e) => {
+      const payload = e.detail;
+      if (payload && payload.localization_coords && meshRef.current) {
+        const { x, y, z } = payload.localization_coords;
+        meshRef.current.position.set(
+          (x - 0.5) * 1.5,
+          (y - 0.5) * 1.5,
+          (z - 0.5) * 1.5
+        );
+      }
+    };
+    if (events) {
+      events.addEventListener('data', handleData);
+      return () => events.removeEventListener('data', handleData);
     }
-  });
+  }, [events]);
 
-  // 3. แสดงผลโมเดลโดยใช้ <primitive />
   return (
-    <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-      <primitive
-        ref={meshRef}
-        object={scene}
-        scale={1.5} // ปรับขนาดเริ่มต้นตามความเหมาะสมของไฟล์
-        position={[0, 0, 0]}
+    <mesh ref={meshRef}>
+      <sphereGeometry args={[0.06, 16, 16]} />
+      <meshStandardMaterial 
+        color="#0ea5e9" 
+        emissive="#0ea5e9" 
+        emissiveIntensity={2} 
+        transparent 
+        opacity={0.6} 
       />
-    </Float>
+      <pointLight color="#0ea5e9" intensity={1} distance={0.5} />
+    </mesh>
   );
-};
+}
 
 const HeartModel3D = () => {
   return (
-    <div style={{ width: '100%', height: '500px' }}>
-      <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
-        <ambientLight intensity={1.5} />
-        <pointLight position={[10, 10, 10]} intensity={2} />
-        <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} />
-
-        <HeartShape />
-
-        <OrbitControls enableZoom={true} />
+    <div className="w-full h-full bg-transparent overflow-hidden relative">
+      <Canvas shadows camera={{ position: [0, 0, 4], fov: 45 }} gl={{ antialias: false }}>
+        <Suspense fallback={null}>
+          <Stage environment="city" intensity={0.5}>
+            <Heart />
+            <Hotspot />
+          </Stage>
+          <OrbitControls enableZoom={true} autoRotate={true} autoRotateSpeed={1} />
+        </Suspense>
       </Canvas>
     </div>
   );
 };
 
-// ช่วยจอง Memory และทำให้โหลดเร็วขึ้น
 useGLTF.preload('/models/heart.glb');
-
 export default HeartModel3D;

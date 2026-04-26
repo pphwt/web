@@ -1,50 +1,74 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Activity, Brain, FileText, Settings, LogOut, Zap, Users } from 'lucide-react';
-
-const navItems = [
-  { id: '/', icon: Users, label: 'Patient List' },
-  { id: '/monitoring', icon: Activity, label: 'Live Monitoring' },
-  { id: '/analysis', icon: Brain, label: '3D Analysis' },
-  { id: '/reports', icon: FileText, label: 'Reports' },
-];
+import { Activity, Brain, FileText, LogOut, Zap, Users, Archive, FlaskConical, Sun, Moon, Database, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const Sidebar = () => {
+  const { logout } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
+  const { t } = useLanguage();
+
+  const menuItems = [
+    { icon: Users, label: t('nav_patients'), path: '/' },
+    { icon: Activity, label: t('nav_monitoring'), path: '/live' },
+    { icon: FlaskConical, label: t('nav_lab'), path: '/lab' },
+    { icon: Brain, label: t('nav_analysis'), path: '/analysis' },
+    { icon: Database, label: t("sandbox_title"), path: "/sandbox" },
+    { icon: ShieldCheck, label: t("ai_diag_title"), path: "/ai-diagnostics" },
+    { icon: Archive, label: t('nav_archives'), path: '/archives' },
+    { icon: FileText, label: t('nav_reports'), path: '/reports' },
+  ];
+
   return (
-    <aside className="w-64 border-r border-white/5 flex flex-col glass z-20 bg-[#0B0F1A]">
+    <aside className="w-64 border-r border-[var(--border-color)] flex flex-col glass z-20 bg-[var(--bg-sidebar)]">
       <div className="p-6 mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-[#4FD1C5]/20 rounded-lg text-[#4FD1C5]">
+          <div className="p-2 bg-sky-500/20 rounded-lg text-sky-500">
             <Zap className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-bold tracking-tighter text-white">
-            BIOELECTRIC<span className="text-[#4FD1C5] text-xs ml-1">AI</span>
+          <h1 className="text-xl font-bold tracking-tighter text-[var(--text-main)] uppercase italic">
+            BIOELECTRIC<span className="text-sky-500 text-xs ml-1 font-black">PINN</span>
           </h1>
         </div>
       </div>
 
       <nav className="flex-1 px-4 space-y-2">
-        {navItems.map((item) => (
+        {menuItems.map((item) => (
           <NavLink
-            key={item.id}
-            to={item.id}
+            key={item.path}
+            to={item.path}
             className={({ isActive }) =>
-              `w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive
-                ? 'bg-[#4FD1C5]/20 text-[#4FD1C5] border border-[#4FD1C5]/20 shadow-lg glow-blue'
-                : 'hover:bg-white/5 text-slate-400'
+              `w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
+                ? 'bg-sky-500/10 text-sky-500 border border-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.1)] font-bold'
+                : 'hover:bg-black/5 text-[var(--text-muted)]'
               }`
             }
           >
             <item.icon className="w-5 h-5" />
-            <span className="text-sm font-medium">{item.label}</span>
+            <span className="text-sm font-medium tracking-tight">{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div className="p-4 mt-auto border-t border-white/5">
-        <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white transition-colors">
-          <LogOut className="w-5 h-5" />
-          <span className="text-sm">Logout Session</span>
+      <div className="p-4 mt-auto border-t border-[var(--border-color)] space-y-1">
+        <button 
+          onClick={toggleTheme}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-black/5 transition-all text-[var(--text-muted)] hover:text-sky-500"
+        >
+          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            {isDarkMode ? t('nav_light_mode') : t('nav_dark_mode')}
+          </span>
+        </button>
+
+        <button 
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-500/10 transition-all text-[var(--text-muted)] hover:text-rose-500"
+        >
+          <LogOut size={18} />
+          <span className="text-[10px] font-black uppercase tracking-widest">{t('nav_terminate')}</span>
         </button>
       </div>
     </aside>

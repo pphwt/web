@@ -1,15 +1,17 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
+import { TopBar } from './TopBar';
 
 export const MainLayout = ({ children }) => {
   return (
-    <div className="flex h-screen w-screen bg-[#0b0f1a] text-slate-200 overflow-hidden font-sans">
+    <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300 overflow-hidden">
       <Sidebar />
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-background">
-        <div className="flex-1 overflow-auto relative">
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar />
+        <main className="flex-1 overflow-auto p-8">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 };

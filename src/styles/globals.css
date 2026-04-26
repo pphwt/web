@@ -3,6 +3,36 @@
 @tailwind utilities;
 
 :root {
+  /* Light Theme (Default) */
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: rgba(0, 0, 0, 0.05);
+  --accent-color: #0ea5e9;
+  --accent-glow: rgba(14, 165, 233, 0.1);
+  --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  --grid-color: rgba(14, 165, 233, 0.08);
+  --viz-bg: #ffffff;
+  
+  color-scheme: light;
+}
+
+.dark {
+  /* Dark Theme */
+  --bg-main: #070b14;
+  --bg-card: rgba(19, 24, 38, 0.8);
+  --bg-sidebar: #0e121d;
+  --text-main: #f1f5f9;
+  --text-muted: #64748b;
+  --border-color: rgba(255, 255, 255, 0.05);
+  --accent-color: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.1);
+  --card-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+  --grid-color: rgba(56, 189, 248, 0.15);
+  --viz-bg: rgba(0, 0, 0, 0.6);
+  
   color-scheme: dark;
 }
 
@@ -10,43 +40,42 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #0f172a;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Custom scrollbars for a premium look */
+/* Fix build warnings for appearance compatibility */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+/* Resolve vertical-align vs display block conflict */
+img, svg, video, canvas, audio, iframe, embed, object {
+  display: block;
+  vertical-align: unset !important;
+}
+
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(56, 189, 248, 0.2);
+  background: var(--border-color);
   border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.4);
-}
-
-/* Glassmorphism utility */
 .glass {
-  background: rgba(30, 41, 59, 0.7);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.glow-blue {
-  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
-}
-
-/* 3D Container overlay */
-.overlay-3d {
-  pointer-events: none;
-}
-.overlay-3d > * {
-  pointer-events: auto;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
 }
