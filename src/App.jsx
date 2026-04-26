@@ -20,6 +20,8 @@ import PatientArchives from './pages/PatientArchives';
 import EducationalLab from './pages/EducationalLab';
 import NeuralSandbox from './pages/NeuralSandbox';
 import AIDiagnostics from './pages/AIDiagnostics';
+import BrainDiagnostics from './pages/BrainDiagnostics';
+import HelpManual from './pages/HelpManual';
 
 function App() {
   return (
@@ -46,8 +48,10 @@ function App() {
                             <Route path="/analysis" element={<Analysis />} />
                             <Route path="/sandbox" element={<NeuralSandbox />} />
                             <Route path="/ai-diagnostics" element={<AIDiagnostics />} />
+                            <Route path="/brain-diagnostics" element={<BrainDiagnostics />} />
                             <Route path="/archives" element={<PatientArchives />} />
                             <Route path="/lab" element={<EducationalLab />} />
+                            <Route path="/help" element={<HelpManual />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                           </Routes>
                         </MainLayout>

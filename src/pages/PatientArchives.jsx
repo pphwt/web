@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
-import ECGViewer from '../components/visualizers/ECGViewer';
+import ECGCanvas from '../components/visualizers/ECGCanvas';
 
 const PatientArchives = () => {
   const { selectedPatient } = usePatient();
@@ -15,6 +15,39 @@ const PatientArchives = () => {
       fetchArchives();
     }
   }, [selectedPatient, token]);
+
+  const handleExport = () => {
+    if (!selectedArchive) return;
+    
+    const exportData = {
+        report_metadata: {
+            app: "Bioelectric PINN Intelligence",
+            version: "1.4.2",
+            timestamp: new Date().toISOString()
+        },
+        patient: {
+            name: selectedPatient?.name,
+            id: selectedPatient?.id
+        },
+        snapshot: {
+            id: selectedArchive.id,
+            timestamp: selectedArchive.created_at,
+            avg_bpm: selectedArchive.bpm_avg,
+            ai_confidence: selectedArchive.ai_confidence,
+            physics: selectedArchive.physics_snapshot
+        },
+        data_leads: selectedArchive.leads_data
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Bioelectric_Report_${selectedArchive.id.substring(0,8)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const fetchArchives = async () => {
     setLoading(true);
@@ -106,12 +139,10 @@ const PatientArchives = () => {
                                     ))}
                                 </div>
                             </div>
-                            <div className="h-[400px]">
-                                <ECGViewer 
-                                    heartRate={selectedArchive.bpm_avg} 
-                                    liveData={selectedArchive.leads_data} 
-                                    rhythm="Recorded"
-                                />
+                            <div className="space-y-4">
+                                <ECGCanvas initialData={selectedArchive.leads_data?.lead_i} label="LEAD I (FRONTAL)" color="#0ea5e9" height={100} />
+                                <ECGCanvas initialData={selectedArchive.leads_data?.lead_ii} label="LEAD II (VECTOR)" color="#6366f1" height={100} />
+                                <ECGCanvas initialData={selectedArchive.leads_data?.v5} label="V5 (PRECORDIAL)" color="#8b5cf6" height={100} />
                             </div>
                         </div>
 
@@ -125,7 +156,10 @@ const PatientArchives = () => {
                                 <p className="text-sm text-[var(--text-muted)] leading-relaxed">Data packet integrity: 100%. Recorded at 20Hz sample rate via PINN Neural Bridge.</p>
                             </div>
                             <div className="bg-[var(--bg-card)] p-6 rounded-3xl border border-[var(--border-color)] flex flex-col justify-center items-center shadow-sm">
-                                <button className="w-full py-4 bg-sky-500 hover:bg-sky-600 text-white font-black rounded-2xl transition-all uppercase tracking-widest text-xs shadow-lg">
+                                <button 
+                                    onClick={handleExport}
+                                    className="w-full py-4 bg-sky-500 hover:bg-sky-600 text-white font-black rounded-2xl transition-all uppercase tracking-widest text-xs shadow-lg active:scale-95"
+                                >
                                     Export Snapshot
                                 </button>
                             </div>
