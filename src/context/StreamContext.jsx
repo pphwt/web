@@ -8,15 +8,27 @@ export const StreamProvider = ({ children }) => {
   const [data, setData] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef(null);
+  const currentPatientId = useRef(null);
 
   const streamEvents = useRef(new EventTarget());
+
+  const sendSubscribe = (patientId) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN && patientId) {
+      socketRef.current.send(JSON.stringify({ type: 'subscribe', patient_id: patientId }));
+    }
+  };
+
+  const subscribe = (patientId) => {
+    currentPatientId.current = patientId;
+    sendSubscribe(patientId);
+  };
 
   useEffect(() => {
     let isMounted = true;
 
     const connect = () => {
       if (!isMounted) return;
-      
+
       const socket = new WebSocket(WS_URL);
       socketRef.current = socket;
 
@@ -24,6 +36,10 @@ export const StreamProvider = ({ children }) => {
         if (isMounted) {
           setIsConnected(true);
           console.log('Global Stream Connected');
+          // Re-subscribe after reconnect
+          if (currentPatientId.current) {
+            sendSubscribe(currentPatientId.current);
+          }
         }
       };
 
@@ -82,11 +98,12 @@ export const StreamProvider = ({ children }) => {
   };
 
   return (
-    <StreamContext.Provider value={{ 
-      data, 
-      isConnected, 
-      sendUpdate, 
-      events: streamEvents.current 
+    <StreamContext.Provider value={{
+      data,
+      isConnected,
+      sendUpdate,
+      subscribe,
+      events: streamEvents.current
     }}>
       {children}
     </StreamContext.Provider>

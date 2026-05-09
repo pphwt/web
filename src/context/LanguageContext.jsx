@@ -61,6 +61,66 @@ export const translations = {
     ref_physionet: 'MIT-BIH Arrhythmia Standard',
     ref_pinn_paper: 'Aliev-Panfilov Model Core',
     ref_disclaimer: 'Disclaimer: This AI system is a diagnostic aid and should not replace clinical judgment.',
+
+    // Patient List
+    patient_db_title: 'Patient Database',
+    patient_db_subtitle: 'Electronic medical records management system',
+    register_patient: 'Register New Patient',
+    modal_title: 'Patient Registration (Clinical Registration)',
+    modal_subtitle: 'Recording data according to HL7 FHIR standards',
+    tab_demographics: 'Demographics',
+    tab_clinical: 'Clinical Information',
+    label_fullname: 'Full Name',
+    label_idcard: 'ID Card / Passport Number',
+    label_dob: 'Date of Birth',
+    label_gender: 'Gender',
+    label_blood: 'Blood Type',
+    label_priority: 'Priority Level',
+    label_allergies: 'Drug Allergies & Precautions',
+    label_emergency: 'Emergency Contact (Name/Phone)',
+    btn_cancel: 'Cancel',
+    btn_next: 'Next Step',
+    btn_complete: 'Complete Registration',
+    status_active: 'Active',
+    patient_count: 'patient',
+    patient_count_filtered: 'filtered from',
+    no_patient_found: 'No matching patients found',
+    no_patient_data: 'No patient data yet',
+
+    // Live Monitoring
+    start_capture: 'Record',
+
+    // Layout
+    language: 'Language',
+    quick_switch: 'Quick Switch',
+    recent_subjects: 'Recent Subjects',
+
+    // Neural Sandbox
+    sandbox_subtitle: 'Physics-Informed Neural Simulation',
+    select_dataset: 'Select Dataset',
+    run_test: 'Run Neural Analysis',
+
+    // AI Diagnostics
+    ai_diag_subtitle: 'Deep Signal Classification Engine',
+    dataset_ref: 'Dataset Reference',
+    dataset_mit: 'MIT-BIH Arrhythmia Database',
+    model_ref: 'Model Reference',
+    model_ap: 'Aliev-Panfilov PINN Core',
+
+    // Analysis
+    analysis_title: '3D Analysis Center',
+    analysis_subtitle: 'Real-time source localization and neural mapping',
+    active_patient: 'Active Patient',
+    slice: 'Slice',
+    grid: 'Grid',
+    '3d': '3D',
+    system_resonance: 'System Resonance',
+    success: 'Online',
+    loading: 'Processing...',
+    capture_snapshot: 'Capture Snapshot',
+    localization_log: 'Localization Log',
+    capture_success: 'Snapshot saved successfully',
+    capture_error: 'Failed to save snapshot',
   },
   th: {
     // Nav
@@ -71,7 +131,7 @@ export const translations = {
     nav_lab: 'ห้องแล็บจำลอง',
     nav_reports: 'รายงานผลตรวจ',
     nav_help: 'ศูนย์ช่วยเหลือ',
-    nav_terminate: 'จบเซสชัน',
+    nav_terminate: 'ออกจากระบบ',
     nav_light_mode: 'โหมดสว่าง',
     nav_dark_mode: 'โหมดมืด',
     sandbox_title: 'แซนด์บ็อกซ์จำลอง',
@@ -140,7 +200,46 @@ export const translations = {
     btn_cancel: 'ยกเลิก',
     btn_next: 'ขั้นตอนถัดไป',
     btn_complete: 'ลงทะเบียนสำเร็จ',
-    status_active: 'กำลังรับการรักษา'
+    status_active: 'กำลังรับการรักษา',
+    patient_count: 'ราย',
+    patient_count_filtered: 'กรองจาก',
+    no_patient_found: 'ไม่พบผู้ป่วยที่ตรงกัน',
+    no_patient_data: 'ยังไม่มีข้อมูลผู้ป่วย',
+
+    // Live Monitoring
+    start_capture: 'บันทึก',
+
+    // Layout
+    language: 'ภาษา',
+    quick_switch: 'สลับคนไข้',
+    recent_subjects: 'รายการล่าสุด',
+
+    // Neural Sandbox
+    sandbox_subtitle: 'การจำลองประสาทด้วยฟิสิกส์',
+    select_dataset: 'เลือกชุดข้อมูล',
+    run_test: 'รันการวิเคราะห์',
+
+    // AI Diagnostics
+    ai_diag_subtitle: 'ระบบจำแนกสัญญาณเชิงลึก',
+    dataset_ref: 'แหล่งข้อมูลอ้างอิง',
+    dataset_mit: 'ฐานข้อมูล MIT-BIH Arrhythmia',
+    model_ref: 'อ้างอิงโมเดล',
+    model_ap: 'แกน PINN Aliev-Panfilov',
+
+    // Analysis
+    analysis_title: 'ศูนย์วิเคราะห์ 3 มิติ',
+    analysis_subtitle: 'ระบุตำแหน่งต้นกำเนิดสัญญาณแบบเรียลไทม์',
+    active_patient: 'คนไข้ที่เลือก',
+    slice: 'ตัดภาพ',
+    grid: 'กริด',
+    '3d': '3D',
+    system_resonance: 'ความสอดคล้องระบบ',
+    success: 'ออนไลน์',
+    loading: 'กำลังประมวลผล...',
+    capture_snapshot: 'บันทึก Snapshot',
+    localization_log: 'บันทึกตำแหน่ง',
+    capture_success: 'บันทึก Snapshot สำเร็จ',
+    capture_error: 'บันทึก Snapshot ล้มเหลว',
   }
 };
 

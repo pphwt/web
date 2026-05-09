@@ -2,225 +2,382 @@ import React, { useState, useEffect } from 'react';
 import { usePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { UserPlus, Search, User, CreditCard, Droplets, AlertTriangle, Phone, Calendar, ChevronRight } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import {
+  UserPlus, Search, User, CreditCard, Droplets,
+  AlertTriangle, Phone, Calendar, ChevronRight, X, Users, Menu,
+} from 'lucide-react';
+import { useMobileMenu } from '../components/layout/MainLayout';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const calculateAge = (dob) => {
+  if (!dob) return 0;
+  const diff = Date.now() - new Date(dob).getTime();
+  return Math.abs(new Date(diff).getUTCFullYear() - 1970);
+};
+
+const BLOOD_TYPES  = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const CASE_TYPES   = ['General', 'Emergency', 'Urgent', 'Referral'];
+const GENDER_OPTS  = ['ชาย (Male)', 'หญิง (Female)', 'อื่นๆ'];
+
+const EMPTY_FORM = {
+  name: '', id_card: '', dob: '', gender: 'Male',
+  blood_type: 'O', allergies: '', emergency_contact: '', case_type: 'General',
+};
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+const FormInput = ({ label, icon, required, dk, ...props }) => (
+  <div className="space-y-1.5">
+    <label className={`flex items-center gap-1.5 text-xs font-semibold ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
+      {icon && <span className="opacity-60">{icon}</span>}
+      {label}
+      {required && <span className="text-rose-500 ml-0.5">*</span>}
+    </label>
+    <input
+      {...props}
+      required={required}
+      className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:ring-2 ${
+        dk
+          ? 'bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 focus:border-sky-500/50 focus:ring-sky-500/10'
+          : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500/15'
+      }`}
+    />
+  </div>
+);
+
+const FormSelect = ({ label, dk, children, ...props }) => (
+  <div className="space-y-1.5">
+    <label className={`block text-xs font-semibold ${dk ? 'text-slate-400' : 'text-slate-600'}`}>{label}</label>
+    <select
+      {...props}
+      className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition appearance-none focus:ring-2 ${
+        dk
+          ? 'bg-white/[0.04] border-white/[0.08] text-white focus:border-sky-500/50 focus:ring-sky-500/10'
+          : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-sky-500 focus:ring-sky-500/15'
+      }`}
+    >
+      {children}
+    </select>
+  </div>
+);
+
+const FormTextarea = ({ label, icon, dk, ...props }) => (
+  <div className="space-y-1.5">
+    <label className={`flex items-center gap-1.5 text-xs font-semibold ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
+      {icon && <span className="opacity-60">{icon}</span>}
+      {label}
+    </label>
+    <textarea
+      {...props}
+      rows={3}
+      className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition resize-none focus:ring-2 ${
+        dk
+          ? 'bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-600 focus:border-sky-500/50 focus:ring-sky-500/10'
+          : 'bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500/15'
+      }`}
+    />
+  </div>
+);
+
+// ─── main ─────────────────────────────────────────────────────────────────────
 
 const PatientList = () => {
   const { patients, refreshPatients, addPatient, setSelectedPatient } = usePatient();
   const { token } = useAuth();
   const { t } = useLanguage();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('basic'); // 'basic', 'clinical', 'contact'
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    id_card: '',
-    dob: '',
-    gender: 'Male',
-    blood_type: 'O',
-    allergies: '',
-    emergency_contact: '',
-    case_type: 'General'
-  });
+  const { isDarkMode: dk } = useTheme();
+  const openMenu = useMobileMenu();
 
-  useEffect(() => {
-    if (token) refreshPatients();
-  }, [token]);
+  const [searchTerm, setSearchTerm]   = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab]     = useState('basic');
+  const [formData, setFormData]       = useState(EMPTY_FORM);
+
+  useEffect(() => { if (token) refreshPatients(); }, [token]);
+
+  const patch = (key, val) => setFormData(f => ({ ...f, [key]: val }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await addPatient({
-        ...formData,
-        age: calculateAge(formData.dob) // คำนวณอายุอัตโนมัติจากวันเกิด
-    });
-    if (success) {
-      setIsModalOpen(false);
-      setFormData({ name: '', id_card: '', dob: '', gender: 'Male', blood_type: 'O', allergies: '', emergency_contact: '', case_type: 'General' });
-    }
+    const ok = await addPatient({ ...formData, age: calculateAge(formData.dob) });
+    if (ok) { setIsModalOpen(false); setFormData(EMPTY_FORM); setActiveTab('basic'); }
   };
 
-  const calculateAge = (dob) => {
-    if (!dob) return 0;
-    const birthDate = new Date(dob);
-    const difference = Date.now() - birthDate.getTime();
-    const ageDate = new Date(difference);
-    return Math.abs(ageDate.getUTCFullYear() - 1970);
-  };
-
-  const filteredPatients = patients.filter(p => 
+  const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id_card?.includes(searchTerm)
   );
 
+  // ── tokens ─────────────────────────────────────────────────────
+  const pageBg     = dk ? 'bg-[var(--bg-main)]'    : 'bg-[var(--bg-main)]';
+  const cardBg     = dk ? 'bg-[#0d1525] border-white/[0.06] hover:border-sky-500/25' : 'bg-white border-slate-200 hover:border-sky-400/50';
+  const cardName   = dk ? 'text-slate-100'          : 'text-slate-900';
+  const cardMeta   = dk ? 'text-slate-500'          : 'text-slate-400';
+  const infoLabel  = dk ? 'text-slate-600'          : 'text-slate-400';
+  const infoValue  = dk ? 'text-slate-200'          : 'text-slate-700';
+  const avatarCls  = dk ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20' : 'bg-sky-50 text-sky-600 border border-sky-200';
+  const searchCls  = dk
+    ? 'bg-white/[0.04] border-white/[0.07] text-white placeholder:text-slate-600 focus:border-sky-500/50 focus:ring-sky-500/10'
+    : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500/15';
+  const divider    = dk ? 'border-white/[0.06]'     : 'border-slate-100';
+  const modalBg    = dk ? 'bg-[#0d1525] border-white/[0.08]' : 'bg-white border-slate-200';
+  const modalTitle = dk ? 'text-white'              : 'text-slate-900';
+  const modalSub   = dk ? 'text-slate-500'          : 'text-slate-500';
+
   return (
-    <div className="p-4 md:p-10 font-sans min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
+    <div className={`p-4 md:p-8 min-h-screen ${pageBg} text-[var(--text-main)] transition-colors duration-300`}>
       <div className="max-w-[1400px] mx-auto">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+
+        {/* ── Header ───────────────────────────────────────────── */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-black text-sky-500 tracking-tighter uppercase italic">{t('patient_db_title')}</h1>
-            <p className="text-[var(--text-muted)] text-xs font-bold tracking-[0.2em] mt-2 uppercase">{t('patient_db_subtitle')}</p>
+            <h1 className={`text-2xl font-bold tracking-tight ${dk ? 'text-white' : 'text-slate-900'}`}>
+              {t('patient_db_title')}
+            </h1>
+            <p className={`mt-1 text-sm ${dk ? 'text-slate-500' : 'text-slate-500'}`}>
+              {t('patient_db_subtitle')}
+            </p>
           </div>
-          <div className="flex w-full md:w-auto gap-4">
-            <div className="relative flex-1 md:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
-              <input 
-                type="text" 
+
+          <div className="flex w-full md:w-auto gap-3">
+            <button
+              onClick={openMenu}
+              className={`lg:hidden p-2.5 rounded-xl border transition-colors ${dk ? 'border-white/[0.07] text-slate-400 hover:bg-white/[0.05]' : 'border-slate-200 text-slate-500 hover:bg-slate-100'}`}
+            >
+              <Menu size={18} />
+            </button>
+            <div className="relative flex-1 md:w-72">
+              <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${dk ? 'text-slate-600' : 'text-slate-400'}`} size={16} />
+              <input
+                type="text"
                 placeholder={t('search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-all shadow-sm"
+                className={`w-full rounded-xl border pl-10 pr-4 py-2.5 text-sm outline-none transition focus:ring-2 ${searchCls}`}
               />
             </div>
-            <button 
+            <button
               onClick={() => setIsModalOpen(true)}
-              className="bg-sky-500 hover:bg-sky-600 text-white p-4 rounded-2xl shadow-lg shadow-sky-500/20 transition-all active:scale-95 flex items-center gap-3 font-black text-xs uppercase tracking-widest"
+              className="flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white transition active:scale-95 shrink-0"
             >
-              <UserPlus size={20} />
+              <UserPlus size={16} />
               <span className="hidden md:inline">{t('register_patient')}</span>
             </button>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredPatients.map(p => (
-            <div 
-              key={p.id}
-              onClick={() => setSelectedPatient(p)}
-              className="bg-[var(--bg-card)] p-8 rounded-[3rem] border border-[var(--border-color)] hover:border-sky-500/50 transition-all cursor-pointer group shadow-sm hover:shadow-xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-full -mr-16 -mt-16 group-hover:bg-sky-500/10 transition-colors" />
-              <div className="flex items-center gap-6 mb-6">
-                <div className="w-16 h-16 bg-sky-500/10 text-sky-500 rounded-3xl flex items-center justify-center font-black text-xl shadow-inner">
-                  {p.name.charAt(0)}
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-800">{p.name}</h3>
-                  <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">HN: {p.id_card?.substring(0,8) || 'GEN-001'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <InfoItem label={t('label_dob')} value={`${p.age}y`} />
-                <InfoItem label={t('label_blood')} value={p.blood_type || 'O+'} />
-                <InfoItem label={t('label_priority')} value={p.case_type} />
-                <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">สถานะ</span>
-                  <span className="text-[10px] font-bold text-emerald-500 uppercase mt-1">● {t('status_active')}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* ── Stats row ─────────────────────────────────────────── */}
+        <div className={`mb-6 flex items-center gap-2 text-sm ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
+          <Users size={14} />
+          <span>{filtered.length} {t('patient_count')}{searchTerm ? ` (${t('patient_count_filtered')} ${patients.length})` : ''}</span>
         </div>
 
-        {/* Professional Registration Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-2xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="bg-slate-50 p-10 border-b border-slate-100 flex justify-between items-center">
-                <div>
-                  <h2 className="text-3xl font-black text-slate-800 italic uppercase tracking-tighter">{t('modal_title')}</h2>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{t('modal_subtitle')}</p>
+        {/* ── Patient grid ──────────────────────────────────────── */}
+        {filtered.length === 0 ? (
+          <div className={`flex flex-col items-center justify-center rounded-2xl border py-20 ${dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50'}`}>
+            <Users size={36} className={`mb-3 ${dk ? 'text-slate-700' : 'text-slate-300'}`} />
+            <p className={`text-sm font-semibold ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
+              {searchTerm ? t('no_patient_found') : t('no_patient_data')}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map((p) => (
+              <motion.div
+                key={p.id}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => setSelectedPatient(p)}
+                className={`group cursor-pointer rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg ${cardBg}`}
+              >
+                {/* Card header */}
+                <div className="flex items-start gap-3.5 mb-4">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${avatarCls}`}>
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate font-semibold text-sm leading-tight ${cardName}`}>{p.name}</p>
+                    <p className={`text-[11px] mt-0.5 ${cardMeta}`}>HN: {p.id_card?.substring(0, 8) || 'GEN-001'}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
+                    dk ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                       : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>
+                    ● {t('status_active')}
+                  </span>
                 </div>
-                <div className="flex gap-2">
-                    <TabBtn active={activeTab === 'basic'} onClick={() => setActiveTab('basic')} label={t('tab_demographics')} icon={<User size={14}/>} />
-                    <TabBtn active={activeTab === 'clinical'} onClick={() => setActiveTab('clinical')} label={t('tab_clinical')} icon={<Droplets size={14}/>} />
-                </div>
-              </div>
 
-              <form onSubmit={handleSubmit} className="p-10 space-y-8">
-                {activeTab === 'basic' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputField label={t('label_fullname')} icon={<User size={16}/>} value={formData.name} onChange={v => setFormData({...formData, name: v})} placeholder="เช่น นายสมชาย ใจดี" required />
-                    <InputField label={t('label_idcard')} icon={<CreditCard size={16}/>} value={formData.id_card} onChange={v => setFormData({...formData, id_card: v})} placeholder="เลขบัตร 13 หลัก" />
-                    <InputField label={t('label_dob')} icon={<Calendar size={16}/>} type="date" value={formData.dob} onChange={v => setFormData({...formData, dob: v})} required />
-                    <SelectField label={t('label_gender')} value={formData.gender} onChange={v => setFormData({...formData, gender: v})} options={['ชาย (Male)', 'หญิง (Female)', 'อื่นๆ']} />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <SelectField label={t('label_blood')} value={formData.blood_type} onChange={v => setFormData({...formData, blood_type: v})} options={['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']} />
-                    <SelectField label={t('label_priority')} value={formData.case_type} onChange={v => setFormData({...formData, case_type: v})} options={['General', 'Emergency', 'Urgent', 'Referral']} />
-                    <div className="md:col-span-2">
-                        <TextAreaField label={t('label_allergies')} icon={<AlertTriangle size={16}/>} value={formData.allergies} onChange={v => setFormData({...formData, allergies: v})} placeholder="ระบุประวัติการแพ้ยาหรืออาการแพ้อื่นๆ..." />
-                    </div>
-                    <div className="md:col-span-2">
-                        <InputField label={t('label_emergency')} icon={<Phone size={16}/>} value={formData.emergency_contact} onChange={v => setFormData({...formData, emergency_contact: v})} placeholder="ชื่อและเบอร์โทรผู้ติดต่อ" />
-                    </div>
-                  </div>
-                )}
+                {/* Divider */}
+                <div className={`mb-4 h-px ${dk ? 'bg-white/[0.05]' : 'bg-slate-100'}`} />
 
-                <div className="flex justify-between items-center pt-8 border-t border-slate-100">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-xs font-black uppercase text-slate-400 hover:text-slate-600 transition-colors tracking-widest">{t('btn_cancel')}</button>
-                  <div className="flex gap-4">
-                    {activeTab === 'basic' ? (
-                        <button type="button" onClick={() => setActiveTab('clinical')} className="bg-slate-800 text-white px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-slate-800/20 active:scale-95">{t('btn_next')} <ChevronRight size={16}/></button>
-                    ) : (
-                        <button type="submit" className="bg-sky-500 hover:bg-sky-600 text-white px-12 py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-sky-500/20 transition-all active:scale-95">{t('btn_complete')}</button>
-                    )}
-                  </div>
+                {/* Info grid */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: t('label_dob'),      value: `${p.age}y` },
+                    { label: t('label_blood'),     value: p.blood_type || 'O+' },
+                    { label: t('label_priority'),  value: p.case_type || 'General' },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className={`text-[10px] font-medium uppercase tracking-wider mb-0.5 ${infoLabel}`}>{label}</p>
+                      <p className={`text-sm font-semibold truncate ${infoValue}`}>{value}</p>
+                    </div>
+                  ))}
                 </div>
-              </form>
-            </div>
+              </motion.div>
+            ))}
           </div>
         )}
+
+        {/* ── Register modal ───────────────────────────────────── */}
+        <AnimatePresence>
+          {isModalOpen && (
+            <motion.div
+              key="modal-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div
+                className={`absolute inset-0 ${dk ? 'bg-slate-950/70' : 'bg-slate-400/30'} backdrop-blur-sm`}
+                onClick={() => setIsModalOpen(false)}
+              />
+
+              <motion.div
+                key="modal-card"
+                initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.97 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border shadow-2xl ${modalBg}`}
+              >
+                {/* Modal header */}
+                <div className={`flex items-center justify-between border-b px-6 py-5 ${divider}`}>
+                  <div>
+                    <h2 className={`text-base font-bold ${modalTitle}`}>{t('modal_title')}</h2>
+                    <p className={`mt-0.5 text-xs ${modalSub}`}>{t('modal_subtitle')}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* Tabs */}
+                    <div className={`flex gap-1 rounded-xl border p-1 ${dk ? 'bg-white/[0.04] border-white/[0.07]' : 'bg-slate-100 border-slate-200'}`}>
+                      {[
+                        { key: 'basic',    label: t('tab_demographics'), icon: <User size={13} /> },
+                        { key: 'clinical', label: t('tab_clinical'),     icon: <Droplets size={13} /> },
+                      ].map(({ key, label, icon }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setActiveTab(key)}
+                          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                            activeTab === key
+                              ? dk ? 'bg-sky-500/20 text-sky-300' : 'bg-white text-sky-700 shadow-sm'
+                              : dk ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
+                          }`}
+                        >
+                          {icon}{label}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className={`p-1.5 rounded-lg transition-colors ${dk ? 'text-slate-500 hover:text-slate-200 hover:bg-white/5' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal form */}
+                <form onSubmit={handleSubmit}>
+                  <div className="px-6 py-5">
+                    <AnimatePresence mode="wait">
+                      {activeTab === 'basic' ? (
+                        <motion.div
+                          key="basic"
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 8 }}
+                          transition={{ duration: 0.15 }}
+                          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                        >
+                          <FormInput dk={dk} label={t('label_fullname')} icon={<User size={14}/>} value={formData.name} onChange={(e) => patch('name', e.target.value)} placeholder="เช่น นายสมชาย ใจดี" required />
+                          <FormInput dk={dk} label={t('label_idcard')} icon={<CreditCard size={14}/>} value={formData.id_card} onChange={(e) => patch('id_card', e.target.value)} placeholder="เลขบัตร 13 หลัก" />
+                          <FormInput dk={dk} label={t('label_dob')} icon={<Calendar size={14}/>} type="date" value={formData.dob} onChange={(e) => patch('dob', e.target.value)} required />
+                          <FormSelect dk={dk} label={t('label_gender')} value={formData.gender} onChange={(e) => patch('gender', e.target.value)}>
+                            {GENDER_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
+                          </FormSelect>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="clinical"
+                          initial={{ opacity: 0, x: 8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -8 }}
+                          transition={{ duration: 0.15 }}
+                          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                        >
+                          <FormSelect dk={dk} label={t('label_blood')} value={formData.blood_type} onChange={(e) => patch('blood_type', e.target.value)}>
+                            {BLOOD_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                          </FormSelect>
+                          <FormSelect dk={dk} label={t('label_priority')} value={formData.case_type} onChange={(e) => patch('case_type', e.target.value)}>
+                            {CASE_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+                          </FormSelect>
+                          <div className="md:col-span-2">
+                            <FormTextarea dk={dk} label={t('label_allergies')} icon={<AlertTriangle size={14}/>} value={formData.allergies} onChange={(e) => patch('allergies', e.target.value)} placeholder="ระบุประวัติการแพ้ยาหรืออาการแพ้อื่นๆ..." />
+                          </div>
+                          <div className="md:col-span-2">
+                            <FormInput dk={dk} label={t('label_emergency')} icon={<Phone size={14}/>} value={formData.emergency_contact} onChange={(e) => patch('emergency_contact', e.target.value)} placeholder="ชื่อและเบอร์โทรผู้ติดต่อ" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Modal footer */}
+                  <div className={`flex items-center justify-between border-t px-6 py-4 ${divider}`}>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className={`text-sm font-semibold transition-colors ${dk ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      {t('btn_cancel')}
+                    </button>
+                    <div className="flex gap-2">
+                      {activeTab === 'basic' ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('clinical')}
+                          className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold transition active:scale-95 ${
+                            dk ? 'bg-white/[0.07] text-slate-200 hover:bg-white/[0.12]' : 'bg-slate-900 text-white hover:bg-slate-700'
+                          }`}
+                        >
+                          {t('btn_next')} <ChevronRight size={15} />
+                        </button>
+                      ) : (
+                        <button
+                          type="submit"
+                          className="flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-6 py-2.5 text-sm font-semibold text-white transition active:scale-95"
+                        >
+                          {t('btn_complete')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
-
-const InfoItem = ({ label, value }) => (
-  <div className="flex flex-col">
-    <span className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest">{label}</span>
-    <span className="text-sm font-bold text-slate-700 mt-1">{value}</span>
-  </div>
-);
-
-const TabBtn = ({ active, onClick, label, icon }) => (
-    <button type="button" onClick={onClick} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${active ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20' : 'text-slate-400 hover:bg-slate-200'}`}>
-        {icon} {label}
-    </button>
-);
-
-const InputField = ({ label, icon, value, onChange, placeholder, type = "text", required = false }) => (
-    <div className="space-y-2">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-            {icon} {label} {required && <span className="text-rose-500">*</span>}
-        </label>
-        <input 
-            type={type}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            required={required}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all font-bold text-slate-700"
-        />
-    </div>
-);
-
-const SelectField = ({ label, value, onChange, options }) => (
-    <div className="space-y-2">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
-        <select 
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all font-bold text-slate-700 appearance-none"
-        >
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-    </div>
-);
-
-const TextAreaField = ({ label, icon, value, onChange, placeholder }) => (
-    <div className="space-y-2">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-            {icon} {label}
-        </label>
-        <textarea 
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            rows={3}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all font-bold text-slate-700 resize-none"
-        />
-    </div>
-);
 
 export default PatientList;

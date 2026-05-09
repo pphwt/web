@@ -1,6 +1,6 @@
 import React, { Suspense, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Stage } from '@react-three/drei';
+import { useGLTF, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStream } from '../../context/StreamContext';
 
@@ -95,10 +95,12 @@ const HeartModel3D = () => {
     <div className="w-full h-full bg-transparent overflow-hidden relative">
       <Canvas shadows camera={{ position: [0, 0, 4], fov: 45 }} gl={{ antialias: true }}>
         <Suspense fallback={null}>
-          <Stage environment="city" intensity={0.5}>
-            <Heart />
-            <Hotspot />
-          </Stage>
+          <ambientLight intensity={0.5} />
+          <directionalLight position={[5, 5, 5]} intensity={1.0} />
+          <directionalLight position={[-5, -3, -5]} intensity={0.3} color="#6366f1" />
+          <pointLight position={[0, 3, 0]} intensity={0.5} color="#0ea5e9" />
+          <Heart />
+          <Hotspot />
           <OrbitControls enableZoom={true} autoRotate={false} />
         </Suspense>
       </Canvas>
