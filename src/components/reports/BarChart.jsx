@@ -1,13 +1,12 @@
 import React from 'react';
 
-export const BarChart = ({ data, color, highlightIndex }) => {
+export const BarChart = ({ data, color, highlightIndex, dk }) => {
   const max = Math.max(...data);
   return (
     <div className="flex items-end gap-1 h-[60px]">
       {data.map((v, i) => {
         const heightPercent = Math.max(10, (v / max) * 100);
         const isHigh = i === highlightIndex;
-        
         return (
           <div
             key={i}
@@ -16,8 +15,8 @@ export const BarChart = ({ data, color, highlightIndex }) => {
             style={{
               height: `${heightPercent}%`,
               backgroundColor: isHigh ? '#ef4444' : color,
-              opacity: isHigh ? 1 : 0.4,
-              boxShadow: isHigh ? '0 0 12px rgba(239, 68, 68, 0.4)' : 'none'
+              opacity: isHigh ? 1 : dk === false ? 0.55 : 0.4,
+              boxShadow: isHigh ? '0 0 12px rgba(239,68,68,0.4)' : 'none',
             }}
           />
         );

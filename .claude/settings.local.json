@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx sixzens *)",
+      "Bash(cat vite.config.js)",
+      "Bash(cat vite.config.ts)"
+    ]
+  }
+}

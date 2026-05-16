@@ -15,11 +15,12 @@ import LiveMonitoring from './pages/LiveMonitoring';
 import Reports from './pages/Reports';
 import Analysis from './pages/Analysis';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import PatientArchives from './pages/PatientArchives';
 import EducationalLab from './pages/EducationalLab';
 import NeuralSandbox from './pages/NeuralSandbox';
 import AIDiagnostics from './pages/AIDiagnostics';
+import BrainDiagnostics from './pages/BrainDiagnostics';
+import HelpManual from './pages/HelpManual';
 
 function App() {
   return (
@@ -32,22 +33,24 @@ function App() {
                 <Router>
                   <Routes>
                     {/* Public Routes */}
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
+                    <Route path="/auth/login" element={<Login />} />
 
                     {/* Protected Dashboard Routes */}
                     <Route path="/*" element={
                       <ProtectedRoute>
                         <MainLayout>
                           <Routes>
-                            <Route path="/" element={<PatientList />} />
-                            <Route path="/live" element={<LiveMonitoring />} />
-                            <Route path="/reports" element={<Reports />} />
-                            <Route path="/analysis" element={<Analysis />} />
-                            <Route path="/sandbox" element={<NeuralSandbox />} />
-                            <Route path="/ai-diagnostics" element={<AIDiagnostics />} />
-                            <Route path="/archives" element={<PatientArchives />} />
-                            <Route path="/lab" element={<EducationalLab />} />
+                            <Route path="/page/overview" element={<PatientList />} />
+                            <Route path="/" element={<Navigate to="/page/overview" replace />} />
+                            <Route path="/page/live" element={<LiveMonitoring />} />
+                            <Route path="/page/reports" element={<Reports />} />
+                            <Route path="/page/analysis" element={<Analysis />} />
+                            <Route path="/page/sandbox" element={<NeuralSandbox />} />
+                            <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
+                            <Route path="/page/brain-diagnostics" element={<BrainDiagnostics />} />
+                            <Route path="/page/archives" element={<PatientArchives />} />
+                            <Route path="/page/lab" element={<EducationalLab />} />
+                            <Route path="/page/help" element={<HelpManual />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                           </Routes>
                         </MainLayout>

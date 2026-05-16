@@ -34,3 +34,4 @@ dist-ssr
 tools/ngrok
 scripts/*.bak
 public/models/*.tmp
+.vercel
