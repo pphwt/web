@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FlaskConical, Wifi, WifiOff, Heart, Activity, Zap, Clock } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import ECGCanvas from '../components/visualizers/ECGCanvas';
 import PhysicsControlPanel from '../components/visualizers/PhysicsControlPanel';
+import AHABullsEye from '../components/visualizers/AHABullsEye';
 import { useStream } from '../context/StreamContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -96,10 +97,19 @@ function VitalCard({ icon: Icon, label, value, unit, normal, sublabel, color }) 
 }
 
 const EducationalLab = () => {
-  const { data: streamData, isConnected, sendUpdate } = useStream();
+  const { data: streamData, isConnected, sendUpdate, events } = useStream();
   const { isDarkMode: dk } = useTheme();
   const { t } = useLanguage();
   const [selected, setSelected] = useState(null);
+  const [ahaData,  setAhaData]  = useState(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.aha?.segment > 0) setAhaData(e.detail.aha);
+    };
+    events?.addEventListener('data', handler);
+    return () => events?.removeEventListener('data', handler);
+  }, [events]);
 
   const loadScenario = (s) => {
     setSelected(s);
@@ -271,17 +281,33 @@ const EducationalLab = () => {
             </div>
           </div>
 
-          {/* Right: Parameters + Info */}
+          {/* Right: Parameters + AHA Bull's-eye + Info */}
           <div className="lg:col-span-3 flex flex-col gap-4">
             <div className={`rounded-2xl border p-4 ${surface}`}>
               <PhysicsControlPanel />
             </div>
 
-            {/* Clinical interpretation */}
+            {/* AHA 17-Segment Bull's-eye */}
+            <div className={`rounded-2xl border p-4 ${surface}`}>
+              <div className={`flex items-center gap-2 mb-3`}>
+                <Heart size={12} className={secLabel} />
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${secLabel}`}>
+                  AHA 17-Segment Map
+                </span>
+              </div>
+              <div className="flex justify-center">
+                <AHABullsEye
+                  activeSegment={ahaData?.segment ?? 0}
+                  aha={ahaData}
+                />
+              </div>
+            </div>
+
+            {/* Clinical signs for active scenario */}
             {selected && (
               <div className={`rounded-2xl border p-4 ${surface}`}>
                 <div className={`text-[9px] font-bold uppercase tracking-widest mb-3 ${secLabel}`}>
-                  Clinical Interpretation
+                  Scenario Signs
                 </div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: selected.color }} />
@@ -299,20 +325,6 @@ const EducationalLab = () => {
                 </div>
               </div>
             )}
-
-            {/* PINN info */}
-            <div className={`rounded-2xl border p-4 ${
-              dk ? 'bg-sky-500/[0.04] border-sky-500/12' : 'bg-sky-50 border-sky-100'
-            }`}>
-              <div className={`text-[9px] font-bold uppercase tracking-widest mb-2 ${dk ? 'text-sky-500/70' : 'text-sky-600/70'}`}>
-                How it works
-              </div>
-              <p className={`text-[10px] leading-relaxed ${dk ? 'text-sky-400/60' : 'text-sky-700/70'}`}>
-                The PINN solver uses the Aliev-Panfilov model to simulate cardiac electrical propagation.
-                Adjust parameters above to observe how ischemia, conductivity, and excitability affect
-                ECG morphology and source localization.
-              </p>
-            </div>
           </div>
         </div>
       </div>
