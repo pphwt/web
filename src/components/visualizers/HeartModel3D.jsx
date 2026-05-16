@@ -33,13 +33,15 @@ function Heart() {
   useEffect(() => {
     const handleData = (e) => {
       const payload = e.detail;
-      if (payload && payload.u !== undefined && scene) {
+      // payload.leads.lead_i is the u value (0-1 range from PINN)
+      const u = payload?.leads?.lead_i ?? payload?.u;
+      if (u !== undefined && scene) {
         scene.traverse((child) => {
           if (child.isMesh) {
-            const targetColor = getRainbowColor(payload.u);
+            const targetColor = getRainbowColor(u);
             child.material.color.lerp(targetColor, 0.3);
             child.material.emissive = targetColor;
-            child.material.emissiveIntensity = payload.u * 0.5;
+            child.material.emissiveIntensity = Math.abs(u) * 0.5;
           }
         });
       }
