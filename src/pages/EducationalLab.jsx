@@ -113,7 +113,7 @@ const EducationalLab = () => {
 
   const loadScenario = (s) => {
     setSelected(s);
-    sendUpdate({ type: 'parameter_update', params: s.params });
+    sendUpdate({ type: 'parameter_update', params: s.params, scenario_id: s.id });
   };
 
   const hr   = streamData?.heart_rate  ?? '--';
