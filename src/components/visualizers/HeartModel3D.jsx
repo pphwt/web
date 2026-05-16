@@ -4,7 +4,6 @@ import { useGLTF, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStream } from '../../context/StreamContext';
 
-// ── Activation colour scale (Red=early → Purple=late) ────────────────────────
 const STOPS = [
   [255, 0,   0  ],
   [255, 165, 0  ],
@@ -24,7 +23,6 @@ function activationColor(u) {
   return new THREE.Color(`rgb(${r},${g},${b})`);
 }
 
-// ── Anatomical region label from normalised [0,1] coords ─────────────────────
 function regionFromXYZ(x, y, z) {
   if (z > 0.72) return x < 0.5 ? 'LV Outflow Tract' : 'RV Outflow Tract';
   if (z < 0.25) return 'Ventricular Apex';
@@ -34,15 +32,19 @@ function regionFromXYZ(x, y, z) {
   return ant ? 'RV Anterior Wall' : 'RV Free Wall';
 }
 
-// ── Anatomical heart (heart.glb) with live activation coloring ───────────────
-function Heart({ bbRef }) {
-  const { scene }   = useGLTF('/models/heart.glb');
-  const { events }  = useStream();
-  const meshRef     = useRef();
-  const activRef    = useRef(0);   // latest activation value for useFrame
-  const baseColorRef = useRef({}); // store original material colors
+function riskFromRegion(region) {
+  if (region.includes('Anterior') || region.includes('Septum')) return 'HIGH';
+  if (region.includes('Inferior') || region.includes('Lateral')) return 'MODERATE';
+  return 'LOW';
+}
 
-  // Clone materials + capture bounding box once
+function Heart({ bbRef }) {
+  const { scene }    = useGLTF('/models/heart.glb');
+  const { events }   = useStream();
+  const meshRef      = useRef();
+  const activRef     = useRef(0);
+  const baseColorRef = useRef({});
+
   useEffect(() => {
     if (!scene) return;
     scene.traverse((child) => {
@@ -55,16 +57,13 @@ function Heart({ bbRef }) {
       child.material.emissiveIntensity = 0.25;
       child.material.roughness = Math.max(child.material.roughness ?? 0.5, 0.4);
       child.material.metalness = Math.min(child.material.metalness ?? 0, 0.15);
-      // Save original colour for reset
       baseColorRef.current[child.uuid] = child.material.color.clone();
     });
 
-    // Compute bounding box in LOCAL space, accounting for scale=1.5 applied to primitive
     const bb = new THREE.Box3().setFromObject(scene);
     bbRef.current = { bb, scale: 1.5 };
   }, [scene, bbRef]);
 
-  // High-freq activation updates (20 Hz from WebSocket)
   useEffect(() => {
     const handler = (e) => {
       const u = e.detail?.leads?.lead_i ?? e.detail?.u;
@@ -82,7 +81,6 @@ function Heart({ bbRef }) {
     return () => events?.removeEventListener('data', handler);
   }, [events, scene]);
 
-  // Heartbeat pulse: ~72 BPM = 1.2 Hz
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const t = clock.getElapsedTime();
@@ -93,15 +91,16 @@ function Heart({ bbRef }) {
   return <primitive ref={meshRef} object={scene} scale={1.5} />;
 }
 
-// ── Pulsing source hotspot ────────────────────────────────────────────────────
+// ── Pulsing 3D source hotspot (torus rings — visible from all angles) ─────────
 function PulsingHotspot({ bbRef, onUpdate }) {
-  const groupRef  = useRef();
-  const ring1Ref  = useRef();
-  const ring2Ref  = useRef();
-  const posRef    = useRef({ tx: 0, ty: 0, tz: 0 });
+  const groupRef = useRef();
+  const ring1Ref = useRef();
+  const ring2Ref = useRef();
+  const ring3Ref = useRef();
+  const posRef   = useRef({ tx: 0, ty: 0, tz: 0 });
   const [visible, setVisible] = useState(false);
-  const cbRef     = useRef(onUpdate);
-  cbRef.current   = onUpdate;
+  const cbRef    = useRef(onUpdate);
+  cbRef.current  = onUpdate;
   const { events } = useStream();
 
   useEffect(() => {
@@ -121,7 +120,6 @@ function PulsingHotspot({ bbRef, onUpdate }) {
       };
       setVisible(true);
 
-      // Convert normalised → mm for display (cardiac mesh bounds)
       const BOUNDS_MM = { x: 103.2, y: 92.2, z: 72.0 };
       cbRef.current?.({
         coords,
@@ -143,11 +141,12 @@ function PulsingHotspot({ bbRef, onUpdate }) {
     const { tx, ty, tz } = posRef.current;
     groupRef.current.position.set(tx, ty, tz);
     const t = clock.getElapsedTime();
-    [ring1Ref, ring2Ref].forEach((ref, i) => {
+    // Three rings staggered in phase
+    [ring1Ref, ring2Ref, ring3Ref].forEach((ref, i) => {
       if (!ref.current) return;
-      const phase = ((t * 1.1 + i * 0.55) % 1.2) / 1.2;
-      ref.current.scale.setScalar(1 + phase * 3.2);
-      ref.current.material.opacity = (1 - phase) * 0.8;
+      const phase = ((t * 1.0 + i * 0.4) % 1.4) / 1.4;
+      ref.current.scale.setScalar(1 + phase * 2.8);
+      ref.current.material.opacity = (1 - phase) * 0.9;
     });
   });
 
@@ -155,79 +154,152 @@ function PulsingHotspot({ bbRef, onUpdate }) {
 
   return (
     <group ref={groupRef}>
-      {/* Bright core */}
+      {/* Outer glow halo */}
       <mesh>
-        <sphereGeometry args={[0.04, 16, 16]} />
-        <meshStandardMaterial color="#ffffff" emissive="#fffb00" emissiveIntensity={10} toneMapped={false} />
+        <sphereGeometry args={[0.28, 16, 16]} />
+        <meshBasicMaterial color="#00e5ff" transparent opacity={0.06} depthWrite={false} />
       </mesh>
-      {/* Ring 1 */}
+
+      {/* Core sphere */}
+      <mesh>
+        <sphereGeometry args={[0.10, 20, 20]} />
+        <meshStandardMaterial
+          color="#ffffff"
+          emissive="#ff3300"
+          emissiveIntensity={18}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Inner bright core */}
+      <mesh>
+        <sphereGeometry args={[0.055, 16, 16]} />
+        <meshBasicMaterial color="#ffffff" />
+      </mesh>
+
+      {/* Torus ring 1 — XY plane */}
       <mesh ref={ring1Ref}>
-        <ringGeometry args={[0.06, 0.085, 32]} />
-        <meshBasicMaterial color="#00e5ff" transparent opacity={0.85} side={THREE.DoubleSide} depthWrite={false} />
+        <torusGeometry args={[0.22, 0.016, 8, 48]} />
+        <meshBasicMaterial color="#00e5ff" transparent opacity={0.9} depthWrite={false} />
       </mesh>
-      {/* Ring 2 */}
-      <mesh ref={ring2Ref}>
-        <ringGeometry args={[0.06, 0.085, 32]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} />
+
+      {/* Torus ring 2 — XZ plane */}
+      <mesh ref={ring2Ref} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.22, 0.016, 8, 48]} />
+        <meshBasicMaterial color="#ff4444" transparent opacity={0.8} depthWrite={false} />
       </mesh>
-      <pointLight color="#00e5ff" intensity={5} distance={1.2} />
+
+      {/* Torus ring 3 — YZ plane */}
+      <mesh ref={ring3Ref} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.22, 0.016, 8, 48]} />
+        <meshBasicMaterial color="#ffff00" transparent opacity={0.7} depthWrite={false} />
+      </mesh>
+
+      {/* Vertical spike (beacon) */}
+      <mesh position={[0, 0.38, 0]}>
+        <cylinderGeometry args={[0.004, 0.018, 0.28, 8]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.85} />
+      </mesh>
+      <mesh position={[0, 0.54, 0]}>
+        <sphereGeometry args={[0.025, 8, 8]} />
+        <meshBasicMaterial color="#00e5ff" />
+      </mesh>
+
+      {/* Lights */}
+      <pointLight color="#00e5ff" intensity={25} distance={3.0} />
+      <pointLight color="#ff3300" intensity={10} distance={1.2} />
     </group>
   );
 }
 
-// ── Source info overlay ───────────────────────────────────────────────────────
+// ── Clinical source info overlay ──────────────────────────────────────────────
 function SourcePanel({ info }) {
   if (!info) return null;
   const { region, mm, confidence } = info;
-  const cc = confidence >= 80 ? '#22c55e' : confidence >= 60 ? '#f59e0b' : '#ef4444';
+  const risk = riskFromRegion(region);
+  const riskColor = risk === 'HIGH' ? '#ef4444' : risk === 'MODERATE' ? '#f59e0b' : '#22c55e';
+  const confColor = confidence >= 80 ? '#22c55e' : confidence >= 60 ? '#f59e0b' : '#ef4444';
+
   return (
     <div style={{
       position: 'absolute', top: 12, left: 12,
-      background: 'rgba(0,0,0,0.80)', backdropFilter: 'blur(12px)',
-      border: '1px solid rgba(239,68,68,0.5)', borderRadius: 10,
-      padding: '10px 14px', color: '#fff', fontSize: 12,
-      fontFamily: 'ui-monospace,monospace', minWidth: 215, zIndex: 10, pointerEvents: 'none',
+      background: 'rgba(4,10,24,0.88)', backdropFilter: 'blur(14px)',
+      border: `1px solid ${riskColor}55`, borderRadius: 12,
+      padding: '12px 16px', color: '#fff',
+      fontFamily: 'ui-monospace,monospace', minWidth: 230, zIndex: 10, pointerEvents: 'none',
     }}>
-      <div style={{ color: '#ef4444', fontWeight: 700, fontSize: 10, letterSpacing: 1.5, marginBottom: 6 }}>
-        ● SOURCE LOCALIZATION
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 7, height: 7, borderRadius: '50%',
+            backgroundColor: riskColor, boxShadow: `0 0 6px ${riskColor}`,
+          }} />
+          <span style={{ color: riskColor, fontWeight: 700, fontSize: 9, letterSpacing: 1.8 }}>
+            SOURCE LOCALIZATION
+          </span>
+        </div>
+        <span style={{
+          background: riskColor + '22', border: `1px solid ${riskColor}44`,
+          color: riskColor, fontSize: 9, fontWeight: 700,
+          padding: '2px 7px', borderRadius: 4, letterSpacing: 0.8,
+        }}>
+          {risk} RISK
+        </span>
       </div>
-      <div style={{ color: '#f97316', fontWeight: 700, fontSize: 14, marginBottom: 10, lineHeight: 1.3 }}>
+
+      {/* Region name */}
+      <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15, marginBottom: 10, letterSpacing: 0.3 }}>
         {region}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#cbd5e1', fontSize: 11 }}>
-        {[['X (L→R)', mm.x], ['Y (Ant→Post)', mm.y], ['Z (Apex→Base)', mm.z]].map(([l, v]) => (
-          <div key={l} style={{ display: 'flex', justifyContent: 'space-between' }}>
+
+      {/* Coordinates */}
+      <div style={{ fontSize: 11, marginBottom: 10 }}>
+        <div style={{ color: '#475569', fontSize: 9, letterSpacing: 1.2, marginBottom: 5, fontWeight: 600 }}>
+          3D COORDINATES (mm)
+        </div>
+        {[['X  (L→R)', mm.x], ['Y  (Ant→Post)', mm.y], ['Z  (Apex→Base)', mm.z]].map(([l, v]) => (
+          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
             <span style={{ color: '#64748b' }}>{l}</span>
-            <span>{v} mm</span>
+            <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{v} mm</span>
           </div>
         ))}
       </div>
-      <div style={{
-        marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      }}>
-        <span style={{ color: '#64748b', fontSize: 11 }}>AI Confidence</span>
-        <span style={{ color: cc, fontWeight: 700, fontSize: 13 }}>{confidence}%</span>
+
+      {/* AI Confidence bar */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, alignItems: 'center' }}>
+          <span style={{ color: '#64748b', fontSize: 10 }}>AI Confidence</span>
+          <span style={{ color: confColor, fontWeight: 800, fontSize: 14 }}>{confidence}%</span>
+        </div>
+        <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 2 }}>
+          <div style={{
+            height: '100%', width: `${confidence}%`,
+            background: `linear-gradient(to right, ${confColor}88, ${confColor})`,
+            borderRadius: 2, transition: 'width 0.5s ease',
+          }} />
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Activation legend ─────────────────────────────────────────────────────────
 function ColorLegend() {
   return (
     <div style={{
       position: 'absolute', bottom: 12, left: 12,
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+      background: 'rgba(4,10,24,0.75)', backdropFilter: 'blur(8px)',
+      border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8,
       padding: '7px 12px', fontSize: 11, fontFamily: 'ui-monospace,monospace',
       color: '#94a3b8', zIndex: 10, pointerEvents: 'none',
     }}>
-      <div style={{ marginBottom: 5, color: '#475569', letterSpacing: 1, fontSize: 10 }}>ACTIVATION MAP</div>
+      <div style={{ marginBottom: 5, color: '#475569', letterSpacing: 1.2, fontSize: 9, fontWeight: 600 }}>
+        ACTIVATION MAP
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
         <span style={{ color: '#ef4444', fontSize: 10 }}>Early</span>
         <div style={{
-          width: 64, height: 6, borderRadius: 3,
+          width: 70, height: 6, borderRadius: 3,
           background: 'linear-gradient(to right,#ef4444,#f97316,#eab308,#22c55e,#3b82f6,#a855f7)',
         }} />
         <span style={{ color: '#a855f7', fontSize: 10 }}>Late</span>
@@ -236,7 +308,6 @@ function ColorLegend() {
   );
 }
 
-// ── Root ──────────────────────────────────────────────────────────────────────
 const HeartModel3D = () => {
   const [sourceInfo, setSourceInfo] = useState(null);
   const bbRef = useRef(null);
@@ -247,10 +318,9 @@ const HeartModel3D = () => {
         shadows
         camera={{ position: [0, 0.5, 4], fov: 42 }}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
-        scene={{ background: new THREE.Color(0x080b14) }}
+        scene={{ background: new THREE.Color(0x040a18) }}
       >
         <Suspense fallback={null}>
-          {/* Lighting for realistic cardiac tissue */}
           <ambientLight intensity={0.4} />
           <directionalLight position={[3, 5, 4]}   intensity={1.2} castShadow />
           <directionalLight position={[-4, -2, -3]} intensity={0.35} color="#6366f1" />
@@ -258,7 +328,7 @@ const HeartModel3D = () => {
           <pointLight       position={[2, -3, 2]}   intensity={0.3}  color="#ef4444" />
           <Heart bbRef={bbRef} />
           <PulsingHotspot bbRef={bbRef} onUpdate={setSourceInfo} />
-          <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.6} />
+          <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
         </Suspense>
       </Canvas>
       <SourcePanel info={sourceInfo} />
