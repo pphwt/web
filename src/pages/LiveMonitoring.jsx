@@ -247,13 +247,13 @@ const LiveMonitoring = () => {
               </div>
               <div className={`${ecgBg} p-4 space-y-3`}>
                 {[
-                  { data: streamData?.leads?.lead_i,  label: 'LEAD I',  color: '#0ea5e9' },
-                  { data: streamData?.leads?.lead_ii, label: 'LEAD II', color: '#6366f1' },
-                  { data: streamData?.leads?.v5,      label: 'V5',      color: '#8b5cf6' },
-                ].map(({ data, label, color }) => (
+                  { leadKey: 'lead_i',  label: 'LEAD I',  color: '#0ea5e9' },
+                  { leadKey: 'lead_ii', label: 'LEAD II', color: '#6366f1' },
+                  { leadKey: 'v5',      label: 'V5',      color: '#8b5cf6' },
+                ].map(({ leadKey, label, color }) => (
                   <div key={label}>
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-                    <ECGCanvas data={isFrozen ? undefined : data} label="" color={color} height={110} />
+                    <ECGCanvas leadKey={leadKey} paused={isFrozen} label="" color={color} height={110} />
                   </div>
                 ))}
               </div>

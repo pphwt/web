@@ -147,11 +147,11 @@ const EducationalLab = () => {
               </div>
               <div className={`p-4 space-y-3 ${ecgBg}`}>
                 {[
-                  { data: streamData?.leads?.lead_i,  label: 'LEAD I',  color: '#0ea5e9' },
-                  { data: streamData?.leads?.lead_ii, label: 'LEAD II', color: '#6366f1' },
-                  { data: streamData?.leads?.v5,      label: 'V5',      color: '#8b5cf6' },
-                ].map(({ data, label, color }) => (
-                  <ECGCanvas key={label} data={data} label={label} color={color} height={70} />
+                  { leadKey: 'lead_i',  label: 'LEAD I',  color: '#0ea5e9' },
+                  { leadKey: 'lead_ii', label: 'LEAD II', color: '#6366f1' },
+                  { leadKey: 'v5',      label: 'V5',      color: '#8b5cf6' },
+                ].map(({ leadKey, label, color }) => (
+                  <ECGCanvas key={label} leadKey={leadKey} label={label} color={color} height={70} />
                 ))}
               </div>
             </div>
