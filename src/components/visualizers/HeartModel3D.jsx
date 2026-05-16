@@ -1,6 +1,6 @@
 import React, { Suspense, useRef, useEffect, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
+import { useGLTF, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStream } from '../../context/StreamContext';
 
@@ -256,8 +256,6 @@ const HeartModel3D = () => {
           <directionalLight position={[-4, -2, -3]} intensity={0.35} color="#6366f1" />
           <pointLight       position={[0, 4, 1]}    intensity={0.6}  color="#0ea5e9" />
           <pointLight       position={[2, -3, 2]}   intensity={0.3}  color="#ef4444" />
-          <Environment preset="night" />
-
           <Heart bbRef={bbRef} />
           <PulsingHotspot bbRef={bbRef} onUpdate={setSourceInfo} />
           <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.6} />

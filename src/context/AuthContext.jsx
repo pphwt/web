@@ -2,15 +2,35 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const AuthContext = createContext();
 
+const readStoredToken = () => {
+  const stored = localStorage.getItem('bio_token');
+  if (!stored) return null;
+  try {
+    const payload = JSON.parse(atob(stored.split('.')[1]));
+    if (payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('bio_token');
+      return null;
+    }
+    return stored;
+  } catch {
+    localStorage.removeItem('bio_token');
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('bio_token'));
+  const [token, setToken] = useState(readStoredToken);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (token) {
-      // In a real app, you would verify the token with the backend here
-      setUser({ username: 'admin' }); // Placeholder
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUser({ username: payload.sub || 'user' });
+      } catch {
+        setToken(null);
+      }
     }
     setIsLoading(false);
   }, [token]);
