@@ -159,12 +159,13 @@ function AHANodes({ meshData, showLabels }) {
 
 // ── Pulsing hotspot mapped to cardiac mesh coordinates ────────────────────────
 function PulsingHotspot({ meshData, onUpdate }) {
-  const groupRef = useRef();
-  const ring1Ref = useRef();
-  const ring2Ref = useRef();
-  const posRef   = useRef(null);  // null = no data yet
-  const cbRef    = useRef(onUpdate);
-  cbRef.current  = onUpdate;
+  const groupRef  = useRef();
+  const ring1Ref  = useRef();
+  const ring2Ref  = useRef();
+  const posRef    = useRef({ tx: 0, ty: 0, tz: 0 });
+  const [visible, setVisible] = useState(false);
+  const cbRef     = useRef(onUpdate);
+  cbRef.current   = onUpdate;
 
   const { events } = useStream();
 
@@ -183,7 +184,6 @@ function PulsingHotspot({ meshData, onUpdate }) {
       const cz = (b.zMin + b.zMax) / 2;
       const scale = 2 / Math.max(b.xMax - b.xMin, b.yMax - b.yMin, b.zMax - b.zMin);
 
-      // coords are normalised [0,1] — convert to mesh mm, then to Three.js space
       const wx = coords.x * (b.xMax - b.xMin) + b.xMin;
       const wy = coords.y * (b.yMax - b.yMin) + b.yMin;
       const wz = coords.z * (b.zMax - b.zMin) + b.zMin;
@@ -193,14 +193,11 @@ function PulsingHotspot({ meshData, onUpdate }) {
         ty: (wy - cy) * scale,
         tz: (wz - cz) * scale,
       };
+      setVisible(true);
 
       cbRef.current?.({
         coords,
-        mm: {
-          x: wx.toFixed(1),
-          y: wy.toFixed(1),
-          z: wz.toFixed(1),
-        },
+        mm:         { x: wx.toFixed(1), y: wy.toFixed(1), z: wz.toFixed(1) },
         region:     regionFromXYZ(coords.x, coords.y, coords.z),
         confidence: Math.round(conf * 100),
       });
@@ -210,36 +207,50 @@ function PulsingHotspot({ meshData, onUpdate }) {
   }, [events]);
 
   useFrame(({ clock }) => {
-    if (!posRef.current || !groupRef.current) return;
+    if (!visible || !groupRef.current) return;
     const { tx, ty, tz } = posRef.current;
     groupRef.current.position.set(tx, ty, tz);
 
     const t = clock.getElapsedTime();
     [ring1Ref, ring2Ref].forEach((ref, i) => {
       if (!ref.current) return;
-      const phase = ((t * 0.85 + i * 0.75) % 1.5) / 1.5;
-      ref.current.scale.setScalar(1 + phase * 2.5);
-      ref.current.material.opacity = (1 - phase) * 0.75;
+      const phase = ((t * 1.1 + i * 0.6) % 1.2) / 1.2;
+      ref.current.scale.setScalar(1 + phase * 3);
+      ref.current.material.opacity = (1 - phase) * 0.85;
     });
   });
 
-  if (!posRef.current) return null;
+  if (!visible) return null;
 
   return (
     <group ref={groupRef}>
+      {/* Bright white-yellow core — contrasts against red mesh */}
       <mesh>
-        <sphereGeometry args={[0.04, 16, 16]} />
-        <meshStandardMaterial color="#ff2200" emissive="#ff2200" emissiveIntensity={6} />
+        <sphereGeometry args={[0.045, 16, 16]} />
+        <meshStandardMaterial color="#ffffff" emissive="#fffb00" emissiveIntensity={8} />
       </mesh>
-      <mesh ref={ring1Ref} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.055, 0.075, 32]} />
-        <meshBasicMaterial color="#ff4400" transparent opacity={0.75} side={THREE.DoubleSide} depthWrite={false} />
+      {/* Pulsing ring 1 — cyan */}
+      <mesh ref={ring1Ref}>
+        <ringGeometry args={[0.065, 0.09, 32]} />
+        <meshBasicMaterial color="#00e5ff" transparent opacity={0.85} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
-      <mesh ref={ring2Ref} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.055, 0.075, 32]} />
-        <meshBasicMaterial color="#ff8800" transparent opacity={0.4} side={THREE.DoubleSide} depthWrite={false} />
+      {/* Pulsing ring 2 — white offset */}
+      <mesh ref={ring2Ref}>
+        <ringGeometry args={[0.065, 0.09, 32]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
-      <pointLight color="#ff2200" intensity={3} distance={1.2} />
+      {/* Label above marker */}
+      <Html position={[0, 0.14, 0]} distanceFactor={5} style={{ pointerEvents: 'none' }}>
+        <div style={{
+          fontSize: 10, color: '#fffb00', whiteSpace: 'nowrap',
+          background: 'rgba(0,0,0,0.7)', padding: '2px 6px', borderRadius: 4,
+          fontFamily: 'ui-monospace,monospace', fontWeight: 700, letterSpacing: 0.8,
+          border: '1px solid rgba(255,251,0,0.4)',
+        }}>
+          ● SOURCE
+        </div>
+      </Html>
+      <pointLight color="#00e5ff" intensity={4} distance={1.0} />
     </group>
   );
 }
