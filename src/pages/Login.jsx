@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { HeartPulse, Eye, EyeOff, CheckCircle2, XCircle, Moon, Sun } from 'lucide-react';
+import { HeartPulse, Eye, EyeOff, CheckCircle2, XCircle, Moon, Sun, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Login = () => {
@@ -118,6 +118,61 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!username || !username.trim()) {
+      setModalState({
+        type: 'error',
+        title: 'กรุณากรอกชื่อผู้ใช้',
+        message: 'กรุณากรอกชื่อผู้ใช้ (อีเมล) ในช่องกรอกข้อมูลด้านล่างก่อน เพื่อให้ระบบสืบค้นข้อมูลในฐานข้อมูลหลัก'
+      });
+      return;
+    }
+
+    setModalState({
+      type: 'success',
+      title: 'กำลังตรวจสอบ...',
+      message: `ระบบกำลังตรวจสอบรายชื่อผู้ใช้งาน "${username}" ในฐานข้อมูลการรักษาความปลอดภัยหลัก...`
+    });
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': '69420'
+        },
+        body: JSON.stringify({ username: username.trim() }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setModalState({
+          type: 'success',
+          title: 'ตั้งรหัสใหม่สำเร็จ',
+          message: `พบบัญชีผู้ใช้ในระบบ! รหัสผ่านของคุณได้รับการรีเซ็ตเป็นรหัสชั่วคราวคือ: "${data.temporary_password}" เรียบร้อยแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านนี้และเปลี่ยนใหม่ทันที`
+        });
+      } else {
+        let errorDetail = 'ไม่พบชื่อผู้ใช้งานนี้ในระบบฐานข้อมูลหลัก';
+        try {
+          const payload = await response.json();
+          errorDetail = payload?.detail || errorDetail;
+        } catch {}
+        
+        setModalState({
+          type: 'error',
+          title: 'ไม่พบชื่อผู้ใช้',
+          message: errorDetail
+        });
+      }
+    } catch (err) {
+      setModalState({
+        type: 'error',
+        title: 'เชื่อมต่อล้มเหลว',
+        message: 'ไม่สามารถติดต่อเซิร์ฟเวอร์หลักได้ในขณะนี้ กรุณาตรวจสอบการเชื่อมต่อเครือข่ายหรือติดต่อผู้ดูแลระบบ'
+      });
+    }
+  };
+
   return (
     <div className={`${pageClass} flex items-center justify-center p-4 sm:p-6 overflow-hidden`}>
       <AnimatePresence>
@@ -141,21 +196,26 @@ const Login = () => {
               className={`relative w-full max-w-sm overflow-hidden rounded-[20px] border ${modalCardClass} backdrop-blur-2xl`}
             >
               <div className="p-7 text-center">
-                <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border ${modalState.type === 'success' ? 'border-sky-400/20 bg-sky-400/10 text-sky-300' : 'border-rose-400/20 bg-rose-400/10 text-rose-300'}`}>
-                  {modalState.type === 'success'
-                    ? <CheckCircle2 size={30} strokeWidth={1.75} />
-                    : <XCircle size={30} strokeWidth={1.75} />
-                  }
+                <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border ${
+                  modalState.type === 'success'
+                    ? 'border-sky-400/20 bg-sky-400/10 text-sky-300'
+                    : modalState.type === 'info'
+                      ? 'border-amber-400/20 bg-amber-400/10 text-amber-300'
+                      : 'border-rose-400/20 bg-rose-400/10 text-rose-300'
+                }`}>
+                  {modalState.type === 'success' && <CheckCircle2 size={30} strokeWidth={1.75} />}
+                  {modalState.type === 'info' && <Info size={30} strokeWidth={1.75} />}
+                  {modalState.type === 'error' && <XCircle size={30} strokeWidth={1.75} />}
                 </div>
 
                 <h3 className={`text-3xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{modalState.title}</h3>
                 <p className={`mt-3 text-sm leading-7 ${modalMessageClass}`}>{modalState.message}</p>
 
                 <div className="mt-6">
-                  {modalState.type === 'success' ? (
+                  {modalState.type === 'success' && (modalState.title === 'เข้าสู่ระบบสำเร็จ' || modalState.title === 'กำลังตรวจสอบ...') ? (
                     <div className={modalSuccessPanelClass}>
                       <span className="h-2 w-2 animate-pulse rounded-full bg-sky-300 shrink-0" />
-                      กำลังเตรียมหน้าถัดไป...
+                      {modalState.title === 'เข้าสู่ระบบสำเร็จ' ? 'กำลังเตรียมหน้าถัดไป...' : 'กำลังติดต่อเซิร์ฟเวอร์...'}
                     </div>
                   ) : (
                     <button
@@ -163,7 +223,7 @@ const Login = () => {
                       onClick={() => setModalState(null)}
                       className={modalRetryClass}
                     >
-                      ลองใหม่
+                      {modalState.type === 'info' || modalState.type === 'success' ? 'ตกลง' : 'ลองใหม่'}
                     </button>
                   )}
                 </div>
@@ -246,9 +306,13 @@ const Login = () => {
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <label className={`block text-sm font-medium ${fieldLabelClass}`}>รหัสผ่าน</label>
-                    <a href="#" className={`text-sm font-medium ${linkClass}`}>
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className={`text-sm font-medium ${linkClass} hover:underline focus:outline-none`}
+                    >
                       ลืมรหัสผ่าน?
-                    </a>
+                    </button>
                   </div>
                   <div className="relative">
                     <input
