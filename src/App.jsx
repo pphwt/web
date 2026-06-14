@@ -19,7 +19,6 @@ import PatientArchives from './pages/PatientArchives';
 import EducationalLab from './pages/EducationalLab';
 import NeuralSandbox from './pages/NeuralSandbox';
 import AIDiagnostics from './pages/AIDiagnostics';
-import BrainDiagnostics from './pages/BrainDiagnostics';
 import HelpManual from './pages/HelpManual';
 
 function App() {
@@ -47,7 +46,6 @@ function App() {
                             <Route path="/page/analysis" element={<Analysis />} />
                             <Route path="/page/sandbox" element={<NeuralSandbox />} />
                             <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
-                            <Route path="/page/brain-diagnostics" element={<BrainDiagnostics />} />
                             <Route path="/page/archives" element={<PatientArchives />} />
                             <Route path="/page/lab" element={<EducationalLab />} />
                             <Route path="/page/help" element={<HelpManual />} />

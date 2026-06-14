@@ -141,7 +141,12 @@ const EducationalLab = () => {
               <FlaskConical size={17} />
             </div>
             <div>
-              <h1 className={`text-sm font-bold ${mainText}`}>{t('nav_lab')}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className={`text-sm font-bold ${mainText}`}>{t('nav_lab')}</h1>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                  dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
+                }`}>SIMULATION</span>
+              </div>
               <p className={`mt-0.5 text-xs ${subText}`}>Cardiac Electrophysiology Simulator</p>
             </div>
           </div>

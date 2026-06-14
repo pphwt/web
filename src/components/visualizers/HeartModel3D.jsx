@@ -130,44 +130,56 @@ function Top5Markers({ bbRef, top5 }) {
 }
 
 // ── Primary pin marker ────────────────────────────────────────────────────────
-function PinMarker({ bbRef, onUpdate }) {
+function PinMarker({ bbRef, result, onUpdate }) {
   const groupRef        = useRef();
   const posRef          = useRef(null);
   const [info, setInfo] = useState(null);
   const { events }      = useStream();
 
-  useEffect(() => {
-    const handler = (e) => {
-      const coords = e.detail?.localization_coords;
-      const conf   = e.detail?.ai_confidence ?? 0;
-      const aha    = e.detail?.aha;
-      if (!coords || !bbRef.current) return;
+  // Build pin info from a stream-shaped payload (live frame OR static analyze result)
+  const applyDetail = (detail) => {
+    const coords = detail?.localization_coords;
+    const conf   = detail?.ai_confidence ?? 0;
+    const aha    = detail?.aha;
+    if (!coords || !bbRef.current) return;
 
-      posRef.current = normToScene(coords, bbRef);
+    posRef.current = normToScene(coords, bbRef);
 
-      const territory = aha?.territory ?? '—';
-      const risk      = aha?.risk ?? 'LOW';
-      const label     = aha?.label ?? regionFromAHA(aha?.segment);
-      const nextInfo  = {
-        coords,
-        mm: {
-          x: (coords.x * 103.2).toFixed(1),
-          y: (coords.y * 92.2).toFixed(1),
-          z: (coords.z * 72.0).toFixed(1),
-        },
-        segment:    aha?.segment ?? 0,
-        region:     label,
-        territory,
-        risk,
-        confidence: Math.round(conf * 100),
-        aha,
-      };
-      setInfo(nextInfo);
-      onUpdate?.(nextInfo);
+    const territory = aha?.territory ?? '—';
+    const risk      = aha?.risk ?? 'LOW';
+    const label     = aha?.label ?? regionFromAHA(aha?.segment);
+    const nextInfo  = {
+      coords,
+      mm: {
+        x: (coords.x * 103.2).toFixed(1),
+        y: (coords.y * 92.2).toFixed(1),
+        z: (coords.z * 72.0).toFixed(1),
+      },
+      segment:    aha?.segment ?? 0,
+      region:     label,
+      territory,
+      risk,
+      confidence: Math.round(conf * 100),
+      aha,
     };
+    setInfo(nextInfo);
+    onUpdate?.(nextInfo);
+  };
+
+  // Static mode: a single analyze result drives the pin (no live stream)
+  useEffect(() => {
+    if (result) applyDetail(result);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, bbRef.current]);
+
+  // Live mode: subscribe to the 20 Hz stream (only when no static result)
+  useEffect(() => {
+    if (result) return;
+    const handler = (e) => applyDetail(e.detail);
     events?.addEventListener('data', handler);
     return () => events?.removeEventListener('data', handler);
-  }, [events, bbRef, onUpdate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, bbRef, onUpdate, result]);
 
   useFrame(() => {
     if (!groupRef.current || !posRef.current) return;
@@ -262,7 +274,7 @@ function ColorLegend() {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-const HeartModel3D = () => {
+const HeartModel3D = ({ result = null }) => {
   const [nodePositions, setNodePositions] = useState([]);
   const [activationMap, setActivationMap] = useState(Array(75).fill(0.5));
   const [top5Nodes,     setTop5Nodes]     = useState([]);
@@ -276,14 +288,23 @@ const HeartModel3D = () => {
       .catch(() => {});
   }, []);
 
+  // Static mode: drive activation/top5 from the analyze result
   useEffect(() => {
+    if (!result) return;
+    if (result.activation_map) setActivationMap(result.activation_map);
+    if (result.top5_nodes)     setTop5Nodes(result.top5_nodes);
+  }, [result]);
+
+  // Live mode: subscribe to the stream (only when no static result)
+  useEffect(() => {
+    if (result) return;
     const handler = (e) => {
       if (e.detail?.activation_map) setActivationMap(e.detail.activation_map);
       if (e.detail?.top5_nodes)     setTop5Nodes(e.detail.top5_nodes);
     };
     events?.addEventListener('data', handler);
     return () => events?.removeEventListener('data', handler);
-  }, [events]);
+  }, [events, result]);
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative">
@@ -301,7 +322,7 @@ const HeartModel3D = () => {
           <Heart bbRef={bbRef} />
           <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} />
           <Top5Markers bbRef={bbRef} top5={top5Nodes} />
-          <PinMarker bbRef={bbRef} onUpdate={() => {}} />
+          <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} />
           <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
         </Suspense>
       </Canvas>

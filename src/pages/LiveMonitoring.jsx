@@ -161,6 +161,9 @@ const LiveMonitoring = () => {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className={`text-sm font-bold ${mainText}`}>{t('nav_monitoring')}</h1>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                  dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
+                }`} title="สัญญาณนี้สร้างจากแบบจำลอง ไม่ใช่ผู้ป่วยจริง">SIMULATION</span>
                 <StatusPill connected={isConnected} dk={dk} />
                 {!isNormal && (
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border animate-pulse ${

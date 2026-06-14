@@ -41,8 +41,7 @@ The frontend connects to the FastAPI backend via a persistent WebSocket, receivi
           │  /page/live          LiveMonitoring   — primary clinical UI │
           │  /page/lab           EducationalLab   — PINN + 3D sandbox  │
           │  /page/ai-diagnostics AIDiagnostics   — model explainability│
-          │  /page/brain-diagnostics BrainDiagnostics — EEG / neural   │
-          │  /page/analysis      Analysis         — batch ECG review   │
+          │  /page/analysis      Analysis         — REAL ECG analyze    │
           │  /page/reports       Reports          — aggregate stats    │
           │  /page/archives      PatientArchives  — session history    │
           │  /page/sandbox       NeuralSandbox    — raw PINN interface │
@@ -191,9 +190,9 @@ Model explainability panel. Shows:
 - Physics residual bar chart (PDE residual distribution)
 - ECG comparison: predicted vs observed waveform side-by-side
 
-### `BrainDiagnostics` ([src/pages/BrainDiagnostics.jsx](src/pages/BrainDiagnostics.jsx))
+### `Analysis` ([src/pages/Analysis.jsx](src/pages/Analysis.jsx))
 
-EEG / neural source localization interface with 3D brain model. Mirrors the cardiac flow but for EEG signals and neural dipole localization.
+**Real ECG analysis tool** (not the live simulation). The clinician picks a sample ECG from the intracardiac dataset or uploads a `.npy`/`.csv` file, then `POST`s to `/localization/analyze`. Displays the real analyzed waveform, the 3D heart with the localized source pin (reuses `HeartModel3D` via a static `result` prop), and an honest result panel: AHA region, risk, confidence, measured heart rate, source mm-coordinates, plus a `~50 mm` accuracy disclaimer. The live-stream pages (`LiveMonitoring`, `EducationalLab`) are labeled **SIMULATION** to distinguish synthesized signals from this real path.
 
 ---
 
@@ -208,7 +207,6 @@ All routes are protected (require valid JWT). Route structure in [src/App.jsx](s
   /page/live         — LiveMonitoring
   /page/lab          — EducationalLab
   /page/ai-diagnostics — AIDiagnostics
-  /page/brain-diagnostics — BrainDiagnostics
   /page/analysis     — Analysis
   /page/reports      — Reports
   /page/archives     — PatientArchives
@@ -258,7 +256,7 @@ npm run lint
 | Package | Version | Purpose |
 |---------|---------|---------|
 | React | 18.2 | UI framework |
-| Vite | 8.x | Build tool + dev server |
+| Vite | 8.x | Build tool + dev server (needs `@vitejs/plugin-react` ≥ 5.2 for vite 8 peer compat) |
 | React Three Fiber | 8.x | Three.js declarative wrapper |
 | @react-three/drei | 9.x | Three.js helpers (OrbitControls, Html, useGLTF) |
 | Three.js | 0.163 | 3D rendering engine |

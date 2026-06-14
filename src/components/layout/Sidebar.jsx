@@ -22,7 +22,6 @@ const buildSections = (t) => [
     label: 'วินิจฉัย',
     items: [
       { icon: Database,    label: t('sandbox_title'),     path: '/page/sandbox' },
-      { icon: Brain,       label: 'Brain Source Mapping',  path: '/page/brain-diagnostics' },
       { icon: ShieldCheck, label: t('ai_diag_title'),      path: '/page/ai-diagnostics' },
     ],
   },
