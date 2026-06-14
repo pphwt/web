@@ -5,32 +5,46 @@ const LanguageContext = createContext();
 export const translations = {
   en: {
     // Nav
-    nav_monitoring: 'Live Monitoring',
+    nav_monitoring: 'Live Telemetry',
     nav_diagnostics: 'Diagnostic Hub',
-    nav_archives: 'Neural Archives',
+    nav_archives: 'ECG Archives',
     nav_patients: 'Patient Database',
-    nav_lab: 'Neural Lab',
+    nav_lab: 'Cardiac Lab',
     nav_reports: 'Clinical Reports',
     nav_help: 'Help Center',
     nav_terminate: 'End Session',
     nav_light_mode: 'Light',
     nav_dark_mode: 'Dark',
-    sandbox_title: 'Neural Sandbox',
+    sandbox_title: 'PINN Sandbox',
     ai_diag_title: 'AI Diagnostic View',
+    nav_analysis: '3D Analysis Center',
     in_focus: 'Current Patient',
     search_placeholder: 'Search by name or ID...',
     
+    // Quick Actions
+    action_live: 'Live Telemetry',
+    action_analysis: '3D ECG Solve',
+    action_report: 'View Report',
+    
+    // Sustainable Innovation
+    sust_title: 'Sustainable Cardiology Impact',
+    sust_desc: 'Non-invasive AI source mapping replaces invasive diagnostic catheterization, reducing hospital carbon footprints, plastic waste, and patient costs.',
+    catheters_saved: 'Catheters Avoided',
+    waste_saved: 'Clinical Waste Prevented',
+    cost_saved: 'Patient Cost Reduced',
+    rural_referrals: 'Rural Scans Processed',
+    
     // Help Center / Manual
     manual_title: 'Clinical Operations Manual',
-    manual_subtitle: 'System guidelines and neural interpretation standards',
+    manual_subtitle: 'System guidelines and electrophysiology interpretation standards',
     man_mod1_title: 'Live Telemetry & Capture',
     man_mod1_desc: 'Managing real-time bio-signal streams and hardware bridging.',
     man_instr1_title: 'Electrode Placement',
     man_instr1_body: 'Ensure leads V1-V6 are positioned according to standard precordial placement for optimal PINN solving.',
     man_instr1_list: '• V1-V2: 4th intercostal space • V4-V6: 5th intercostal space',
     man_instr2_title: 'Bridge Linking',
-    man_instr2_body: 'Enter the Device ID in the sidebar to link physical hardware to the neural cloud.',
-    man_instr2_standard: 'Standard: NeuralBridge Protocol v2.1',
+    man_instr2_body: 'Enter the Device ID in the sidebar to link physical hardware to the bioelectric cloud.',
+    man_instr2_standard: 'Standard: Bioelectric Bridge Protocol v2.1',
     man_mod2_title: 'Vital Interpretation',
     man_mod2_desc: 'Standard clinical thresholds used by the Bioelectric AI.',
     man_vital_title: 'Clinical Reference Ranges',
@@ -46,9 +60,9 @@ export const translations = {
     man_vital_axis_desc: 'Dominant vector of activation.',
     man_sandbox_logic_title: 'Physics Sandbox',
     man_sandbox_logic_body: 'Adjust Aliev-Panfilov parameters to simulate myocardial propagation delays.',
-    man_sandbox_map_title: 'Neural Mapping',
+    man_sandbox_map_title: 'Cardiac Mapping',
     man_sandbox_map_body: 'Real-time source localization using the PINN inverse solver.',
-    man_mod3_title: 'Neural Lab Operations',
+    man_mod3_title: 'Cardiac Lab Operations',
     man_mod3_desc: 'Simulating complex pathologies using biophysical constants.',
     man_param_a_title: 'Excitation (a)',
     man_param_a_desc: 'Threshold of cellular depolarization.',
@@ -109,7 +123,7 @@ export const translations = {
 
     // Analysis
     analysis_title: '3D Analysis Center',
-    analysis_subtitle: 'Real-time source localization and neural mapping',
+    analysis_subtitle: 'Real-time source localization and cardiac mapping',
     active_patient: 'Active Patient',
     slice: 'Slice',
     grid: 'Grid',
@@ -126,9 +140,9 @@ export const translations = {
     // Nav
     nav_monitoring: 'ระบบติดตามสด',
     nav_diagnostics: 'ศูนย์วินิจฉัย AI',
-    nav_archives: 'คลังประวัติประสาท',
+    nav_archives: 'คลังประวัติการตรวจ',
     nav_patients: 'ฐานข้อมูลคนไข้',
-    nav_lab: 'ห้องแล็บจำลอง',
+    nav_lab: 'ห้องแล็บฟิสิกส์หัวใจ',
     nav_reports: 'รายงานผลตรวจ',
     nav_help: 'ศูนย์ช่วยเหลือ',
     nav_terminate: 'ออกจากระบบ',
@@ -136,20 +150,34 @@ export const translations = {
     nav_dark_mode: 'โหมดมืด',
     sandbox_title: 'แซนด์บ็อกซ์จำลอง',
     ai_diag_title: 'มุมมองวินิจฉัย AI',
+    nav_analysis: 'ศูนย์วิเคราะห์ 3 มิติ',
     in_focus: 'คนไข้ปัจจุบัน',
     search_placeholder: 'ค้นหาด้วยชื่อ หรือ เลขบัตรประชาชน...',
+    
+    // Quick Actions
+    action_live: 'ติดตามคลื่นไฟฟ้าสด',
+    action_analysis: 'วิเคราะห์พิกัด 3D',
+    action_report: 'ดูรายงานผล',
+    
+    // Sustainable Innovation
+    sust_title: 'ดัชนีนวัตกรรมความยั่งยืนโรคหัวใจ (Sustainable Cardiology Impact)',
+    sust_desc: 'การใช้ AI ระบุพิกัดแบบไม่ลุกล้ำ (Non-invasive) ช่วยทดแทนการผ่าตัดใส่สายสวนไฟฟ้าหัวใจ ลดการสร้างขยะพลาสติกชีวภาพ ลดคาร์บอนฟุตพริ้นท์ของ รพ. และประหยัดค่าใช้จ่ายให้ผู้ป่วย',
+    catheters_saved: 'ลดขยะสายสวนไฟฟ้า',
+    waste_saved: 'ลดขยะพลาสติกการแพทย์',
+    cost_saved: 'ประหยัดค่ารักษาคนไข้',
+    rural_referrals: 'รองรับ รพ. ห่างไกล',
 
     // Help Center / Manual
     manual_title: 'คู่มือการปฏิบัติงานทางคลินิก',
-    manual_subtitle: 'แนวทางปฏิบัติและการแปลผลสัญญาณประสาทไฟฟ้า',
+    manual_subtitle: 'แนวทางปฏิบัติและการแปลผลคลื่นไฟฟ้าหัวใจ',
     man_mod1_title: 'ระบบติดตามและรับข้อมูล',
     man_mod1_desc: 'การจัดการสัญญาณชีวภาพแบบเรียลไทม์และการเชื่อมต่อฮาร์ดแวร์',
     man_instr1_title: 'การวางตำแหน่งขั้วไฟฟ้า',
     man_instr1_body: 'ตรวจสอบการวาง Lead V1-V6 ให้ตรงตามมาตรฐาน Precordial เพื่อการประมวลผล PINN ที่แม่นยำที่สุด',
     man_instr1_list: '• V1-V2: ช่องซี่โครงที่ 4 • V4-V6: ช่องซี่โครงที่ 5',
     man_instr2_title: 'การเชื่อมต่ออุปกรณ์',
-    man_instr2_body: 'กรอกรหัส Device ID ในแถบด้านข้างเพื่อเชื่อมต่อฮาร์ดแวร์จริงเข้าสู่ Neural Cloud',
-    man_instr2_standard: 'มาตรฐาน: โปรโตคอล NeuralBridge v2.1',
+    man_instr2_body: 'กรอกรหัส Device ID ในแถบด้านข้างเพื่อเชื่อมต่อฮาร์ดแวร์จริงเข้าสู่ Bioelectric Cloud',
+    man_instr2_standard: 'มาตรฐาน: โปรโตคอล Bioelectric Bridge v2.1',
     man_mod2_title: 'เกณฑ์การแปลผลสัญญาณชีพ',
     man_mod2_desc: 'เกณฑ์มาตรฐานทางคลินิกที่ใช้ในระบบ Bioelectric AI',
     man_vital_title: 'ช่วงอ้างอิงทางคลินิก (Reference Ranges)',
@@ -165,7 +193,7 @@ export const translations = {
     man_vital_axis_desc: 'ทิศทางหลักของการนำไฟฟ้าในหัวใจ',
     man_sandbox_logic_title: 'ระบบแซนด์บ็อกซ์ฟิสิกส์',
     man_sandbox_logic_body: 'ปรับพารามิเตอร์ Aliev-Panfilov เพื่อจำลองความหน่วงของการแพร่กระจายกระแสไฟฟ้า',
-    man_sandbox_map_title: 'แผนที่ประสาทไฟฟ้า',
+    man_sandbox_map_title: 'แผนที่ไฟฟ้าหัวใจ 3 มิติ',
     man_sandbox_map_body: 'การระบุตำแหน่งต้นกำเนิดสัญญาณแบบเรียลไทม์ด้วย PINN Inverse Solver',
     man_mod3_title: 'การใช้งานห้องแล็บจำลอง',
     man_mod3_desc: 'จำลองพยาธิสภาพที่ซับซ้อนโดยใช้ค่าคงที่ทางฟิสิกส์ชีวภาพ',
@@ -215,7 +243,7 @@ export const translations = {
     recent_subjects: 'รายการล่าสุด',
 
     // Neural Sandbox
-    sandbox_subtitle: 'การจำลองประสาทด้วยฟิสิกส์',
+    sandbox_subtitle: 'การจำลองไฟฟ้าหัวใจด้วย PINN',
     select_dataset: 'เลือกชุดข้อมูล',
     run_test: 'รันการวิเคราะห์',
 
@@ -228,7 +256,7 @@ export const translations = {
 
     // Analysis
     analysis_title: 'ศูนย์วิเคราะห์ 3 มิติ',
-    analysis_subtitle: 'ระบุตำแหน่งต้นกำเนิดสัญญาณแบบเรียลไทม์',
+    analysis_subtitle: 'ระบุตำแหน่งต้นกำเนิดสัญญาณหัวใจแบบเรียลไทม์',
     active_patient: 'คนไข้ที่เลือก',
     slice: 'ตัดภาพ',
     grid: 'กริด',
@@ -245,6 +273,10 @@ export const translations = {
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState('th');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('lang', language);
+  }, [language]);
 
   const t = (key) => {
     return translations[language][key] || translations['en'][key] || key;

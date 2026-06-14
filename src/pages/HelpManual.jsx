@@ -163,7 +163,7 @@ const HelpManual = () => {
         {/* Footer */}
         <div className={`text-center py-3 border-t ${divider}`}>
           <p className={`text-[10px] font-semibold ${secLabel}`}>Bioelectric PINN v1.0.4 Clinical Build</p>
-          <p className={`text-[9px] mt-1 ${dk ? 'text-slate-700' : 'text-slate-300'}`}>Designed for Medical Professionals & Neural Researchers</p>
+          <p className={`text-[9px] mt-1 ${dk ? 'text-slate-700' : 'text-slate-300'}`}>Designed for Cardiologists & Clinical Professionals</p>
         </div>
       </div>
     </div>

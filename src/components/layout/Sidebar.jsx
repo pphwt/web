@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  Activity, Brain, FileText, LogOut, Users, Archive,
+  Activity, FileText, LogOut, Users, Archive,
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
-  X, ChevronUp,
+  X, ChevronUp, HeartPulse,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -14,8 +14,9 @@ const buildSections = (t) => [
   {
     label: 'หลัก',
     items: [
-      { icon: Users,    label: t('nav_patients'),  path: '/page/overview' },
-      { icon: Activity, label: t('nav_monitoring'), path: '/page/live' },
+      { icon: Users,      label: t('nav_patients'),  path: '/page/overview' },
+      { icon: HeartPulse, label: t('nav_analysis'),  path: '/page/analysis' },
+      { icon: Activity,   label: t('nav_monitoring'), path: '/page/live' },
     ],
   },
   {
@@ -107,7 +108,7 @@ export const Sidebar = ({ onClose }) => {
       <div className="px-4 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${logoIcon}`}>
-            <Brain size={17} />
+            <HeartPulse size={17} />
           </div>
           <div>
             <p className={`text-sm font-bold leading-none tracking-tight ${logoText}`}>Bioelectric</p>

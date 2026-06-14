@@ -22,7 +22,7 @@
  * @property {string} patientId - Associated patient ID.
  * @property {string} type - Report descriptive type.
  * @property {'URGENT ALERT' | 'ANALYZING' | 'COMPLETED'} status - Report processing status.
- * @property {'Heart' | 'Brain' | 'Activity'} icon - Icon type for the report.
+ * @property {'Heart' | 'Activity'} icon - Icon type for the report.
  * @property {string} time - Report generation time.
  * @property {ReportDetail[]} details - The details array.
  */

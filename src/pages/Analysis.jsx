@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2 } from 'lucide-react';
+import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, User, CheckCircle2 } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { usePatient } from '../context/PatientContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -47,6 +48,7 @@ function WaveformPlot({ leads, dk }) {
 const Analysis = () => {
   const { isDarkMode: dk } = useTheme();
   const { showToast } = useToast();
+  const { selectedPatient, patients } = usePatient();
 
   const [samples, setSamples] = useState([]);
   const [sampleId, setSampleId] = useState('');
@@ -54,17 +56,35 @@ const Analysis = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Auto-match patient to a sample signal
+  const activeSample = useMemo(() => {
+    if (!selectedPatient || !patients.length || !samples.length) return null;
+    const idx = patients.findIndex(p => p.id === selectedPatient.id);
+    if (idx === -1) return null;
+    return samples[idx % samples.length];
+  }, [selectedPatient, patients, samples]);
+
+  // Set sampleId when activeSample is resolved
+  useEffect(() => {
+    if (activeSample && !file) {
+      setSampleId(activeSample.id);
+    }
+  }, [activeSample, file]);
+
   useEffect(() => {
     fetch(`${API_BASE}/api/v1/localization/samples?limit=24`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.samples) {
           setSamples(d.samples);
-          if (d.samples[0]) setSampleId(d.samples[0].id);
+          // Only set default if no active patient sample is matched yet
+          if (d.samples[0] && !selectedPatient) {
+            setSampleId(d.samples[0].id);
+          }
         }
       })
       .catch(() => {});
-  }, []);
+  }, [selectedPatient]);
 
   const analyze = async () => {
     if (!file && !sampleId) {
@@ -167,6 +187,37 @@ const Analysis = () => {
 
           {/* Right: controls + honest result */}
           <div className="lg:col-span-4 flex flex-col gap-5">
+
+            {/* Selected Patient Context Card */}
+            {selectedPatient && (
+              <div className={`rounded-2xl border p-4 transition-all duration-300 ${
+                dk ? 'bg-sky-500/[0.02] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.02)]' : 'bg-sky-50/50 border-sky-200'
+              }`}>
+                <div className="flex items-center gap-2.5 mb-2.5">
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                    dk ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'
+                  }`}>
+                    <User size={14} />
+                  </div>
+                  <div>
+                    <p className={`text-xs font-bold leading-none ${dk ? 'text-white' : 'text-slate-900'}`}>{selectedPatient.name}</p>
+                    <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
+                      HN: {selectedPatient.id_card?.substring(0, 8) || 'GEN-001'} · Age: {selectedPatient.age || 'n/a'}
+                    </p>
+                  </div>
+                </div>
+                {activeSample && (
+                  <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] ${
+                    dk ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                  }`}>
+                    <CheckCircle2 size={12} className="shrink-0 text-emerald-500 animate-pulse" />
+                    <span className="font-medium">
+                      เชื่อมต่อคลื่นไฟฟ้าคนไข้สำเร็จ (Auto-linked: {activeSample.name})
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Input */}
             <div className={`rounded-2xl border p-4 ${surface}`}>

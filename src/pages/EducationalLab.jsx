@@ -143,9 +143,15 @@ const EducationalLab = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className={`text-sm font-bold ${mainText}`}>{t('nav_lab')}</h1>
-                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
-                  dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
-                }`}>SIMULATION</span>
+                {streamData?.is_hardware ? (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border animate-pulse ${
+                    dk ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                  }`}>HARDWARE SENSOR</span>
+                ) : (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                    dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
+                  }`}>SIMULATION</span>
+                )}
               </div>
               <p className={`mt-0.5 text-xs ${subText}`}>Cardiac Electrophysiology Simulator</p>
             </div>
@@ -163,138 +169,109 @@ const EducationalLab = () => {
           </div>
         </header>
 
-        {/* Body */}
+        {/* Live Vitals Strip (Full Width at Top) */}
+        <div className={`rounded-2xl border overflow-hidden ${surface}`}>
+          <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${divider}`}>
+            <Activity size={13} className={`${dk ? 'text-rose-400' : 'text-rose-600'}`} />
+            <span className={`text-xs font-bold ${mainText}`}>Live Vital Signs</span>
+            {!isConnected && (
+              <span className={`text-[9px] font-semibold ml-auto ${dk ? 'text-red-400' : 'text-red-500'}`}>
+                — Not connected
+              </span>
+            )}
+          </div>
+          <div className="p-3 grid grid-cols-5 gap-2">
+            <VitalCard icon={Heart}    label="Heart Rate" value={hr}   unit="BPM" normal={[60, 100]} sublabel="HR" />
+            <VitalCard icon={Activity} label="QRS Duration" value={qrs} unit="ms"  normal={[60, 120]}  sublabel="QRS" />
+            <VitalCard icon={Clock}    label="PR Interval" value={pr}  unit="ms"  normal={[120, 200]} sublabel="PR" />
+            <VitalCard icon={Zap}      label="Corrected QT" value={qtc} unit="ms"  normal={[350, 450]} sublabel="QTc" />
+            <VitalCard             label="AI Confidence" value={conf} unit="%"   color="#0ea5e9"     sublabel="PINN" />
+          </div>
+        </div>
+
+        {/* Body Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-          {/* Left: Clinical Scenarios */}
-          <div className={`lg:col-span-3 rounded-2xl border flex flex-col ${surface}`}>
-            <div className={`flex items-center gap-2 px-4 py-3 border-b ${divider}`}>
-              <Heart size={13} className={secLabel} />
-              <span className={`text-xs font-bold ${secLabel}`}>Clinical Scenarios</span>
-            </div>
-            <div className="p-3 space-y-2">
-              {SCENARIOS.map(s => {
-                const active = selected?.id === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => loadScenario(s)}
-                    className={`w-full text-left px-3 py-3 rounded-xl border transition-all ${
-                      active
-                        ? dk ? 'bg-white/[0.06] border-white/15' : 'bg-slate-50 border-slate-300'
-                        : dk ? 'border-transparent hover:bg-white/[0.03]' : 'border-transparent hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
-                        <span className={`text-[9px] font-bold uppercase tracking-wider`} style={{ color: s.color }}>
-                          {s.difficulty}
-                        </span>
-                      </div>
-                      {active && (
-                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
-                          dk ? 'bg-white/10 text-slate-300' : 'bg-slate-100 text-slate-600'
-                        }`}>ACTIVE</span>
-                      )}
-                    </div>
-                    <p className={`text-xs font-bold mb-1 ${active ? mainText : mainText}`}>{s.title}</p>
-                    <p className={`text-[10px] leading-relaxed ${subText}`}>{s.description}</p>
-                    {active && (
-                      <div className={`mt-2 pt-2 border-t space-y-0.5 ${divider}`}>
-                        {s.signs.map(sign => (
-                          <div key={sign} className="flex items-center gap-1.5">
-                            <div className="h-1 w-1 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                            <span className={`text-[9px] ${subText}`}>{sign}</span>
+          {/* Left Column (lg:col-span-3): Clinical Scenarios & AHA 17-Segment Map */}
+          <div className="lg:col-span-3 flex flex-col gap-5">
+            {/* Clinical Scenarios */}
+            <div className={`rounded-2xl border flex flex-col ${surface}`}>
+              <div className={`flex items-center gap-2 px-4 py-3 border-b ${divider}`}>
+                <Heart size={13} className={secLabel} />
+                <span className={`text-xs font-bold ${secLabel}`}>Clinical Scenarios</span>
+              </div>
+              <div className="p-3 space-y-2 relative">
+                {streamData?.is_hardware && (
+                  <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] rounded-b-2xl flex flex-col items-center justify-center p-4 text-center z-10">
+                    <Heart size={20} className="text-emerald-400 animate-pulse mb-1.5" />
+                    <p className="text-xs font-bold text-emerald-400">Hardware Feed Active</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Cannot select simulation scenarios while physical detector is streaming.</p>
+                  </div>
+                )}
+                {SCENARIOS.map(s => {
+                  const active = selected?.id === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => loadScenario(s)}
+                      className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all duration-300 relative overflow-hidden group ${
+                        active
+                          ? dk ? 'bg-white/[0.04]' : 'bg-white shadow-md'
+                          : dk ? 'bg-white/[0.01] border-white/[0.04] hover:bg-white/[0.03] hover:border-white/[0.12] hover:-translate-y-0.5' : 'bg-slate-50/40 border-slate-100 hover:bg-slate-50/80 hover:border-slate-200 hover:-translate-y-0.5'
+                      }`}
+                      style={active ? {
+                        borderColor: s.color + '70',
+                        boxShadow: dk ? `0 4px 20px ${s.color}12, 0 0 0 1px ${s.color}20` : `0 4px 20px ${s.color}0a, 0 0 0 1px ${s.color}15`
+                      } : {}}
+                    >
+                      {/* Color bar indicator on the left side */}
+                      <div
+                        className="absolute left-0 top-0 bottom-0 w-1 transition-all duration-300"
+                        style={{
+                          backgroundColor: s.color,
+                          opacity: active ? 1 : 0.35,
+                        }}
+                      />
+                      
+                      <div className="pl-1.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: s.color }}>
+                            {s.difficulty}
+                          </span>
+                          {active ? (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
+                              backgroundColor: s.color + '15',
+                              color: s.color,
+                              border: `1px solid ${s.color}30`
+                            }}>ACTIVE</span>
+                          ) : (
+                            <span className={`text-[8px] font-medium opacity-0 group-hover:opacity-100 transition-opacity ${subText}`}>
+                              CLICK TO LOAD
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs font-bold mb-1 ${mainText}`}>{s.title}</p>
+                        <p className={`text-[10px] leading-relaxed ${subText}`}>{s.description}</p>
+                        {active && (
+                          <div className={`mt-2.5 pt-2 border-t space-y-1 ${divider}`}>
+                            {s.signs.map(sign => (
+                              <div key={sign} className="flex items-center gap-1.5">
+                                <div className="h-1 w-1 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                                <span className={`text-[9px] font-mono ${subText}`}>{sign}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Center: 3D + Vitals + ECG */}
-          <div className="lg:col-span-6 flex flex-col gap-4">
-
-            {/* 3D Localization */}
-            <div className={`rounded-2xl border overflow-hidden ${surface}`}>
-              <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
-                <div className="flex items-center gap-2">
-                  <Zap size={13} className={`${dk ? 'text-sky-400' : 'text-sky-600'}`} />
-                  <span className={`text-xs font-bold ${mainText}`}>3D Cardiac Source Localization</span>
-                </div>
-                {selected && (
-                  <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold`} style={{
-                    color: selected.color,
-                    backgroundColor: selected.color + '18',
-                    borderColor: selected.color + '40',
-                  }}>
-                    {selected.title}
-                  </span>
-                )}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="h-[360px] relative">
-                <HeartModel3D />
-                <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-black/50 backdrop-blur-md px-3 py-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[10px] font-bold text-emerald-300 tracking-wide">PINN ACTIVE</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Live Vitals Strip */}
-            <div className={`rounded-2xl border overflow-hidden ${surface}`}>
-              <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${divider}`}>
-                <Activity size={13} className={`${dk ? 'text-rose-400' : 'text-rose-600'}`} />
-                <span className={`text-xs font-bold ${mainText}`}>Live Vital Signs</span>
-                {!isConnected && (
-                  <span className={`text-[9px] font-semibold ml-auto ${dk ? 'text-red-400' : 'text-red-500'}`}>
-                    — Not connected
-                  </span>
-                )}
-              </div>
-              <div className="p-3 grid grid-cols-5 gap-2">
-                <VitalCard icon={Heart}    label="Heart Rate" value={hr}   unit="BPM" normal={[60, 100]} sublabel="HR" />
-                <VitalCard icon={Activity} label="QRS Duration" value={qrs} unit="ms"  normal={[60, 120]}  sublabel="QRS" />
-                <VitalCard icon={Clock}    label="PR Interval" value={pr}  unit="ms"  normal={[120, 200]} sublabel="PR" />
-                <VitalCard icon={Zap}      label="Corrected QT" value={qtc} unit="ms"  normal={[350, 450]} sublabel="QTc" />
-                <VitalCard             label="AI Confidence" value={conf} unit="%"   color="#0ea5e9"     sublabel="PINN" />
-              </div>
-            </div>
-
-            {/* ECG Monitor */}
-            <div className={`rounded-2xl border overflow-hidden ${surface}`}>
-              <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
-                <div className="flex items-center gap-2">
-                  <Activity size={13} className={`${dk ? 'text-sky-400' : 'text-sky-600'}`} />
-                  <span className={`text-xs font-bold ${mainText}`}>ECG Monitor</span>
-                </div>
-                <span className={`text-[9px] font-semibold ${secLabel}`}>3-Lead · 20 Hz · Real-time</span>
-              </div>
-              <div className={`p-4 space-y-4 ${dk ? 'bg-[#030a14]' : 'bg-slate-50'}`}>
-                {[
-                  { leadKey: 'lead_i',  label: 'Lead I',   color: '#0ea5e9' },
-                  { leadKey: 'lead_ii', label: 'Lead II',  color: '#6366f1' },
-                  { leadKey: 'v5',      label: 'V5',       color: '#8b5cf6' },
-                ].map(({ leadKey, label, color }) => (
-                  <ECGCanvas key={label} leadKey={leadKey} label={label} color={color} height={80} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Parameters + AHA Bull's-eye + Info */}
-          <div className="lg:col-span-3 flex flex-col gap-4">
-            <div className={`rounded-2xl border p-4 ${surface}`}>
-              <PhysicsControlPanel />
             </div>
 
             {/* AHA 17-Segment Bull's-eye */}
             <div className={`rounded-2xl border p-4 ${surface}`}>
-              <div className={`flex items-center gap-2 mb-3`}>
+              <div className="flex items-center gap-2 mb-3">
                 <Heart size={12} className={secLabel} />
                 <span className={`text-[10px] font-bold uppercase tracking-widest ${secLabel}`}>
                   AHA 17-Segment Map
@@ -306,6 +283,67 @@ const EducationalLab = () => {
                   aha={ahaData}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Center Column: 3D Localization & ECG Monitor */}
+          <div className="lg:col-span-6 flex flex-col gap-5">
+            {/* 3D Localization */}
+            <div className={`rounded-2xl border overflow-hidden ${surface}`}>
+              <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
+                <div className="flex items-center gap-2">
+                  <Zap size={13} className={`${dk ? 'text-sky-400' : 'text-sky-600'}`} />
+                  <span className={`text-xs font-bold ${mainText}`}>3D Cardiac Source Localization</span>
+                </div>
+                {streamData?.is_hardware ? (
+                  <span className="rounded-full border px-2.5 py-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse">
+                    Hardware Stream
+                  </span>
+                ) : selected ? (
+                  <span className="rounded-full border px-2.5 py-1 text-[10px] font-semibold" style={{
+                    color: selected.color,
+                    backgroundColor: selected.color + '18',
+                    borderColor: selected.color + '40',
+                  }}>
+                    {selected.title}
+                  </span>
+                ) : null}
+              </div>
+              <div className="h-[360px] relative">
+                <HeartModel3D />
+                <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-xl border border-emerald-500/25 bg-black/50 backdrop-blur-md px-3 py-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-300 tracking-wide">PINN ACTIVE</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ECG Monitor (Moved inside center column, height reduced to 50px per lead) */}
+            <div className={`rounded-2xl border overflow-hidden ${surface}`}>
+              <div className={`flex items-center justify-between px-4 py-2 border-b ${divider}`}>
+                <div className="flex items-center gap-2">
+                  <Activity size={13} className={`${dk ? 'text-sky-400' : 'text-sky-600'}`} />
+                  <span className={`text-xs font-bold ${mainText}`}>ECG Monitor</span>
+                </div>
+                <span className={`text-[8px] font-semibold ${secLabel}`}>3-Lead · 20 Hz · Real-time</span>
+              </div>
+              <div className={`p-3 space-y-3 ${dk ? 'bg-[#030a14]' : 'bg-slate-50'}`}>
+                {[
+                  { leadKey: 'lead_i',  label: 'Lead I',   color: '#0ea5e9' },
+                  { leadKey: 'lead_ii', label: 'Lead II',  color: '#6366f1' },
+                  { leadKey: 'v5',      label: 'V5',       color: '#8b5cf6' },
+                ].map(({ leadKey, label, color }) => (
+                  <ECGCanvas key={label} leadKey={leadKey} label={label} color={color} height={50} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Physics Control Panel & Scenario Signs */}
+          <div className="lg:col-span-3 flex flex-col gap-5">
+            {/* Physics Control Panel */}
+            <div className={`rounded-2xl border p-4 ${surface}`}>
+              <PhysicsControlPanel />
             </div>
 
             {/* Clinical signs for active scenario */}
@@ -331,6 +369,7 @@ const EducationalLab = () => {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </div>

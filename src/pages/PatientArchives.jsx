@@ -177,7 +177,7 @@ const PatientArchives = () => {
                   <div className={`rounded-2xl border p-4 ${surface}`}>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${secLabel}`}>Observation</p>
                     <p className={`text-xs leading-relaxed ${subText}`}>
-                      Neural activity during this session showed stable diffusion patterns with high AI classification accuracy.
+                      Cardiac activation propagation during this session showed stable diffusion patterns with high AI classification accuracy.
                     </p>
                   </div>
                   <div className={`rounded-2xl border p-4 ${surface}`}>
@@ -186,7 +186,7 @@ const PatientArchives = () => {
                       <p className={`text-[10px] font-semibold uppercase tracking-wider ${secLabel}`}>Integrity</p>
                     </div>
                     <p className={`text-xs leading-relaxed ${subText}`}>
-                      Data packet integrity: 100%. Recorded at 20Hz via PINN Neural Bridge.
+                      Data packet integrity: 100%. Recorded at 20Hz via PINN Cardiac Bridge.
                     </p>
                   </div>
                   <div className={`rounded-2xl border p-4 flex items-center justify-center ${surface}`}>

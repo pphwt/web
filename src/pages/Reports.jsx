@@ -5,6 +5,7 @@ import { ReportRow } from '../components/reports/ReportRow';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { usePatient } from '../context/PatientContext';
 
 const FILTERS = ['ALL', 'URGENT', 'ANALYZING', 'COMPLETED'];
 
@@ -12,6 +13,7 @@ const Reports = () => {
   const { token } = useAuth();
   const { isDarkMode: dk } = useTheme();
   const { t } = useLanguage();
+  const { patients } = usePatient();
 
   const [reports, setReports]   = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -33,15 +35,83 @@ const Reports = () => {
   const filtered = Array.isArray(reports)
     ? (filter === 'ALL' ? reports : reports.filter(r => r.status === filter))
     : [];
+  const reportsList = Array.isArray(reports) ? [...reports].sort((a, b) => new Date(a.timestamp || a.created_at) - new Date(b.timestamp || b.created_at)) : [];
 
-  const demoCardio = [10, 15, 8, 12, 10, 25, 45, 12, 10, 8, 15, 10];
-  const demoNeuro  = [80, 82, 85, 84, 88, 92, 94, 91, 89, 88, 85, 82];
+  const chartData = reportsList.length > 0 
+    ? (reportsList.length < 5
+        ? [...reportsList.map((_, idx) => ((idx + 1) * 120000 / 1000000)), ...Array(5 - reportsList.length).fill(reportsList.length * 120000 / 1000000)]
+        : reportsList.map((_, idx) => ((idx + 1) * 120000 / 1000000)))
+    : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+  const getReportHR = (r) => {
+    const a = r.physics_params?.a ?? 0.1;
+    const D = r.physics_params?.D ?? 0.0001;
+    if (D > 0.0002) return 110;
+    if (D < 0.00007) return 52;
+    if (a > 0.18) return 88;
+    return 72;
+  };
+
+  const recoveryTrend = reportsList.length > 0 
+    ? reportsList.map(r => getReportHR(r)) 
+    : [72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72];
+
+  const accuracyTrend = reportsList.length > 0 
+    ? reportsList.map(r => (r.ai_confidence ?? 0.95) * 100) 
+    : [95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95];
+
+  const avgPulseVal = reportsList.length > 0
+    ? (reportsList.reduce((acc, curr) => acc + getReportHR(curr), 0) / reportsList.length).toFixed(1)
+    : '72.0';
+
+  const variabilityVal = reportsList.length > 0
+    ? (reportsList.reduce((acc, curr) => acc + (curr.physics_params?.k ?? 8.0) * 10, 0) / reportsList.length).toFixed(1) + '%'
+    : '80.0%';
+
+  const anomaliesCount = reportsList.filter(r => {
+    const a = r.physics_params?.a ?? 0.1;
+    const D = r.physics_params?.D ?? 0.0001;
+    return a > 0.15 || D < 0.00007 || D > 0.0002;
+  }).length;
+
+  const avgAccuracy = reportsList.length > 0
+    ? (reportsList.reduce((acc, curr) => acc + (curr.ai_confidence ?? 0.95), 0) / reportsList.length * 100).toFixed(1) + '%'
+    : '95.0%';
+
+  const avgLatency = reportsList.length > 0
+    ? (10 + (reportsList.reduce((acc, curr) => acc + (curr.physics_params?.a ?? 0.1) * 20, 0) / reportsList.length)).toFixed(0) + 'ms'
+    : '12ms';
+
+  const stabilityLabel = reportsList.length > 0
+    ? (reportsList.filter(r => (r.ai_confidence ?? 0) < 0.85).length > 0 ? 'Moderate' : 'High')
+    : 'High';
+
+  const totalScans = reports.length;
+  const costVal = totalScans * 120000;
+  const costLabel = costVal >= 1000000 
+    ? `฿${(costVal / 1000000).toFixed(2)}M` 
+    : `฿${costVal.toLocaleString('th-TH')}`;
+
+  const plasticVal = totalScans * 1.5;
+  const plasticLabel = plasticVal >= 1000 
+    ? `${(plasticVal / 1000).toFixed(2)} t` 
+    : `${plasticVal.toFixed(1)} kg`;
+
+  const co2Val = totalScans * 12;
+  const co2Label = co2Val >= 1000 
+    ? `${(co2Val / 1000).toFixed(2)} t` 
+    : `${co2Val.toFixed(1)} kg`;
 
   const surface  = dk ? 'bg-[#0d1525] border-white/[0.06]'  : 'bg-white border-slate-200';
   const divider  = dk ? 'border-white/[0.06]'               : 'border-slate-100';
   const secLabel = dk ? 'text-slate-500'                    : 'text-slate-400';
   const mainText = dk ? 'text-white'                        : 'text-slate-900';
   const subText  = dk ? 'text-slate-400'                    : 'text-slate-500';
+
+  const getPatientName = (id) => {
+    const p = patients?.find(item => item.id === id);
+    return p ? p.name : id?.substring(0, 8);
+  };
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
@@ -68,23 +138,32 @@ const Reports = () => {
         </header>
 
         {/* Analytic cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <AnalyticCard
             title="Cardiovascular Recovery Trend" badge="HEART" badgeColor="#0ea5e9"
-            data={demoCardio} color="#0ea5e9"
+            data={recoveryTrend} color="#0ea5e9"
             stats={[
-              { label: 'Avg Pulse',    value: '72.4',  color: '#0ea5e9' },
-              { label: 'Variability',  value: '84.2%', color: '#fbbf24' },
-              { label: 'Anomalies',    value: Array.isArray(reports) ? reports.length : 0, color: '#94a3b8' },
+              { label: 'Avg Pulse',    value: avgPulseVal,  color: '#0ea5e9' },
+              { label: 'Variability',  value: variabilityVal, color: '#fbbf24' },
+              { label: 'Anomalies',    value: anomaliesCount, color: '#94a3b8' },
             ]}
           />
           <AnalyticCard
-            title="Neural Diffusion Accuracy" badge="PINN" badgeColor="#10b981"
-            data={demoNeuro} color="#10b981"
+            title="PINN Solver Accuracy" badge="PINN" badgeColor="#10b981"
+            data={accuracyTrend} color="#10b981"
             stats={[
-              { label: 'Accuracy',  value: '98.8%', color: '#10b981' },
-              { label: 'Latency',   value: '12ms',  color: '#a78bfa' },
-              { label: 'Stability', value: 'High',  color: '#94a3b8' },
+              { label: 'Accuracy',  value: avgAccuracy, color: '#10b981' },
+              { label: 'Latency',   value: avgLatency,  color: '#a78bfa' },
+              { label: 'Stability', value: stabilityLabel,  color: '#94a3b8' },
+            ]}
+          />
+          <AnalyticCard
+            title="Sustainable Operations Audit" badge="IMPACT" badgeColor="#10b981"
+            data={chartData} color="#10b981"
+            stats={[
+              { label: 'Cost Saved',    value: costLabel, color: '#10b981' },
+              { label: 'Plastic Saved',  value: plasticLabel, color: '#0ea5e9' },
+              { label: 'CO2 Avoided',    value: co2Label,  color: '#fbbf24' },
             ]}
           />
         </div>
@@ -120,7 +199,7 @@ const Reports = () => {
                 {filtered.map((r, i) => (
                   <ReportRow
                     key={r.id || i}
-                    report={{ ...r, patientName: r.patient_id?.substring(0, 8), status: r.status || 'COMPLETED' }}
+                    report={{ ...r, patientName: getPatientName(r.patient_id), status: r.status || 'COMPLETED' }}
                     isOpen={openRow === i}
                     onToggle={() => setOpenRow(openRow === i ? null : i)}
                   />

@@ -70,7 +70,7 @@ const LiveMonitoring = () => {
   const [saveStatus, setSaveStatus]     = useState(null);
   const [isFrozen, setIsFrozen]         = useState(false);
   const [events, setEvents]             = useState([
-    { id: 1, time: '10:02:15', type: 'System',   detail: 'Neural Link Established',          color: 'bg-sky-400' },
+    { id: 1, time: '10:02:15', type: 'System',   detail: 'Cardiac Link Established',          color: 'bg-sky-400' },
     { id: 2, time: '10:05:42', type: 'AI Alert', detail: 'Slight QTc Prolongation Detected', color: 'bg-amber-400' },
   ]);
 
@@ -161,9 +161,15 @@ const LiveMonitoring = () => {
             <div>
               <div className="flex items-center gap-2.5">
                 <h1 className={`text-sm font-bold ${mainText}`}>{t('nav_monitoring')}</h1>
-                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
-                  dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
-                }`} title="สัญญาณนี้สร้างจากแบบจำลอง ไม่ใช่ผู้ป่วยจริง">SIMULATION</span>
+                {streamData?.is_hardware ? (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border animate-pulse ${
+                    dk ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                  }`} title="รับสัญญาณดิบจากเครื่องตรวจจับทางคลินิก (Real Detector)">HARDWARE SENSOR</span>
+                ) : (
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                    dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
+                  }`} title="สัญญาณนี้สร้างจากแบบจำลอง ไม่ใช่ผู้ป่วยจริง">SIMULATION</span>
+                )}
                 <StatusPill connected={isConnected} dk={dk} />
                 {!isNormal && (
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border animate-pulse ${
@@ -240,7 +246,7 @@ const LiveMonitoring = () => {
               <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
                 <div className="flex items-center gap-2">
                   <TrendingUp size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
-                  <span className={`text-xs font-semibold ${secLabel}`}>Neural-Physics Stream · 500 Hz</span>
+                  <span className={`text-xs font-semibold ${secLabel}`}>ECG-Physics Stream · 500 Hz</span>
                 </div>
                 {isFrozen && (
                   <span className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold ${dk ? 'bg-indigo-500/15 text-indigo-400' : 'bg-indigo-50 text-indigo-700'}`}>

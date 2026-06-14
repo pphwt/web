@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Brain, Eye, EyeOff, CheckCircle2, XCircle, Moon, Sun } from 'lucide-react';
+import { HeartPulse, Eye, EyeOff, CheckCircle2, XCircle, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Login = () => {
@@ -188,11 +188,11 @@ const Login = () => {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.16),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.08),_transparent_30%)]" />
             <div className="relative z-10">
               <div className="inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium">
-                <Brain size={18} />
+                <HeartPulse size={18} />
                 Bioelectric PINN
               </div>
               <div className="mt-16 max-w-md">
-                <h2 className="text-4xl font-bold leading-tight">เข้าสู่ระบบสำหรับงานวิเคราะห์สัญญาณประสาทอย่างปลอดภัย</h2>
+                <h2 className="text-4xl font-bold leading-tight">เข้าสู่ระบบสำหรับงานวิเคราะห์คลื่นไฟฟ้าหัวใจอย่างปลอดภัย</h2>
                 <p className="mt-5 text-base leading-7 text-white/85">
                   เข้าสู่แพลตฟอร์มเพื่อเฝ้าดูสัญญาณ ตรวจสอบรายงาน และจัดการงานวินิจฉัยผู้ป่วยได้ในที่เดียว
                 </p>
@@ -202,11 +202,11 @@ const Login = () => {
             <div className="relative z-10 border-t border-white/15 pt-6">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 border border-white/20">
-                  <Brain size={22} />
+                  <HeartPulse size={22} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/70">Bioelectric</p>
-                  <p className="text-sm text-white/80">ระบบวินิจฉัยประสาทขั้นสูง</p>
+                  <p className="text-sm text-white/80">ระบบวิเคราะห์คลื่นไฟฟ้าหัวใจขั้นสูง</p>
                 </div>
               </div>
             </div>
@@ -217,7 +217,7 @@ const Login = () => {
             <div className="w-full max-w-md">
               <div className="lg:hidden mb-8">
                 <div className={`inline-flex items-center gap-3 rounded-full px-4 py-2 border ${themeToggleBadgeClass}`}>
-                  <Brain size={18} />
+                  <HeartPulse size={18} />
                   Bioelectric PINN
                 </div>
               </div>

@@ -67,6 +67,8 @@ const PhysicsControlPanel = () => {
   const { isDarkMode: dk } = useTheme();
   const [params, setParams] = useState(DEFAULTS);
 
+  const isHardware = streamData?.is_hardware;
+
   const updateParam = (key, value) => {
     const next = { ...params, [key]: parseFloat(value) };
     setParams(next);
@@ -93,7 +95,14 @@ const PhysicsControlPanel = () => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 relative">
+      {isHardware && (
+        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] rounded-2xl flex flex-col items-center justify-center p-4 text-center z-10">
+          <Zap size={20} className="text-emerald-400 animate-pulse mb-1.5" />
+          <p className="text-xs font-bold text-emerald-400">Hardware Feed Active</p>
+          <p className="text-[10px] text-slate-400 mt-1">Simulation controls disabled while receiving real-time detector streams.</p>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
