@@ -63,7 +63,7 @@ const AIDiagnostics = () => {
     params: '1.2M',
     precision: 'FP32 Optimized',
     latency: '14.2ms',
-    device: 'NVIDIA CUDA',
+    device: 'CPU (torch)',
     physics_adherence: '99.42%'
   });
 
@@ -74,9 +74,9 @@ const AIDiagnostics = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        setModelStats({ architecture: 'EP-PINN Residual-Dense', params: '1.2M', precision: 'FP32 Optimized', latency: '14.2ms', device: 'NVIDIA CUDA', physics_adherence: '99.42%', ...data });
+        setModelStats({ architecture: 'EP-PINN Residual-Dense', params: '1.2M', precision: 'FP32 Optimized', latency: '14.2ms', device: 'CPU (torch)', physics_adherence: '99.42%', ...data });
       } catch {
-        setModelStats({ architecture: 'EP-PINN Residual-Dense', params: '1.2M', precision: 'FP32 Optimized', latency: '14.2ms', device: 'NVIDIA CUDA', physics_adherence: '99.42%' });
+        setModelStats({ architecture: 'EP-PINN Residual-Dense', params: '1.2M', precision: 'FP32 Optimized', latency: '14.2ms', device: 'CPU (torch)', physics_adherence: '99.42%' });
       }
     })();
   }, []);
@@ -109,15 +109,15 @@ const AIDiagnostics = () => {
           <div className="flex items-center gap-2">
             <div className={`rounded-xl border px-3 py-1.5 text-center ${
               dk ? 'bg-emerald-500/[0.08] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
-            }`}>
-              <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-emerald-400/70' : 'text-emerald-700/70'}`}>Model Accuracy</p>
-              <p className={`text-sm font-bold ${dk ? 'text-emerald-400' : 'text-emerald-700'}`}>99.8%</p>
+            }`} title="EP-PINN transmembrane-potential reconstruction R² on synthetic data">
+              <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-emerald-400/70' : 'text-emerald-700/70'}`}>EP-PINN Recon. R²</p>
+              <p className={`text-sm font-bold ${dk ? 'text-emerald-400' : 'text-emerald-700'}`}>0.998</p>
             </div>
             <div className={`rounded-xl border px-3 py-1.5 text-center ${
-              dk ? 'bg-indigo-500/[0.08] border-indigo-500/20' : 'bg-indigo-50 border-indigo-200'
-            }`}>
-              <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-indigo-400/70' : 'text-indigo-700/70'}`}>Physics Adherence</p>
-              <p className={`text-sm font-bold ${dk ? 'text-indigo-400' : 'text-indigo-700'}`}>{modelStats?.physics_adherence ?? '99.42%'}</p>
+              dk ? 'bg-amber-500/[0.08] border-amber-500/20' : 'bg-amber-50 border-amber-200'
+            }`} title="CardiacLocalizer 3D source localization — mean error on the held-out test set">
+              <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-amber-400/70' : 'text-amber-700/70'}`}>3D Loc. Error</p>
+              <p className={`text-sm font-bold ${dk ? 'text-amber-400' : 'text-amber-700'}`}>~50 mm</p>
             </div>
           </div>
         </header>
@@ -194,6 +194,13 @@ const AIDiagnostics = () => {
                 <MetricBadge dk={dk} label="Temporal Sync" value="Verified"
                   color={dk ? 'text-indigo-400' : 'text-indigo-600'} />
               </div>
+              <p className={`px-4 pb-4 text-[10px] leading-relaxed ${subText}`}>
+                These metrics are the EP-PINN's transmembrane-potential reconstruction on
+                <b> synthetic</b> Aliev-Panfilov data — they do <b>not</b> measure 3D source
+                accuracy. The CardiacLocalizer's 3D localization mean error is <b>~50 mm</b>
+                (AHA top-1 ≈ 26%) on held-out data: a research prototype for decision support,
+                not a validated diagnostic.
+              </p>
             </div>
 
             {/* Physics Residual Loss */}

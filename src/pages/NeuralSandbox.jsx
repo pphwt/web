@@ -138,8 +138,13 @@ const NeuralSandbox = () => {
               <FlaskConical size={17} />
             </div>
             <div>
-              <h1 className={`text-sm font-bold ${mainText}`}>{t('sandbox_title')}</h1>
-              <p className={`mt-0.5 text-xs ${subText}`}>{t('sandbox_subtitle')}</p>
+              <div className="flex items-center gap-2">
+                <h1 className={`text-sm font-bold ${mainText}`}>{t('sandbox_title')}</h1>
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                  dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
+                }`} title="ผลในหน้านี้เป็นการสาธิต (สุ่ม) ไม่ใช่การวินิจฉัยจริง">SIMULATED DEMO</span>
+              </div>
+              <p className={`mt-0.5 text-xs ${subText}`}>{t('sandbox_subtitle')} · ผลสาธิต ไม่ใช่การวินิจฉัยจริง — ใช้หน้า “วิเคราะห์พิกัด 3D” สำหรับผลจากโมเดลจริง</p>
             </div>
           </div>
 
@@ -236,7 +241,7 @@ const NeuralSandbox = () => {
                   className={`rounded-2xl border p-4 ${diagTokens.bg} ${diagTokens.ring}`}
                 >
                   <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${diagTokens.text} opacity-70`}>
-                    AI Confidence
+                    Demo Confidence (simulated)
                   </p>
                   <p className={`text-4xl font-bold leading-none mb-3 ${diagTokens.text}`}>
                     {testResults.metrics.confidence}%

@@ -137,8 +137,8 @@ const Reports = () => {
           </button>
         </header>
 
-        {/* Analytic cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Analytic cards — derived from stored report snapshots */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <AnalyticCard
             title="Cardiovascular Recovery Trend" badge="HEART" badgeColor="#0ea5e9"
             data={recoveryTrend} color="#0ea5e9"
@@ -149,21 +149,12 @@ const Reports = () => {
             ]}
           />
           <AnalyticCard
-            title="PINN Solver Accuracy" badge="PINN" badgeColor="#10b981"
+            title="Avg AI Confidence" badge="PINN" badgeColor="#10b981"
             data={accuracyTrend} color="#10b981"
             stats={[
-              { label: 'Accuracy',  value: avgAccuracy, color: '#10b981' },
-              { label: 'Latency',   value: avgLatency,  color: '#a78bfa' },
-              { label: 'Stability', value: stabilityLabel,  color: '#94a3b8' },
-            ]}
-          />
-          <AnalyticCard
-            title="Sustainable Operations Audit" badge="IMPACT" badgeColor="#10b981"
-            data={chartData} color="#10b981"
-            stats={[
-              { label: 'Cost Saved',    value: costLabel, color: '#10b981' },
-              { label: 'Plastic Saved',  value: plasticLabel, color: '#0ea5e9' },
-              { label: 'CO2 Avoided',    value: co2Label,  color: '#fbbf24' },
+              { label: 'Confidence', value: avgAccuracy, color: '#10b981' },
+              { label: 'Latency',    value: avgLatency,  color: '#a78bfa' },
+              { label: 'Stability',  value: stabilityLabel,  color: '#94a3b8' },
             ]}
           />
         </div>
