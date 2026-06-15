@@ -8,7 +8,6 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { usePatient } from '../context/PatientContext';
 import { useTheme } from '../context/ThemeContext';
-import ECGComparisonCanvas from '../components/visualizers/ECGComparisonCanvas';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -62,30 +61,38 @@ const NeuralSandbox = () => {
     if (!selectedArchive) return;
     setIsRunning(true);
     try {
-      await new Promise(r => setTimeout(r, 1500));
-      const abnormal = Math.random() > 0.5;
+      // Real inference: analyze a real dataset recording with the CardiacLocalizer
+      const API = import.meta.env.VITE_API_URL;
+      const sres = await fetch(`${API}/api/v1/localization/samples?limit=24`);
+      const sdata = await sres.json();
+      const list = sdata?.samples || [];
+      const idx = Math.max(0, archives.indexOf(selectedArchive));
+      const sampleId = (list[idx % (list.length || 1)] || list[0])?.id;
+      if (!sampleId) throw new Error('no sample available');
+
+      const fd = new FormData();
+      fd.append('sample_id', sampleId);
+      const r = await fetch(`${API}/api/v1/localization/analyze`, { method: 'POST', body: fd });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const res = await r.json();
+
+      const region = res.region || {};
+      const high = region.risk === 'HIGH';
       setTestResults({
-        status: abnormal ? 'abnormal' : 'normal',
-        diagnosis: abnormal
-          ? 'Premature Ventricular Contraction (PVC)'
-          : 'Normal Sinus Rhythm',
-        narrative: abnormal
-          ? 'พบคลื่น QRS กว้างและผิดรูปร่าง เกิดก่อนจังหวะปกติ สอดคล้องกับ PVC แนะนำ Holter Monitoring เพิ่มเติม'
-          : 'สัญญาณสม่ำเสมอ ช่วง PR และ QTc อยู่ในเกณฑ์ปกติ ไม่พบความผิดปกติทางสรีรวิทยา',
+        status: high ? 'abnormal' : 'normal',
+        diagnosis: `Localized source: ${region.label ?? '—'} (${region.territory ?? '—'})`,
+        narrative: res.disclaimer || 'ผลจาก CardiacLocalizer (ของจริง) — ใช้ช่วยตัดสินใจ ไม่ใช่การวินิจฉัยขั้นสุดท้าย',
         metrics: {
-          hr:  abnormal ? 88  : 72,
-          qtc: abnormal ? 485 : 420,
-          pr:  abnormal ? 162 : 155,
-          qrs: abnormal ? 112 : 92,
-          confidence: abnormal ? 98.42 : 99.85,
+          hr:  res.heart_rate_bpm ? Math.round(res.heart_rate_bpm) : '—',
+          qtc: '—', pr: '—', qrs: '—',
+          confidence: Math.round((res.confidence ?? 0) * 100),
         },
-        findings: abnormal
-          ? ['PVC Detected', 'Long QTc', 'Ectopic Focus']
-          : ['Regular Rhythm', 'Normal QTc', 'Optimal Sync'],
-        focus_site: abnormal ? 'Left Ventricle / Apex' : 'SA Node Base',
+        findings: [region.label, `${region.territory ?? '—'} territory`, `${region.risk ?? '—'} risk`].filter(Boolean),
+        focus_site: region.label ?? '—',
+        waveform: res.waveform,
       });
-    } catch {
-      console.error('Analysis failed');
+    } catch (e) {
+      console.error('Analysis failed', e);
     } finally {
       setIsRunning(false);
     }
@@ -141,10 +148,10 @@ const NeuralSandbox = () => {
               <div className="flex items-center gap-2">
                 <h1 className={`text-sm font-bold ${mainText}`}>{t('sandbox_title')}</h1>
                 <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
-                  dk ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-violet-50 text-violet-600 border-violet-200'
-                }`} title="ผลในหน้านี้เป็นการสาธิต (สุ่ม) ไม่ใช่การวินิจฉัยจริง">SIMULATED DEMO</span>
+                  dk ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                }`}>REAL MODEL</span>
               </div>
-              <p className={`mt-0.5 text-xs ${subText}`}>{t('sandbox_subtitle')} · ผลสาธิต ไม่ใช่การวินิจฉัยจริง — ใช้หน้า “วิเคราะห์พิกัด 3D” สำหรับผลจากโมเดลจริง</p>
+              <p className={`mt-0.5 text-xs ${subText}`}>{t('sandbox_subtitle')} · CardiacLocalizer จริง บนข้อมูล ECG จริง</p>
             </div>
           </div>
 
@@ -241,7 +248,7 @@ const NeuralSandbox = () => {
                   className={`rounded-2xl border p-4 ${diagTokens.bg} ${diagTokens.ring}`}
                 >
                   <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${diagTokens.text} opacity-70`}>
-                    Demo Confidence (simulated)
+                    AI Confidence
                   </p>
                   <p className={`text-4xl font-bold leading-none mb-3 ${diagTokens.text}`}>
                     {testResults.metrics.confidence}%
@@ -292,14 +299,25 @@ const NeuralSandbox = () => {
                   {/* ECG + Vitals */}
                   <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
 
-                    {/* ECG comparison */}
+                    {/* Analyzed ECG (real signal) */}
                     <div className={`xl:col-span-8 rounded-2xl border overflow-hidden ${surface}`}>
                       <div className={`flex items-center gap-2 px-4 py-3 border-b ${divider}`}>
                         <Target size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
-                        <span className={`text-xs font-semibold ${secLabel}`}>Signal Accuracy Verification</span>
+                        <span className={`text-xs font-semibold ${secLabel}`}>คลื่น ECG ที่วิเคราะห์ (สัญญาณจริง)</span>
                       </div>
-                      <div className={`p-4 ${dk ? 'bg-[#060d18]' : 'bg-slate-50'}`}>
-                        <ECGComparisonCanvas height={240} />
+                      <div className={`p-4 flex flex-col gap-2 ${dk ? 'bg-[#060d18]' : 'bg-slate-50'}`}>
+                        {(testResults.waveform?.leads || []).length > 0
+                          ? [0, 1, 2].map((c) => {
+                              const series = testResults.waveform.leads.map((row) => row[c]);
+                              const mn = Math.min(...series), mx = Math.max(...series), span = (mx - mn) || 1;
+                              const pts = series.map((v, i) => `${(i / (series.length - 1)) * 100},${100 - ((v - mn) / span) * 100}`).join(' ');
+                              return (
+                                <svg key={c} viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-14">
+                                  <polyline points={pts} fill="none" stroke={dk ? '#38bdf8' : '#0284c7'} strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+                                </svg>
+                              );
+                            })
+                          : <p className={`text-xs ${secLabel}`}>ไม่มีคลื่น</p>}
                       </div>
                     </div>
 

@@ -6,7 +6,6 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import ECGComparisonCanvas from '../components/visualizers/ECGComparisonCanvas';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -67,6 +66,15 @@ const AIDiagnostics = () => {
     physics_adherence: '99.42%'
   });
 
+  // Real measured metrics from the backend (train-model-EP/evaluate.py)
+  const [metrics, setMetrics] = useState(null);
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/v1/localization/metrics`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setMetrics(d))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -111,13 +119,13 @@ const AIDiagnostics = () => {
               dk ? 'bg-emerald-500/[0.08] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
             }`} title="EP-PINN transmembrane-potential reconstruction R² on synthetic data">
               <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-emerald-400/70' : 'text-emerald-700/70'}`}>EP-PINN Recon. R²</p>
-              <p className={`text-sm font-bold ${dk ? 'text-emerald-400' : 'text-emerald-700'}`}>0.998</p>
+              <p className={`text-sm font-bold ${dk ? 'text-emerald-400' : 'text-emerald-700'}`}>{metrics?.ep_pinn?.recon_r2 ?? '—'}</p>
             </div>
             <div className={`rounded-xl border px-3 py-1.5 text-center ${
               dk ? 'bg-amber-500/[0.08] border-amber-500/20' : 'bg-amber-50 border-amber-200'
             }`} title="CardiacLocalizer 3D source localization — mean error on the held-out test set">
               <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-amber-400/70' : 'text-amber-700/70'}`}>3D Loc. Error</p>
-              <p className={`text-sm font-bold ${dk ? 'text-amber-400' : 'text-amber-700'}`}>~50 mm</p>
+              <p className={`text-sm font-bold ${dk ? 'text-amber-400' : 'text-amber-700'}`}>{metrics ? `${metrics.localizer.mean_error_mm} mm` : '—'}</p>
             </div>
           </div>
         </header>
@@ -177,29 +185,39 @@ const AIDiagnostics = () => {
           {/* ── Right: Validation ────────────────────────────────── */}
           <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-5">
 
-            {/* Signal Reconstruction */}
+            {/* Model evaluation — real measured metrics */}
             <div className={`rounded-2xl border overflow-hidden ${surface}`}>
               <div className={`flex items-center gap-2 px-4 py-3 border-b ${divider}`}>
                 <Target size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
-                <span className={`text-xs font-semibold ${secLabel}`}>Signal Reconstruction Accuracy</span>
+                <span className={`text-xs font-semibold ${secLabel}`}>Model Evaluation (held-out test set)</span>
+                {metrics?.localizer?.test_n && (
+                  <span className={`ml-auto text-[10px] ${secLabel}`}>N = {metrics.localizer.test_n}</span>
+                )}
               </div>
-              <div className={`p-4 ${dk ? 'bg-[#060d18]' : 'bg-slate-50'}`}>
-                <ECGComparisonCanvas height={220} />
+
+              <div className={`px-4 pt-4 text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-amber-400' : 'text-amber-600'}`}>CardiacLocalizer — 3D source localization</div>
+              <div className={`grid grid-cols-3 gap-3 p-4`}>
+                <MetricBadge dk={dk} label="Mean Error" value={metrics ? `${metrics.localizer.mean_error_mm} mm` : '—'}
+                  color={dk ? 'text-amber-400' : 'text-amber-600'} />
+                <MetricBadge dk={dk} label="AHA Top-1" value={metrics ? `${Math.round(metrics.localizer.aha_top1 * 100)}%` : '—'}
+                  color={dk ? 'text-amber-400' : 'text-amber-600'} />
+                <MetricBadge dk={dk} label="Territory Acc." value={metrics ? `${Math.round(metrics.localizer.territory_acc * 100)}%` : '—'}
+                  color={dk ? 'text-amber-400' : 'text-amber-600'} />
               </div>
-              <div className={`grid grid-cols-3 gap-3 p-4 border-t ${divider}`}>
-                <MetricBadge dk={dk} label="R-Squared Score" value="0.9984"
+
+              <div className={`px-4 pt-1 text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-emerald-400' : 'text-emerald-600'}`}>EP-PINN — reconstruction (synthetic)</div>
+              <div className={`grid grid-cols-3 gap-3 p-4`}>
+                <MetricBadge dk={dk} label="R-Squared" value={metrics?.ep_pinn?.recon_r2 ?? '—'}
                   color={dk ? 'text-emerald-400' : 'text-emerald-600'} />
-                <MetricBadge dk={dk} label="RMSE (Signal)" value="0.0021"
+                <MetricBadge dk={dk} label="RMSE" value={metrics?.ep_pinn?.rmse ?? '—'}
                   color={dk ? 'text-sky-400' : 'text-sky-600'} />
-                <MetricBadge dk={dk} label="Temporal Sync" value="Verified"
+                <MetricBadge dk={dk} label="PDE Converg." value={metrics ? `${Math.round(metrics.ep_pinn.pde_convergence * 100)}%` : '—'}
                   color={dk ? 'text-indigo-400' : 'text-indigo-600'} />
               </div>
+
               <p className={`px-4 pb-4 text-[10px] leading-relaxed ${subText}`}>
-                These metrics are the EP-PINN's transmembrane-potential reconstruction on
-                <b> synthetic</b> Aliev-Panfilov data — they do <b>not</b> measure 3D source
-                accuracy. The CardiacLocalizer's 3D localization mean error is <b>~50 mm</b>
-                (AHA top-1 ≈ 26%) on held-out data: a research prototype for decision support,
-                not a validated diagnostic.
+                {metrics?.disclaimer ??
+                  'Research prototype — localization mean error ~50 mm, not a validated diagnostic.'}
               </p>
             </div>
 

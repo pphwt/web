@@ -147,51 +147,7 @@ const PatientList = () => {
     }
   }, [token, patients]);
 
-  const totalScans = reports.length;
-  const totalCathetersSaved = totalScans;
-  const totalWasteSavedKg = (totalScans * 1.5).toFixed(1);
-  const totalCostSavedThb = (totalScans * 120000).toLocaleString('th-TH');
-  const co2AvoidedKg = (totalScans * 12).toFixed(1);
 
-  const fillDemoData = () => {
-    const demos = [
-      {
-        name: 'นายสมชาย ใจดี',
-        id_card: '1-1001-01882-73-6',
-        dob: '1985-06-15',
-        gender: 'ชาย (Male)',
-        blood_type: 'O+',
-        allergies: 'แพ้ยาเพนิซิลลิน (Penicillin)',
-        emergency_contact: 'นางสมศรี ใจดี (ภรรยา) - 0812345678',
-        case_type: 'General',
-      },
-      {
-        name: 'นางสาววิภา พรหมรักษา',
-        id_card: '3-1012-01994-85-7',
-        dob: '1998-11-20',
-        gender: 'หญิง (Female)',
-        blood_type: 'A+',
-        allergies: 'ไม่มีประวัติแพ้ยา',
-        emergency_contact: 'นายสมเกียรติ พรหมรักษา (บิดา) - 0898765432',
-        case_type: 'Emergency',
-      },
-      {
-        name: 'นายเดวิด มิลเลอร์',
-        id_card: '9-2817-29938-19-1',
-        dob: '1972-04-03',
-        gender: 'อื่นๆ',
-        blood_type: 'B-',
-        allergies: 'แพ้อาหารทะเลรุนแรง (Anaphylaxis)',
-        emergency_contact: 'David Miller Sr. (Father) - +1-555-0199',
-        case_type: 'Urgent',
-      }
-    ];
-    const randomDemo = demos[Math.floor(Math.random() * demos.length)];
-    setFormData(randomDemo);
-    if (showToast) {
-      showToast('สุ่มข้อมูลตัวอย่างสอดคล้องมาตรฐาน HL7 FHIR สำเร็จ', 'success');
-    }
-  };
 
   useEffect(() => { if (token) refreshPatients(); }, [token]);
 
@@ -266,89 +222,6 @@ const PatientList = () => {
           </div>
         </header>
 
-        {/* ── Sustainable Innovation Dashboard ─────────────────── */}
-        <div className={`mb-6 rounded-2xl border p-4 transition-all duration-300 ${
-          dk ? 'bg-emerald-500/[0.02] border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.02)]' : 'bg-emerald-50/50 border-emerald-200'
-        }`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-xl shrink-0 ${dk ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-100 text-emerald-800'}`}>
-                <Leaf size={18} className="animate-pulse" />
-              </div>
-              <div>
-                <h4 className={`text-sm font-bold flex items-center gap-1.5 ${dk ? 'text-emerald-300' : 'text-emerald-950'}`}>
-                  {t('sust_title')}
-                </h4>
-                <p className={`text-xs mt-0.5 leading-relaxed max-w-[800px] ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {t('sust_desc')}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowImpactDetails(!showImpactDetails)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold self-start sm:self-center transition ${
-                dk ? 'bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]' : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50'
-              }`}
-            >
-              {showImpactDetails ? (
-                <>ซ่อนรายละเอียด <ChevronUp size={14} /></>
-              ) : (
-                <>แสดงข้อมูลดัชนีความยั่งยืน <ChevronDown size={14} /></>
-              )}
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {showImpactDetails && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
-              >
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-emerald-500/10">
-                  <div className={`rounded-xl p-3.5 border ${dk ? 'bg-white/[0.02] border-white/[0.04]' : 'bg-white border-emerald-100'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingDown size={14} className="text-emerald-500" />
-                      <span className={`text-[10px] font-semibold tracking-wider ${dk ? 'text-slate-500' : 'text-slate-400'}`}>{t('cost_saved')}</span>
-                    </div>
-                    <p className={`text-lg font-bold ${dk ? 'text-white' : 'text-slate-900'}`}>฿{totalCostSavedThb}</p>
-                    <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>~฿120k saved per scan</p>
-                  </div>
-
-                  <div className={`rounded-xl p-3.5 border ${dk ? 'bg-white/[0.02] border-white/[0.04]' : 'bg-white border-emerald-100'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Trash2 size={14} className="text-emerald-500" />
-                      <span className={`text-[10px] font-semibold tracking-wider ${dk ? 'text-slate-500' : 'text-slate-400'}`}>{t('waste_saved')}</span>
-                    </div>
-                    <p className={`text-lg font-bold ${dk ? 'text-white' : 'text-slate-900'}`}>{totalWasteSavedKg} kg</p>
-                    <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>Bio-waste prevented</p>
-                  </div>
-
-                  <div className={`rounded-xl p-3.5 border ${dk ? 'bg-white/[0.02] border-white/[0.04]' : 'bg-white border-emerald-100'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Globe size={14} className="text-emerald-500" />
-                      <span className={`text-[10px] font-semibold tracking-wider ${dk ? 'text-slate-500' : 'text-slate-400'}`}>{t('co2_avoided') || 'CO2 Saved'}</span>
-                    </div>
-                    <p className={`text-lg font-bold ${dk ? 'text-white' : 'text-slate-900'}`}>{co2AvoidedKg} kg</p>
-                    <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>Operating emissions saved</p>
-                  </div>
-
-                  <div className={`rounded-xl p-3.5 border ${dk ? 'bg-white/[0.02] border-white/[0.04]' : 'bg-white border-emerald-100'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Share2 size={14} className="text-emerald-500" />
-                      <span className={`text-[10px] font-semibold tracking-wider ${dk ? 'text-slate-500' : 'text-slate-400'}`}>{t('rural_referrals')}</span>
-                    </div>
-                    <p className={`text-lg font-bold ${dk ? 'text-white' : 'text-slate-900'}`}>{totalScans} Scans</p>
-                    <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>Linked community hospitals</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
 
         {/* ── Stats row ─────────────────────────────────────────── */}
         <div className={`mb-6 flex items-center gap-2 text-sm ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -514,17 +387,6 @@ const PatientList = () => {
                     <p className={`mt-0.5 text-xs ${modalSub}`}>{t('modal_subtitle')}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={fillDemoData}
-                      className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
-                        dk
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15'
-                          : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                      }`}
-                    >
-                      💡 กรอกข้อมูลสุ่ม
-                    </button>
                     {/* Tabs */}
                     <div className={`flex gap-1 rounded-xl border p-1 ${dk ? 'bg-white/[0.04] border-white/[0.07]' : 'bg-slate-100 border-slate-200'}`}>
                       {[
