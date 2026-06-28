@@ -8,6 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { usePatient } from '../context/PatientContext';
 import { useTheme } from '../context/ThemeContext';
+import { MODEL_API_BASE } from '../services/modelApi';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ const NeuralSandbox = () => {
     setIsRunning(true);
     try {
       // Real inference: analyze a real dataset recording with the CardiacLocalizer
-      const API = import.meta.env.VITE_API_URL;
+      const API = MODEL_API_BASE;
       const sres = await fetch(`${API}/api/v1/localization/samples?limit=24`);
       const sdata = await sres.json();
       const list = sdata?.samples || [];

@@ -6,6 +6,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { MODEL_API_BASE } from '../services/modelApi';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const AIDiagnostics = () => {
   // Real measured metrics from the backend (train-model-EP/evaluate.py)
   const [metrics, setMetrics] = useState(null);
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/v1/localization/metrics`)
+    fetch(`${MODEL_API_BASE}/api/v1/localization/metrics`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setMetrics(d))
       .catch(() => {});

@@ -3,8 +3,9 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStream } from '../../context/StreamContext';
+import { MODEL_API_BASE } from '../../services/modelApi';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = MODEL_API_BASE;
 const HEART_SCALE = 1.5;
 
 function normToScene(n, bbRef) {

@@ -222,10 +222,13 @@ Create `.env.local` in the `web/` directory:
 
 ```env
 VITE_API_URL=http://localhost:8000
+VITE_MODEL_API_URL=http://localhost:8010
 VITE_WS_URL=ws://localhost:8000/api/v1/ws/signals
 ```
 
-In production, these point to the deployed backend URL.
+`VITE_API_URL` is the main clinical backend (auth, patients, reports, archives).
+`VITE_MODEL_API_URL` is the standalone `train-model-EP` FastAPI service for
+`/api/v1/localization/*`. In production, point both at their deployed services.
 
 ---
 
