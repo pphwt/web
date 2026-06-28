@@ -4,9 +4,7 @@ import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
-import { MODEL_API_BASE } from '../services/modelApi';
-
-const API_BASE = MODEL_API_BASE;
+import { modelApi } from '../services/modelApi';
 
 const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
 
@@ -56,6 +54,7 @@ const Analysis = () => {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [datasetInfo, setDatasetInfo] = useState(null);
 
   // Auto-match patient to a sample signal
   const activeSample = useMemo(() => {
@@ -73,11 +72,11 @@ const Analysis = () => {
   }, [activeSample, file]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/localization/samples?limit=24`)
-      .then((r) => (r.ok ? r.json() : null))
+    modelApi.demoSamples(24)
       .then((d) => {
         if (d?.samples) {
           setSamples(d.samples);
+          setDatasetInfo(d.dataset || null);
           // Only set default if no active patient sample is matched yet
           if (d.samples[0] && !selectedPatient) {
             setSampleId(d.samples[0].id);
@@ -95,15 +94,10 @@ const Analysis = () => {
     setLoading(true);
     setResult(null);
     try {
-      const fd = new FormData();
-      if (file) fd.append('file', file);
-      else fd.append('sample_id', sampleId);
-      const r = await fetch(`${API_BASE}/api/v1/localization/analyze`, { method: 'POST', body: fd });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${r.status}`);
-      }
-      setResult(await r.json());
+      const analyzed = file
+        ? await modelApi.analyzeFile(file)
+        : await modelApi.analyzeSample(sampleId);
+      setResult(analyzed);
     } catch (e) {
       showToast(`วิเคราะห์ไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
@@ -182,6 +176,13 @@ const Analysis = () => {
               <div className={`rounded-2xl border p-4 ${surface}`}>
                 <div className={`text-xs font-semibold mb-3 ${secLabel}`}>คลื่น ECG ที่วิเคราะห์ (สัญญาณจริง)</div>
                 <WaveformPlot leads={result.waveform.leads} dk={dk} />
+                {datasetInfo && (
+                  <div className={`mt-2 rounded-xl px-3 py-2 text-[10px] ${
+                    dk ? 'bg-white/[0.03] text-slate-400 border border-white/[0.06]' : 'bg-white/70 text-slate-500 border border-slate-100'
+                  }`}>
+                    Model API: localizer.pt · {datasetInfo.doi}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -233,7 +234,7 @@ const Analysis = () => {
               >
                 {samples.length === 0 && <option>— ไม่พบตัวอย่าง (เช็ก backend/dataset) —</option>}
                 {samples.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.source})</option>
+                  <option key={s.id} value={s.id}>{s.name} ({s.split || 'sample'})</option>
                 ))}
               </select>
 
@@ -290,6 +291,24 @@ const Analysis = () => {
                     </div>
                   ))}
                 </div>
+
+                {result.ground_truth && (
+                  <div className={`mt-3 rounded-xl border p-3 ${dk ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                      Held-out test ground truth
+                    </div>
+                    <div className={`mt-1 grid grid-cols-2 gap-2 text-[11px] ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <div>True node: <b>{result.ground_truth.node_idx}</b></div>
+                      <div>Top-5 hit: <b>{result.ground_truth.top5_hit ? 'YES' : 'NO'}</b></div>
+                      <div className="col-span-2">
+                        Node error: <b>{result.ground_truth.predicted_node_error_mm?.toFixed(1)} mm</b>
+                      </div>
+                    </div>
+                    <p className={`mt-1 text-[10px] ${subText}`}>
+                      Paired VmData ground truth from the simulated intracardiac ECG dataset.
+                    </p>
+                  </div>
+                )}
 
                 {/* Honest disclaimer */}
                 <div className={`mt-3 flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>

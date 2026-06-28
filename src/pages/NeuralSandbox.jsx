@@ -8,7 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { usePatient } from '../context/PatientContext';
 import { useTheme } from '../context/ThemeContext';
-import { MODEL_API_BASE } from '../services/modelApi';
+import { modelApi } from '../services/modelApi';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -63,19 +63,13 @@ const NeuralSandbox = () => {
     setIsRunning(true);
     try {
       // Real inference: analyze a real dataset recording with the CardiacLocalizer
-      const API = MODEL_API_BASE;
-      const sres = await fetch(`${API}/api/v1/localization/samples?limit=24`);
-      const sdata = await sres.json();
+      const sdata = await modelApi.demoSamples(24);
       const list = sdata?.samples || [];
       const idx = Math.max(0, archives.indexOf(selectedArchive));
       const sampleId = (list[idx % (list.length || 1)] || list[0])?.id;
       if (!sampleId) throw new Error('no sample available');
 
-      const fd = new FormData();
-      fd.append('sample_id', sampleId);
-      const r = await fetch(`${API}/api/v1/localization/analyze`, { method: 'POST', body: fd });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const res = await r.json();
+      const res = await modelApi.analyzeSample(sampleId);
 
       const region = res.region || {};
       const high = region.risk === 'HIGH';
@@ -91,6 +85,7 @@ const NeuralSandbox = () => {
         findings: [region.label, `${region.territory ?? '—'} territory`, `${region.risk ?? '—'} risk`].filter(Boolean),
         focus_site: region.label ?? '—',
         waveform: res.waveform,
+        ground_truth: res.ground_truth,
       });
     } catch (e) {
       console.error('Analysis failed', e);

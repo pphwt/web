@@ -192,7 +192,7 @@ Model explainability panel. Shows:
 
 ### `Analysis` ([src/pages/Analysis.jsx](src/pages/Analysis.jsx))
 
-**Real ECG analysis tool** (not the live simulation). The clinician picks a sample ECG from the intracardiac dataset or uploads a `.npy`/`.csv` file, then `POST`s to `/localization/analyze`. Displays the real analyzed waveform, the 3D heart with the localized source pin (reuses `HeartModel3D` via a static `result` prop), and an honest result panel: AHA region, risk, confidence, measured heart rate, source mm-coordinates, plus a `~50 mm` accuracy disclaimer. The live-stream pages (`LiveMonitoring`, `EducationalLab`) are labeled **SIMULATION** to distinguish synthesized signals from this real path.
+**Real ECG analysis tool** (not the live simulation). The clinician picks a held-out simulated ECG from `train-model-EP` or uploads a `.npy`/`.csv` file, then `POST`s to `/localization/analyze`. Displays the analyzed waveform, the 3D heart with the localized source pin (reuses `HeartModel3D` via a static `result` prop), AHA region, risk, confidence, measured heart rate, source mm-coordinates, and paired VmData ground-truth/error when available. The live-stream pages (`LiveMonitoring`, `EducationalLab`) are labeled **SIMULATION** to distinguish synthesized signals from this real path.
 
 ---
 
