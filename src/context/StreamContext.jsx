@@ -25,17 +25,22 @@ export const StreamProvider = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let reconnectDelay = 1000;
+    const MAX_RECONNECT_DELAY = 30000;
+    let reconnectTimeoutId = null;
 
     const connect = () => {
       if (!isMounted) return;
 
+      console.log(`WS Connecting to ${WS_URL}...`);
       const socket = new WebSocket(WS_URL);
       socketRef.current = socket;
 
       socket.onopen = () => {
         if (isMounted) {
           setIsConnected(true);
-          console.log('Global Stream Connected');
+          console.log('Global Stream Connected successfully');
+          reconnectDelay = 1000; // Reset delay on successful connection
           // Re-subscribe after reconnect
           if (currentPatientId.current) {
             sendSubscribe(currentPatientId.current);
@@ -44,20 +49,16 @@ export const StreamProvider = ({ children }) => {
       };
 
       let lastUpdateTime = 0;
-      const UPDATE_THROTTLE_MS = 100; // 10Hz update for UI stats
+      const UPDATE_THROTTLE_MS = 100;
 
       socket.onmessage = (event) => {
         if (!isMounted) return;
         try {
           const payload = JSON.parse(event.data);
           
-          // Emit raw event for high-frequency consumers (ECG, 3D)
           streamEvents.current.dispatchEvent(new CustomEvent('data', { detail: payload }));
-
-          // Always update ref for real-time access (low overhead)
           socketRef.current.latestData = payload;
 
-          // Throttle React state update for stats/params
           const now = Date.now();
           if (now - lastUpdateTime > UPDATE_THROTTLE_MS) {
             setData(payload);
@@ -71,11 +72,19 @@ export const StreamProvider = ({ children }) => {
       socket.onclose = () => {
         if (isMounted) {
           setIsConnected(false);
-          setTimeout(connect, 3000);
+          const jitter = Math.floor(Math.random() * 400) + 100;
+          const nextDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+          const finalDelay = nextDelay + jitter;
+          
+          console.warn(`WS Connection closed. Reconnecting in ${finalDelay}ms (backoff: ${reconnectDelay}ms)...`);
+          reconnectDelay = nextDelay;
+
+          reconnectTimeoutId = setTimeout(connect, finalDelay);
         }
       };
 
       socket.onerror = (err) => {
+        console.error('WS Connection error:', err);
         socket.close();
       };
     };
@@ -84,8 +93,9 @@ export const StreamProvider = ({ children }) => {
 
     return () => {
       isMounted = false;
+      if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
       if (socketRef.current) {
-        socketRef.current.onclose = null; // Prevent reconnect on cleanup
+        socketRef.current.onclose = null;
         socketRef.current.close();
       }
     };
