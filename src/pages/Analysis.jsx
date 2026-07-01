@@ -308,12 +308,24 @@ const Analysis = () => {
                 value={sampleId}
                 onChange={(e) => { setSampleId(e.target.value); setFile(null); }}
                 disabled={!!file}
-                className={`w-full rounded-lg border px-3 py-2 text-xs font-mono mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${file ? 'opacity-50' : ''}`}
+                className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${file ? 'opacity-50' : ''}`}
               >
-                {samples.length === 0 && <option>— ไม่พบตัวอย่าง (เช็ก backend/dataset) —</option>}
-                {samples.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.split || 'sample'})</option>
-                ))}
+                {samples.length === 0 && <option>— ไม่พบตัวอย่าง —</option>}
+                {/* Group samples by their split/category */}
+                {['Normal', 'AFIB', 'MI', 'sample'].map((group) => {
+                  const grouped = samples.filter(s => (s.split || 'sample') === group);
+                  if (!grouped.length) return null;
+                  const groupLabel = { Normal: '🟢 Normal ECG', AFIB: '🟡 Atrial Fibrillation', MI: '🔴 Myocardial Infarction', sample: '⚪ Other' }[group];
+                  return (
+                    <optgroup key={group} label={groupLabel}>
+                      {grouped.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name || s.primary_label || s.id}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
 
               <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>หรืออัปโหลดไฟล์ (.npy / .csv)</label>
