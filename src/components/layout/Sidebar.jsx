@@ -24,15 +24,12 @@ const buildSections = (t) => [
     label: 'คัดกรอง',
     items: [
       { icon: Stethoscope, label: 'อ่านผล ECG (ไฟล์จริง)',   path: '/page/clinical-ecg' },
-      { icon: Database,    label: t('sandbox_title'),     path: '/page/sandbox' },
-      { icon: ShieldCheck, label: t('ai_diag_title'),      path: '/page/ai-diagnostics' },
     ],
   },
   {
     label: 'ข้อมูล',
     items: [
       { icon: Archive,      label: t('nav_archives'), path: '/page/archives' },
-      { icon: FlaskConical, label: t('nav_lab'),      path: '/page/lab' },
       { icon: FileText,     label: t('nav_reports'),  path: '/page/reports' },
     ],
   },

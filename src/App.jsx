@@ -18,9 +18,6 @@ import Analysis from './pages/Analysis';
 import ClinicalEcg from './pages/ClinicalEcg';
 import Login from './pages/Login';
 import PatientArchives from './pages/PatientArchives';
-import EducationalLab from './pages/EducationalLab';
-import NeuralSandbox from './pages/NeuralSandbox';
-import AIDiagnostics from './pages/AIDiagnostics';
 import HelpManual from './pages/HelpManual';
 
 function App() {
@@ -48,10 +45,7 @@ function App() {
                               <Route path="/page/reports" element={<Reports />} />
                               <Route path="/page/analysis" element={<Analysis />} />
                               <Route path="/page/clinical-ecg" element={<ClinicalEcg />} />
-                              <Route path="/page/sandbox" element={<NeuralSandbox />} />
-                              <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
                               <Route path="/page/archives" element={<PatientArchives />} />
-                              <Route path="/page/lab" element={<EducationalLab />} />
                               <Route path="/page/help" element={<HelpManual />} />
                               <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
