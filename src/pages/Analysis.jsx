@@ -45,12 +45,29 @@ function WaveformPlot({ leads, dk }) {
   );
 }
 
+// Hardcoded PTB-XL fallback so the dropdown always has data even when the
+// backend is cold-starting or the real_samples endpoint is unreachable.
+const DEFAULT_SAMPLES = [
+  { id: '00001_hr', name: 'Normal ECG – F 56y',          split: 'Normal' },
+  { id: '00002_hr', name: 'Normal ECG – M 19y',          split: 'Normal' },
+  { id: '00003_hr', name: 'Normal ECG – F 37y',          split: 'Normal' },
+  { id: '00017_hr', name: 'Atrial Fibrillation – M 56y', split: 'AFIB'   },
+  { id: '00152_hr', name: 'Atrial Fibrillation – F 70y', split: 'AFIB'   },
+  { id: '00282_hr', name: 'Atrial Fibrillation – M',     split: 'AFIB'   },
+  { id: '00008_hr', name: 'Inferior MI – M 48y',         split: 'MI'     },
+  { id: '00039_hr', name: 'Inferior MI – M 56y',         split: 'MI'     },
+  { id: '00103_hr', name: 'Inferior MI – M 39y',         split: 'MI'     },
+  { id: '00077_hr', name: 'Anterior MI – M 43y',         split: 'MI'     },
+  { id: '00199_hr', name: 'Anterior MI – F 19y',         split: 'MI'     },
+  { id: '00211_hr', name: 'Anterior MI – F 85y',         split: 'MI'     },
+];
+
 const Analysis = () => {
   const { isDarkMode: dk } = useTheme();
   const { showToast } = useToast();
   const { selectedPatient, patients } = usePatient();
 
-  const [samples, setSamples] = useState([]);
+  const [samples, setSamples] = useState(DEFAULT_SAMPLES);
   const [sampleId, setSampleId] = useState('');
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
@@ -76,9 +93,9 @@ const Analysis = () => {
   }, [activeSample, file]);
 
   useEffect(() => {
-    modelApi.demoSamples(24)
+    modelApi.ecgSamples()
       .then((d) => {
-        if (d?.samples) {
+        if (d?.samples && d.samples.length > 0) {
           setSamples(d.samples);
           setDatasetInfo(d.dataset || null);
           // Only set default if no active patient sample is matched yet
@@ -86,8 +103,9 @@ const Analysis = () => {
             setSampleId(d.samples[0].id);
           }
         }
+        // else: keep DEFAULT_SAMPLES already in state
       })
-      .catch(() => {});
+      .catch(() => {}); // silent – fallback already loaded
   }, [selectedPatient]);
 
   const analyze = async () => {
