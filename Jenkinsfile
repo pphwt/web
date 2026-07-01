@@ -16,6 +16,12 @@ pipeline {
             }
         }
 
+        stage('Prepare Env') {
+            steps {
+                sh 'cp /var/www/bioelectic/web/.env .env'
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 sh 'docker build -t bio-clinical-web .'
