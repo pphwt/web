@@ -6,11 +6,12 @@ import { useStream } from '../context/StreamContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 import { useDiagnosticSolver } from '../hooks/useDiagnosticSolver';
 import {
   Activity, Zap, Save, Heart, TrendingUp, TrendingDown,
   Wifi, WifiOff, Snowflake, History, Dot, Circle,
-  CheckCircle2, AlertTriangle, AlertCircle, Minus,
+  CheckCircle2, AlertTriangle, AlertCircle, Minus, Usb,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -72,6 +73,98 @@ const LiveMonitoring = () => {
   const [saveStatus, setSaveStatus]     = useState(null);
   const [isFrozen, setIsFrozen]         = useState(false);
   const [events, setEvents]             = useState([]);
+
+  const { showToast } = useToast();
+  const { events: streamEvents } = useStream();
+
+  const [serialSupported] = useState('serial' in navigator);
+  const [isSerialConnected, setIsSerialConnected] = useState(false);
+  const serialPortRef = useRef(null);
+  const serialReaderRef = useRef(null);
+
+  const disconnectSerial = async () => {
+    try {
+      if (serialReaderRef.current) {
+        await serialReaderRef.current.cancel();
+        serialReaderRef.current = null;
+      }
+      if (serialPortRef.current) {
+        await serialPortRef.current.close();
+        serialPortRef.current = null;
+      }
+      setIsSerialConnected(false);
+      showToast('ปิดการเชื่อมต่อ USB Serial แล้ว', 'info');
+    } catch (err) {
+      console.error(err);
+      setIsSerialConnected(false);
+    }
+  };
+
+  const connectSerial = async () => {
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      serialPortRef.current = port;
+      setIsSerialConnected(true);
+      showToast('เชื่อมต่ออุปกรณ์ผ่าน USB สำเร็จ!', 'success');
+
+      const reader = port.readable.getReader();
+      serialReaderRef.current = reader;
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          const tokens = trimmed.split(',').map(Number);
+          if (tokens.some(isNaN) || tokens.length === 0) continue;
+
+          const lead_i = tokens[0] ?? 0.0;
+          const lead_ii = tokens[1] ?? 0.0;
+          const v5 = tokens[2] ?? 0.0;
+
+          // Dispatch event to local listeners via StreamContext event target
+          if (streamEvents) {
+            streamEvents.dispatchEvent(new CustomEvent('data', {
+              detail: {
+                leads: { lead_i, lead_ii, v5 },
+                is_hardware: true,
+                heart_rate: 72
+              }
+            }));
+          }
+
+          if (isRecording) {
+            recordingBuffer.current.lead_i.push(lead_i);
+            recordingBuffer.current.lead_ii.push(lead_ii);
+            recordingBuffer.current.v5.push(v5);
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      if (err.name !== 'AbortError') {
+        showToast('เชื่อมต่อพอร์ตล้มเหลว: ' + err.message, 'error');
+      }
+      setIsSerialConnected(false);
+    }
+  };
+
+  // Cleanup serial on unmount
+  useEffect(() => {
+    return () => {
+      if (serialReaderRef.current) serialReaderRef.current.cancel().catch(() => {});
+      if (serialPortRef.current) serialPortRef.current.close().catch(() => {});
+    };
+  }, []);
 
   // Generate real-time event logs dynamically from WebSocket connection and AI state
   useEffect(() => {
@@ -232,6 +325,24 @@ const LiveMonitoring = () => {
                 </motion.span>
               )}
             </AnimatePresence>
+
+            {/* Native USB Serial (Web Serial API) */}
+            {serialSupported && (
+              <button
+                type="button"
+                onClick={isSerialConnected ? disconnectSerial : connectSerial}
+                className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all active:scale-95 ${
+                  isSerialConnected
+                    ? 'bg-emerald-600 border-emerald-500 text-white'
+                    : dk
+                    ? 'border-white/[0.07] text-slate-300 hover:bg-white/[0.04] bg-slate-900/40'
+                    : 'border-slate-200 text-slate-700 hover:bg-slate-50 bg-white'
+                }`}
+              >
+                <Usb size={14} className={isSerialConnected ? 'animate-pulse' : ''} />
+                <span>{isSerialConnected ? 'Connected USB' : 'Connect USB Serial'}</span>
+              </button>
+            )}
 
             {/* Freeze */}
             <button
