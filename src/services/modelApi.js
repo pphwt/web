@@ -64,12 +64,21 @@ export const modelApi = {
 
   // Real clinical-file path: standard formats + neurokit2 measurements + honest
   // localizer gating (see backend /ecg/analyze).
-  analyzeEcgFile: async (file) => {
-    if (file.size > ECG_UPLOAD_MAX_BYTES) {
-      throw new Error(`ECG file is too large. Max ${(ECG_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(1)} MB.`);
-    }
+  analyzeEcgFile: async (fileOrFiles) => {
     const form = new FormData();
-    form.append('file', file);
+    if (Array.isArray(fileOrFiles)) {
+      fileOrFiles.forEach(f => {
+        if (f.size > ECG_UPLOAD_MAX_BYTES) {
+          throw new Error(`ECG file ${f.name} is too large. Max ${(ECG_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(1)} MB.`);
+        }
+        form.append('files', f);
+      });
+    } else if (fileOrFiles) {
+      if (fileOrFiles.size > ECG_UPLOAD_MAX_BYTES) {
+        throw new Error(`ECG file is too large. Max ${(ECG_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(1)} MB.`);
+      }
+      form.append('file', fileOrFiles);
+    }
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
       headers: authHeaders(),
@@ -89,9 +98,12 @@ export const modelApi = {
     }));
   },
 
-  ecgReportBlob: async ({ file, sampleId }) => {
+  ecgReportBlob: async ({ file, files, sampleId }) => {
     const form = new FormData();
     if (file) form.append('file', file);
+    else if (files) {
+      files.forEach(f => form.append('files', f));
+    }
     else form.append('sample_id', sampleId);
     const res = await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/report`, {
       method: 'POST', headers: authHeaders(), body: form,

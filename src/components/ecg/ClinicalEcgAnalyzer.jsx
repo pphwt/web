@@ -56,7 +56,7 @@ export default function ClinicalEcgAnalyzer() {
   const { isDarkMode: dk } = useTheme();
   const { selectedPatient } = usePatient();
   const { showToast } = useToast();
-  const [file, setFile] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState(null);
   const [samples, setSamples] = useState([]);
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
@@ -76,11 +76,11 @@ export default function ClinicalEcgAnalyzer() {
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
 
   const analyze = async () => {
-    if (!file && !sampleId) { setError('เลือกตัวอย่างจริง หรืออัปโหลดไฟล์ก่อน'); return; }
+    if (!uploadedFiles && !sampleId) { setError('เลือกตัวอย่างจริง หรืออัปโหลดไฟล์ก่อน'); return; }
     setLoading(true); setError(''); setResult(null);
     try {
-      setResult(file
-        ? await modelApi.analyzeEcgFile(file)
+      setResult(uploadedFiles
+        ? await modelApi.analyzeEcgFile(uploadedFiles)
         : await modelApi.analyzeEcgSample(sampleId));
     } catch (e) {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
@@ -93,7 +93,11 @@ export default function ClinicalEcgAnalyzer() {
   const downloadPdf = async () => {
     setPdfLoading(true);
     try {
-      const blob = await modelApi.ecgReportBlob(file ? { file } : { sampleId });
+      const blob = await modelApi.ecgReportBlob(
+        uploadedFiles 
+          ? (uploadedFiles.length === 1 ? { file: uploadedFiles[0] } : { files: uploadedFiles }) 
+          : { sampleId }
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `ECG_Report_${sampleId || 'upload'}.pdf`;
@@ -117,7 +121,9 @@ export default function ClinicalEcgAnalyzer() {
       await modelApi.saveEcgReport({
         patient_id: selectedPatient.id,
         result,
-        source_name: file ? file.name : sampleId,
+        source_name: uploadedFiles 
+          ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : uploadedFiles.map(f => f.name).join(', ')) 
+          : sampleId,
       });
       showToast(`บันทึกเข้าเวชระเบียน ${selectedPatient.name} สำเร็จ`, 'success');
     } catch (e) {
@@ -151,9 +157,9 @@ export default function ClinicalEcgAnalyzer() {
             </label>
             <select
               value={sampleId}
-              onChange={(e) => { setSampleId(e.target.value); setFile(null); setError(''); }}
-              disabled={!!file}
-              className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${file ? 'opacity-50' : ''}`}
+              onChange={(e) => { setSampleId(e.target.value); setUploadedFiles(null); setError(''); }}
+              disabled={!!uploadedFiles}
+              className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${uploadedFiles ? 'opacity-50' : ''}`}
             >
               <option value="">— เลือกตัวอย่างจริง —</option>
               {samples.map((s) => (
@@ -166,9 +172,18 @@ export default function ClinicalEcgAnalyzer() {
 
         <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs cursor-pointer mb-3 ${dk ? 'border-white/[0.12] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:bg-slate-50'}`}>
           <Upload size={14} />
-          <span className="truncate">{file ? file.name : 'เลือกไฟล์ (.npy / .csv / .hea+.dat / .dcm)'}</span>
-          <input ref={inputRef} type="file" accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg" className="hidden"
-            onChange={(e) => { setFile(e.target.files?.[0] || null); setSampleId(''); setError(''); }} />
+          <span className="truncate">
+            {uploadedFiles 
+              ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : `${uploadedFiles.length} files selected`) 
+              : 'เลือกไฟล์ (.npy / .csv / .hea+.dat / .dcm)'}
+          </span>
+          <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg" className="hidden"
+            onChange={(e) => { 
+              const list = Array.from(e.target.files || []); 
+              setUploadedFiles(list.length > 0 ? list : null); 
+              setSampleId(''); 
+              setError(''); 
+            }} />
         </label>
         <p className={`text-[10px] mb-3 ${subText}`}>
           รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
