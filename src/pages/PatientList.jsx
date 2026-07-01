@@ -176,6 +176,52 @@ const PatientList = () => {
     p.id_card?.includes(searchTerm)
   );
 
+  const referralSupportOf = (report) => report?.physics_params?.referral_support || {};
+  const reviewStatusOf = (report) => report?.status || referralSupportOf(report)?.review?.status || 'PENDING';
+  const reportsWithReferralSupport = reports.filter((report) => {
+    const support = referralSupportOf(report);
+    return Boolean(support.risk_level || support.triage_status || support.recommendation || support.review);
+  });
+  const highRiskCount = reportsWithReferralSupport.filter(
+    (report) => referralSupportOf(report).risk_level === 'HIGH'
+  ).length;
+  const referredCount = reportsWithReferralSupport.filter(
+    (report) => reviewStatusOf(report) === 'REFERRED'
+  ).length;
+  const reviewReadyCount = reportsWithReferralSupport.length;
+  const estimatedCostAvoidedThb = reviewReadyCount * 350;
+  const estimatedTravelAvoidedKm = Math.max(referredCount, highRiskCount) * 25;
+  const impactStats = [
+    {
+      label: 'Primary-care cases',
+      value: patients.length.toLocaleString('th-TH'),
+      detail: 'ผู้ป่วยที่ลงทะเบียนเพื่อคัดกรองเบื้องต้น',
+      icon: Users,
+      accent: dk ? 'text-sky-300 bg-sky-500/10 border-sky-400/20' : 'text-sky-700 bg-sky-50 border-sky-200',
+    },
+    {
+      label: 'Referral-ready reports',
+      value: reviewReadyCount.toLocaleString('th-TH'),
+      detail: 'รายงานที่มี risk, signal quality และคำแนะนำส่งต่อ',
+      icon: Share2,
+      accent: dk ? 'text-violet-300 bg-violet-500/10 border-violet-400/20' : 'text-violet-700 bg-violet-50 border-violet-200',
+    },
+    {
+      label: 'High-risk triage',
+      value: highRiskCount.toLocaleString('th-TH'),
+      detail: 'เคสที่ควรให้แพทย์ตรวจทาน/พิจารณาส่งต่อเร็ว',
+      icon: HeartPulse,
+      accent: dk ? 'text-rose-300 bg-rose-500/10 border-rose-400/20' : 'text-rose-700 bg-rose-50 border-rose-200',
+    },
+    {
+      label: 'Estimated savings',
+      value: `฿${estimatedCostAvoidedThb.toLocaleString('th-TH')}`,
+      detail: 'ประมาณการต้นทุนเบื้องต้นที่ลดได้จากการคัดกรองก่อนส่งต่อ',
+      icon: Leaf,
+      accent: dk ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20' : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    },
+  ];
+
   // ── tokens ─────────────────────────────────────────────────────
   const pageBg     = dk ? 'bg-[var(--bg-main)]'    : 'bg-[var(--bg-main)]';
   const cardBg     = dk ? 'bg-[#0d1525] border-white/[0.06] hover:border-sky-500/25' : 'bg-white border-slate-200 hover:border-sky-400/50';
@@ -240,6 +286,125 @@ const PatientList = () => {
           <Users size={14} />
           <span>{filtered.length} {t('patient_count')}{searchTerm ? ` (${t('patient_count_filtered')} ${patients.length})` : ''}</span>
         </div>
+
+        <section className={`mb-6 overflow-hidden rounded-2xl border ${
+          dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'
+        }`}>
+          <div className="grid gap-5 p-5 lg:grid-cols-[1.05fr_1.95fr] lg:p-6">
+            <div className="flex flex-col justify-between gap-4">
+              <div>
+                <div className={`mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase ${
+                  dk ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                }`}>
+                  <Leaf size={13} />
+                  NSC Sustainable Innovation
+                </div>
+                <h2 className={`text-xl font-bold tracking-tight ${dk ? 'text-white' : 'text-slate-900'}`}>
+                  Impact dashboard สำหรับคัดกรองและส่งต่อ
+                </h2>
+                <p className={`mt-2 text-sm leading-6 ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
+                  แสดงผลลัพธ์ที่กรรมการมองหาใน 30 วินาที: แก้ปัญหาการเข้าถึงการคัดกรองหัวใจ,
+                  ช่วยหน่วยปฐมภูมิตัดสินใจส่งต่อ และลดต้นทุนที่ไม่จำเป็นโดยยังให้แพทย์เป็นผู้ยืนยันผลสุดท้าย
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {['คัดกรองเร็วขึ้น', 'ส่งต่อชัดขึ้น', 'ลดการเดินทางซ้ำ', 'Decision support'].map((item) => (
+                  <span
+                    key={item}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                      dk ? 'border-white/[0.08] bg-white/[0.04] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {impactStats.map(({ label, value, detail, icon: Icon, accent }) => (
+                  <div
+                    key={label}
+                    className={`rounded-xl border p-4 ${
+                      dk ? 'border-white/[0.07] bg-slate-950/35' : 'border-slate-100 bg-slate-50/70'
+                    }`}
+                  >
+                    <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg border ${accent}`}>
+                      <Icon size={17} />
+                    </div>
+                    <div className={`text-2xl font-bold ${dk ? 'text-white' : 'text-slate-900'}`}>{value}</div>
+                    <div className={`mt-1 text-xs font-bold uppercase ${dk ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+                    <p className={`mt-2 text-xs leading-5 ${dk ? 'text-slate-500' : 'text-slate-500'}`}>{detail}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className={`rounded-xl border px-4 py-3 ${
+                dk ? 'border-white/[0.07] bg-slate-950/25' : 'border-slate-100 bg-white'
+              }`}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      dk ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      <Info size={16} />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
+                        Prototype impact estimate, ไม่ใช่ผลลัพธ์ทางคลินิกที่ยืนยันแล้ว
+                      </p>
+                      <p className={`mt-1 text-xs leading-5 ${dk ? 'text-slate-500' : 'text-slate-500'}`}>
+                        ตัวเลขนี้ใช้สำหรับ demo/pilot readiness โดยอิงจากจำนวนรายงานในระบบและสมมติฐานต้นทุนอย่างระมัดระวัง
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowImpactDetails((value) => !value)}
+                    className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      dk
+                        ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.05]'
+                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {showImpactDetails ? 'ซ่อนรายละเอียด' : 'ดูสมมติฐาน'}
+                    {showImpactDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {showImpactDetails && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      <div className={`mt-4 grid gap-3 border-t pt-4 text-xs md:grid-cols-3 ${
+                        dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-100 text-slate-600'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-500" />
+                          <span>ประหยัดต้นทุนประมาณ ฿350 ต่อเคสที่มี referral-support report พร้อมใช้</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Globe size={14} className="mt-0.5 shrink-0 text-sky-500" />
+                          <span>ลดการเดินทางซ้ำประมาณ {estimatedTravelAvoidedKm.toLocaleString('th-TH')} กม. จากเคส high-risk/ส่งต่อ</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Trash2 size={14} className="mt-0.5 shrink-0 text-emerald-500" />
+                          <span>ลดการใช้ทรัพยากรโดยคัดกรองก่อนส่งต่อ ไม่ claim แทนการวินิจฉัยหรือ outcome จริง</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* ── Patient grid ──────────────────────────────────────── */}
         {filtered.length === 0 ? (
