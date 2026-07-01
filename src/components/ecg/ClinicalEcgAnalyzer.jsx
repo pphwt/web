@@ -206,7 +206,8 @@ export default function ClinicalEcgAnalyzer() {
               <Info size={12} className={`shrink-0 mt-0.5 ${subText}`} />
               <p className={`text-[10px] leading-relaxed ${subText}`}>
                 วัดจาก lead <b>{result.measurements?.lead_used}</b> ด้วย neurokit2. ค่าที่มี <b>≈</b> (PR/QRS/QT/QTc)
-                เป็น open-source delineation อาจคลาดเคลื่อนบน ECG จริงที่มี noise — ใช้ประกอบ ไม่ใช่ค่าจากเครื่องรับรอง
+                เป็น open-source delineation = <b>ค่าประมาณคร่าวๆ คลาดเคลื่อนได้มาก (โดยเฉพาะ QRS width)</b> ไม่ใช้วัดทางคลินิก.
+                <b>HR และ rhythm/วินิจฉัย</b> เชื่อถือได้กว่า.
               </p>
             </div>
           </div>

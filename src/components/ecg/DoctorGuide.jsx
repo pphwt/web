@@ -20,7 +20,7 @@ const RANGES = [
 ];
 
 const LIMITS = [
-  ['ค่าที่มี ≈ (PR/QRS/QT/QTc)', 'มาจาก open-source delineation (neurokit2) อาจคลาดเคลื่อนบน ECG จริงที่มี noise — ยืนยันด้วยตาเสมอ'],
+  ['ค่าที่มี ≈ (PR/QRS/QT/QTc)', 'open-source delineation (neurokit2) = ค่าประมาณคร่าวๆ คลาดเคลื่อนได้มาก โดยเฉพาะ QRS width (มักกว้างเกินจริง) — ไม่ใช้วัดทางคลินิก ยืนยันด้วยตาเสมอ. HR และ rhythm เชื่อได้กว่า'],
   ['3D localization', 'โมเดลเทรนจาก simulation → ปิดสำหรับ clinical ECG (แสดง null พร้อมเหตุผล) ไม่โชว์ตำแหน่งมั่ว'],
   ['รูปถ่าย ECG (BETA)', 'digitize ได้ single-lead, รูป shape ใช้ได้ แต่เวลา/HR ประมาณจนกว่าจะ calibrate'],
   ['วินิจฉัยเบื้องต้น (classifier)', 'decision support ต้องเทรน PTB-XL ก่อน; ถ้ายังไม่เทรนจะไม่แสดงผลปลอม'],
