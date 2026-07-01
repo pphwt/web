@@ -142,11 +142,11 @@ export default function ClinicalEcgAnalyzer() {
         <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs cursor-pointer mb-3 ${dk ? 'border-white/[0.12] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:bg-slate-50'}`}>
           <Upload size={14} />
           <span className="truncate">{file ? file.name : 'เลือกไฟล์ (.npy / .csv / .hea+.dat / .dcm)'}</span>
-          <input ref={inputRef} type="file" accept=".npy,.csv,.xlsx,.xls,.hea,.dat,.dcm,.png,.jpg,.jpeg" className="hidden"
+          <input ref={inputRef} type="file" accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg" className="hidden"
             onChange={(e) => { setFile(e.target.files?.[0] || null); setSampleId(''); setError(''); }} />
         </label>
         <p className={`text-[10px] mb-3 ${subText}`}>
-          รองรับ WFDB (PTB-XL / PhysioNet), DICOM-ECG, Excel (.xlsx), CSV, NumPy — 12-lead หรือ 10-lead ·
+          รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
           รูปถ่าย ECG (.png/.jpg) = <b>BETA</b> single-lead
         </p>
         <button
