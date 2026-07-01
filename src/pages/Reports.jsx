@@ -42,70 +42,48 @@ const Reports = () => {
     : [];
   const reportsList = Array.isArray(reports) ? [...reports].sort((a, b) => new Date(a.timestamp || a.created_at) - new Date(b.timestamp || b.created_at)) : [];
 
-  const chartData = reportsList.length > 0 
-    ? (reportsList.length < 5
-        ? [...reportsList.map((_, idx) => ((idx + 1) * 120000 / 1000000)), ...Array(5 - reportsList.length).fill(reportsList.length * 120000 / 1000000)]
-        : reportsList.map((_, idx) => ((idx + 1) * 120000 / 1000000)))
-    : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
   const getReportHR = (r) => {
-    const a = r.physics_params?.a ?? 0.1;
-    const D = r.physics_params?.D ?? 0.0001;
-    if (D > 0.0002) return 110;
-    if (D < 0.00007) return 52;
-    if (a > 0.18) return 88;
-    return 72;
+    const hr = r.heart_rate_bpm ?? r.physics_params?.referral_support?.heart_rate_bpm;
+    return Number.isFinite(Number(hr)) ? Number(hr) : null;
   };
 
-  const recoveryTrend = reportsList.length > 0 
-    ? reportsList.map(r => getReportHR(r)) 
-    : [72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72];
+  const getReportConfidence = (r) =>
+    Number.isFinite(Number(r.ai_confidence)) ? Number(r.ai_confidence) : null;
+
+  const heartRates = reportsList.map(getReportHR).filter((value) => value !== null);
+  const confidences = reportsList.map(getReportConfidence).filter((value) => value !== null);
+
+  const recoveryTrend = heartRates.length > 0 ? heartRates : [0, 0, 0, 0, 0];
 
   const supportConfidenceTrend = reportsList.length > 0 
-    ? reportsList.map(r => (r.ai_confidence ?? 0.95) * 100) 
-    : [95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95];
+    ? reportsList.map(r => {
+        const confidence = getReportConfidence(r);
+        return confidence === null ? 0 : confidence * 100;
+      })
+    : [0, 0, 0, 0, 0];
 
-  const avgPulseVal = reportsList.length > 0
-    ? (reportsList.reduce((acc, curr) => acc + getReportHR(curr), 0) / reportsList.length).toFixed(1)
-    : '72.0';
+  const avgPulseVal = heartRates.length > 0
+    ? (heartRates.reduce((acc, curr) => acc + curr, 0) / heartRates.length).toFixed(1)
+    : '--';
 
-  const variabilityVal = reportsList.length > 0
-    ? (reportsList.reduce((acc, curr) => acc + (curr.physics_params?.k ?? 8.0) * 10, 0) / reportsList.length).toFixed(1) + '%'
-    : '80.0%';
+  const variabilityVal = heartRates.length > 1
+    ? (Math.max(...heartRates) - Math.min(...heartRates)).toFixed(1) + ' bpm'
+    : '--';
 
   const anomaliesCount = reportsList.filter(r => {
-    const a = r.physics_params?.a ?? 0.1;
-    const D = r.physics_params?.D ?? 0.0001;
-    return a > 0.15 || D < 0.00007 || D > 0.0002;
+    const risk = r.risk_level || r.physics_params?.referral_support?.risk_level;
+    return risk === 'HIGH' || getReportStatus(r) === 'NEEDS_RETAKE';
   }).length;
 
-  const avgAccuracy = reportsList.length > 0
-    ? (reportsList.reduce((acc, curr) => acc + (curr.ai_confidence ?? 0.95), 0) / reportsList.length * 100).toFixed(1) + '%'
-    : '95.0%';
+  const avgAccuracy = confidences.length > 0
+    ? (confidences.reduce((acc, curr) => acc + curr, 0) / confidences.length * 100).toFixed(1) + '%'
+    : '--';
 
-  const avgLatency = reportsList.length > 0
-    ? (10 + (reportsList.reduce((acc, curr) => acc + (curr.physics_params?.a ?? 0.1) * 20, 0) / reportsList.length)).toFixed(0) + 'ms'
-    : '12ms';
+  const reviewedCount = reportsList.filter(r => getReportStatus(r) !== 'PENDING_REVIEW').length;
 
   const stabilityLabel = reportsList.length > 0
-    ? (reportsList.filter(r => (r.ai_confidence ?? 0) < 0.85).length > 0 ? 'Moderate' : 'High')
-    : 'High';
-
-  const totalScans = reports.length;
-  const costVal = totalScans * 120000;
-  const costLabel = costVal >= 1000000 
-    ? `฿${(costVal / 1000000).toFixed(2)}M` 
-    : `฿${costVal.toLocaleString('th-TH')}`;
-
-  const plasticVal = totalScans * 1.5;
-  const plasticLabel = plasticVal >= 1000 
-    ? `${(plasticVal / 1000).toFixed(2)} t` 
-    : `${plasticVal.toFixed(1)} kg`;
-
-  const co2Val = totalScans * 12;
-  const co2Label = co2Val >= 1000 
-    ? `${(co2Val / 1000).toFixed(2)} t` 
-    : `${co2Val.toFixed(1)} kg`;
+    ? (reportsList.filter(r => getReportConfidence(r) !== null && getReportConfidence(r) < 0.85).length > 0 ? 'Review' : 'Recorded')
+    : '--';
 
   const surface  = dk ? 'bg-[#0d1525] border-white/[0.06]'  : 'bg-white border-slate-200';
   const divider  = dk ? 'border-white/[0.06]'               : 'border-slate-100';
@@ -158,7 +136,7 @@ const Reports = () => {
             data={supportConfidenceTrend} color="#10b981"
             stats={[
               { label: 'Confidence', value: avgAccuracy, color: '#10b981' },
-              { label: 'Latency',    value: avgLatency,  color: '#a78bfa' },
+              { label: 'Reviewed',   value: reviewedCount,  color: '#a78bfa' },
               { label: 'Stability',  value: stabilityLabel,  color: '#94a3b8' },
             ]}
           />

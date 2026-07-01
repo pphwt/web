@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n) => String(n ?? '--');
+const MAX_CAPTURE_SECONDS = Number(import.meta.env.VITE_ECG_CAPTURE_MAX_SECONDS || 30);
 
 const StatusPill = ({ connected, dk }) => (
   <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold border ${
@@ -83,6 +84,12 @@ const LiveMonitoring = () => {
     if (isRecording) iv = setInterval(() => setRecordTime(p => p + 1), 1000);
     return () => clearInterval(iv);
   }, [isRecording]);
+
+  useEffect(() => {
+    if (isRecording && recordTime >= MAX_CAPTURE_SECONDS) {
+      toggleRecording();
+    }
+  }, [isRecording, recordTime]);
 
   useEffect(() => {
     if (isRecording && streamData?.leads) {
@@ -227,7 +234,7 @@ const LiveMonitoring = () => {
               }`}
             >
               {isRecording ? (
-                <><span className="h-2 w-2 rounded-full bg-white animate-ping" />{recordTime}s</>
+                <><span className="h-2 w-2 rounded-full bg-white animate-ping" />{recordTime}/{MAX_CAPTURE_SECONDS}s</>
               ) : (
                 <><Save size={13} />{t('start_capture')}</>
               )}

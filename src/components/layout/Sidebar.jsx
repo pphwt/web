@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Activity, FileText, LogOut, Users, Archive,
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
-  X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw,
+  X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw, Stethoscope,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +23,7 @@ const buildSections = (t) => [
   {
     label: 'คัดกรอง',
     items: [
+      { icon: Stethoscope, label: 'อ่านผล ECG (ไฟล์จริง)',   path: '/page/clinical-ecg' },
       { icon: Database,    label: t('sandbox_title'),     path: '/page/sandbox' },
       { icon: ShieldCheck, label: t('ai_diag_title'),      path: '/page/ai-diagnostics' },
     ],

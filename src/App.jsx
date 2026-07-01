@@ -15,6 +15,7 @@ import PatientList from './pages/PatientList';
 import LiveMonitoring from './pages/LiveMonitoring';
 import Reports from './pages/Reports';
 import Analysis from './pages/Analysis';
+import ClinicalEcg from './pages/ClinicalEcg';
 import Login from './pages/Login';
 import PatientArchives from './pages/PatientArchives';
 import EducationalLab from './pages/EducationalLab';
@@ -46,6 +47,7 @@ function App() {
                               <Route path="/page/live" element={<LiveMonitoring />} />
                               <Route path="/page/reports" element={<Reports />} />
                               <Route path="/page/analysis" element={<Analysis />} />
+                              <Route path="/page/clinical-ecg" element={<ClinicalEcg />} />
                               <Route path="/page/sandbox" element={<NeuralSandbox />} />
                               <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
                               <Route path="/page/archives" element={<PatientArchives />} />
