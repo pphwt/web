@@ -18,7 +18,7 @@ pipeline {
 
         stage('Prepare Env') {
             steps {
-                sh 'cp /var/www/bioelectic/web/.env .env'
+                sh 'cp /var/jenkins_home/shared_env/web.env .env'
             }
         }
 
