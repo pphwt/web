@@ -23,7 +23,7 @@ const PatientArchives = () => {
   const fetchArchives = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}/`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setArchives(await res.json());

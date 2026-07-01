@@ -41,6 +41,38 @@ const NeuralSandbox = () => {
   const [isRunning, setIsRunning]         = useState(false);
   const [testResults, setTestResults]     = useState(null);
 
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+const VitalRow = ({ label, value, unit, status, dk }) => {
+  const color =
+    status === 'high'   ? (dk ? 'text-rose-400'    : 'text-rose-600')    :
+    status === 'low'    ? (dk ? 'text-amber-400'   : 'text-amber-600')   :
+                          (dk ? 'text-emerald-400' : 'text-emerald-600');
+  return (
+    <div className={`flex items-center justify-between py-2.5 border-b last:border-0 ${dk ? 'border-white/[0.05]' : 'border-slate-100'}`}>
+      <span className={`text-xs ${dk ? 'text-slate-400' : 'text-slate-500'}`}>{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className={`text-sm font-bold ${color}`}>{value}</span>
+        <span className={`text-[10px] ${dk ? 'text-slate-600' : 'text-slate-400'}`}>{unit}</span>
+      </div>
+    </div>
+  );
+};
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+const NeuralSandbox = () => {
+  const { t } = useLanguage();
+  const { token } = useAuth();
+  const { selectedPatient } = usePatient();
+  const { isDarkMode: dk } = useTheme();
+
+  const [archives, setArchives]           = useState([]);
+  const [selectedArchive, setSelectedArchive] = useState(null);
+  const [isRunning, setIsRunning]         = useState(false);
+  const [testResults, setTestResults]     = useState(null);
+
   useEffect(() => {
     if (selectedPatient && token) fetchArchives();
     setSelectedArchive(null);
@@ -49,7 +81,7 @@ const NeuralSandbox = () => {
 
   const fetchArchives = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}/`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setArchives(await res.json());
