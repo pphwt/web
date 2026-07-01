@@ -48,18 +48,31 @@ function WaveformPlot({ leads, dk }) {
 // Hardcoded PTB-XL fallback so the dropdown always has data even when the
 // backend is cold-starting or the real_samples endpoint is unreachable.
 const DEFAULT_SAMPLES = [
-  { id: '00001_hr', name: 'Normal ECG – F 56y',          split: 'Normal' },
-  { id: '00002_hr', name: 'Normal ECG – M 19y',          split: 'Normal' },
-  { id: '00003_hr', name: 'Normal ECG – F 37y',          split: 'Normal' },
-  { id: '00017_hr', name: 'Atrial Fibrillation – M 56y', split: 'AFIB'   },
-  { id: '00152_hr', name: 'Atrial Fibrillation – F 70y', split: 'AFIB'   },
-  { id: '00282_hr', name: 'Atrial Fibrillation – M',     split: 'AFIB'   },
-  { id: '00008_hr', name: 'Inferior MI – M 48y',         split: 'MI'     },
-  { id: '00039_hr', name: 'Inferior MI – M 56y',         split: 'MI'     },
-  { id: '00103_hr', name: 'Inferior MI – M 39y',         split: 'MI'     },
-  { id: '00077_hr', name: 'Anterior MI – M 43y',         split: 'MI'     },
-  { id: '00199_hr', name: 'Anterior MI – F 19y',         split: 'MI'     },
-  { id: '00211_hr', name: 'Anterior MI – F 85y',         split: 'MI'     },
+  {
+    id: 'data_hearts_dd_0p2_geo_act_3_bcl/pECGData_hearts_dd_0p2_geo_act_3_bcl_bcl.1000.pattern.0.volunteer.v1.npy',
+    name: 'hearts_dd_0p2_geo_act_3_bcl_v1',
+    split: 'sample'
+  },
+  {
+    id: 'data_hearts_dd_0p2_geo_act_3_bcl/pECGData_hearts_dd_0p2_geo_act_3_bcl_bcl.1000.pattern.0.volunteer.v10.npy',
+    name: 'hearts_dd_0p2_geo_act_3_bcl_v10',
+    split: 'sample'
+  },
+  {
+    id: 'data_hearts_dd_0p2_geo_act_3_bcl/pECGData_hearts_dd_0p2_geo_act_3_bcl_bcl.1000.pattern.0.volunteer.v11.npy',
+    name: 'hearts_dd_0p2_geo_act_3_bcl_v11',
+    split: 'sample'
+  },
+  {
+    id: 'data_hearts_dd_0p2_geo_act_3_bcl_gkr_I/pECGData_hearts_dd_0p2_geo_act_3_bcl_gkr_I_bcl.1000.gkr.000.pattern.0.volunteer.v1.npy',
+    name: 'hearts_dd_0p2_geo_act_3_gkr_v1',
+    split: 'sample'
+  },
+  {
+    id: 'data_hearts_dd_0p2_geo_act_3_bcl_gkr_I/pECGData_hearts_dd_0p2_geo_act_3_gkr_I_bcl.1000.gkr.000.pattern.0.volunteer.v10.npy',
+    name: 'hearts_dd_0p2_geo_act_3_gkr_v10',
+    split: 'sample'
+  }
 ];
 
 const Analysis = () => {
@@ -94,7 +107,7 @@ const Analysis = () => {
   }, [activeSample, file]);
 
   useEffect(() => {
-    modelApi.ecgSamples()
+    modelApi.samples()
       .then((d) => {
         if (d?.samples && d.samples.length > 0) {
           setSamples(d.samples);
