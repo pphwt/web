@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, User, CheckCircle2, FileText } from 'lucide-react';
+import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, User, CheckCircle2, FileText, FileDown } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
@@ -68,7 +68,7 @@ const Analysis = () => {
   const { selectedPatient, patients } = usePatient();
 
   const [samples, setSamples] = useState(DEFAULT_SAMPLES);
-  const [sampleId, setSampleId] = useState('');
+  const [sampleId, setSampleId] = useState(DEFAULT_SAMPLES[0].id);
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -76,6 +76,7 @@ const Analysis = () => {
   const [referralDestination, setReferralDestination] = useState('โรงพยาบาลแม่ข่าย / แผนกหัวใจ');
   const [clinicianNote, setClinicianNote] = useState('');
   const [datasetInfo, setDatasetInfo] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(false);
 
   // Auto-match patient to a sample signal
   const activeSample = useMemo(() => {
@@ -161,6 +162,54 @@ const Analysis = () => {
       showToast(`บันทึกรายงานส่งต่อไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
       setSavingReport(false);
+    }
+  };
+
+  // ── Referral Letter PDF ──────────────────────────────────────────────────────
+  const downloadReferralLetter = async () => {
+    if (!result) {
+      showToast('วิเคราะห์ ECG ก่อนออกใบส่งตัว', 'warning');
+      return;
+    }
+    setReferralLoading(true);
+    try {
+      const { VITE_CLINICAL_API_URL } = import.meta.env;
+      const base = VITE_CLINICAL_API_URL || '';
+      const form = new FormData();
+      if (file) {
+        form.append('file', file);
+      } else {
+        form.append('sample_id', sampleId);
+      }
+      // Patient data from selected patient context
+      form.append('patient_name', selectedPatient?.name || 'ผู้ป่วยไม่ระบุชื่อ');
+      form.append('patient_id_card', selectedPatient?.id_card || '');
+      form.append('patient_age', String(selectedPatient?.age || ''));
+      form.append('patient_gender', selectedPatient?.gender || '');
+      form.append('patient_blood_type', selectedPatient?.blood_type || '');
+      form.append('patient_allergies', selectedPatient?.allergies || '');
+      form.append('clinician_note', clinicianNote || '');
+      form.append('referral_destination', referralDestination || '');
+
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${base}/api/v1/ecg/referral-letter`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Referral_${selectedPatient?.name || sampleId || 'ECG'}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('ดาวน์โหลดใบส่งตัวผู้ป่วยสำเร็จ', 'success');
+    } catch (e) {
+      showToast(`ออกใบส่งตัวไม่สำเร็จ: ${e.message}`, 'error');
+    } finally {
+      setReferralLoading(false);
     }
   };
 
@@ -443,17 +492,32 @@ const Analysis = () => {
                   </div>
                 )}
 
-                {result?.source && (
-                  <button
-                    onClick={saveReferralReport}
-                    disabled={savingReport}
-                    className={`mb-3 w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${
-                      savingReport ? 'bg-emerald-600/60 text-white cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }`}
-                  >
-                    {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-                    {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานประกอบการส่งต่อ'}
-                  </button>
+                {result && (
+                  <div className="flex flex-col gap-2 mb-3">
+                    {result?.source && (
+                      <button
+                        onClick={saveReferralReport}
+                        disabled={savingReport}
+                        className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${
+                          savingReport ? 'bg-emerald-600/60 text-white cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        }`}
+                      >
+                        {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                        {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานประกอบการส่งต่อ'}
+                      </button>
+                    )}
+                    {/* Referral Letter — always available after analysis */}
+                    <button
+                      onClick={downloadReferralLetter}
+                      disabled={referralLoading}
+                      className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${
+                        referralLoading ? 'bg-sky-700/60 text-white cursor-not-allowed' : 'bg-sky-700 hover:bg-sky-800 text-white'
+                      }`}
+                    >
+                      {referralLoading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                      {referralLoading ? 'กำลังสร้างใบส่งตัว...' : '📋 ออกใบส่งตัวผู้ป่วย (PDF)'}
+                    </button>
+                  </div>
                 )}
 
                 {result?.source && (

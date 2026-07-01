@@ -197,24 +197,33 @@ const PatientList = () => {
     }
   };
 
+  const [stats, setStats] = useState({
+    total: 0,
+    pending_review: 0,
+    approved: 0,
+    referred: 0,
+    emergency: 0,
+    urgent: 0,
+  });
+
+  useEffect(() => {
+    if (token) {
+      fetch(`${import.meta.env.VITE_API_URL}/reports/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) setStats(data);
+        })
+        .catch(err => console.error('Failed to fetch stats:', err));
+    }
+  }, [token, patients, reports]);
+
   const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id_card?.includes(searchTerm)
   );
 
-  const referralSupportOf = (report) => report?.physics_params?.referral_support || {};
-  const reviewStatusOf = (report) => report?.status || referralSupportOf(report)?.review?.status || 'PENDING';
-  const reportsWithReferralSupport = reports.filter((report) => {
-    const support = referralSupportOf(report);
-    return Boolean(support.risk_level || support.triage_status || support.recommendation || support.review);
-  });
-  const highRiskCount = reportsWithReferralSupport.filter(
-    (report) => referralSupportOf(report).risk_level === 'HIGH'
-  ).length;
-  const referredCount = reportsWithReferralSupport.filter(
-    (report) => reviewStatusOf(report) === 'REFERRED'
-  ).length;
-  const reviewReadyCount = reportsWithReferralSupport.length;
   const impactStats = [
     {
       label: 'Primary-care cases',
@@ -225,21 +234,21 @@ const PatientList = () => {
     },
     {
       label: 'Referral-ready reports',
-      value: reviewReadyCount.toLocaleString('th-TH'),
+      value: (stats?.total || 0).toLocaleString('th-TH'),
       detail: 'รายงานที่มี risk, signal quality และคำแนะนำส่งต่อ',
       icon: Share2,
       accent: dk ? 'text-violet-300 bg-violet-500/10 border-violet-400/20' : 'text-violet-700 bg-violet-50 border-violet-200',
     },
     {
       label: 'High-risk triage',
-      value: highRiskCount.toLocaleString('th-TH'),
+      value: (stats?.emergency || 0).toLocaleString('th-TH'),
       detail: 'เคสที่ควรให้แพทย์ตรวจทาน/พิจารณาส่งต่อเร็ว',
       icon: HeartPulse,
       accent: dk ? 'text-rose-300 bg-rose-500/10 border-rose-400/20' : 'text-rose-700 bg-rose-50 border-rose-200',
     },
     {
       label: 'Marked referrals',
-      value: referredCount.toLocaleString('th-TH'),
+      value: (stats?.referred || 0).toLocaleString('th-TH'),
       detail: 'รายงานที่แพทย์หรือผู้มีสิทธิ์ review แล้ว mark เป็น REFERRED',
       icon: CheckCircle2,
       accent: dk ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20' : 'text-emerald-700 bg-emerald-50 border-emerald-200',

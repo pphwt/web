@@ -65,7 +65,8 @@ const LiveMonitoring = () => {
   const { t } = useLanguage();
   const { isDarkMode: dk } = useTheme();
 
-  const { metrics, clinicalState, isNormal, isCritical } = useDiagnosticSolver(streamData);
+  const [localStreamData, setLocalStreamData] = useState(null);
+  const { metrics, clinicalState, isNormal, isCritical } = useDiagnosticSolver(localStreamData || streamData);
 
   const recordingBuffer = useRef({ lead_i: [], lead_ii: [], v5: [] });
   const [isRecording, setIsRecording]   = useState(false);
@@ -81,6 +82,20 @@ const LiveMonitoring = () => {
   const [isSerialConnected, setIsSerialConnected] = useState(false);
   const serialPortRef = useRef(null);
   const serialReaderRef = useRef(null);
+
+  // Demo Mode state
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const demoIntervalRef = useRef(null);
+  const demoDataRef = useRef(null); // { wf, leadKeys, len, idx }
+
+  useEffect(() => {
+    if (!streamEvents) return;
+    const handler = (e) => {
+      setLocalStreamData(e.detail);
+    };
+    streamEvents.addEventListener('data', handler);
+    return () => streamEvents.removeEventListener('data', handler);
+  }, [streamEvents]);
 
   const disconnectSerial = async () => {
     try {
@@ -137,7 +152,11 @@ const LiveMonitoring = () => {
               detail: {
                 leads: { lead_i, lead_ii, v5 },
                 is_hardware: true,
-                heart_rate: 72
+                heart_rate: 72,
+                qtc: 410,
+                pr_interval: 160,
+                qrs_duration: 95,
+                ai_confidence: 0.99
               }
             }));
           }
@@ -163,8 +182,73 @@ const LiveMonitoring = () => {
     return () => {
       if (serialReaderRef.current) serialReaderRef.current.cancel().catch(() => {});
       if (serialPortRef.current) serialPortRef.current.close().catch(() => {});
+      if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
     };
   }, []);
+
+  const stopDemo = () => {
+    clearInterval(demoIntervalRef.current);
+    demoIntervalRef.current = null;
+    demoDataRef.current = null;
+    setIsDemoMode(false);
+    showToast('Demo Mode หยุดแล้ว', 'info');
+  };
+
+  const startDemo = async () => {
+    if (isDemoMode) {
+      stopDemo();
+      return;
+    }
+    showToast('โหลดข้อมูล Demo ECG...', 'info');
+    try {
+      const base = import.meta.env.VITE_CLINICAL_API_URL || '';
+      const token = localStorage.getItem('token');
+      const form = new FormData();
+      form.append('sample_id', '00017_hr'); // AFIB
+      const res = await fetch(`${base}/api/v1/ecg/analyze`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const wf = data.waveform || {};
+      const leadKeys = Object.keys(wf);
+      if (!leadKeys.length) throw new Error('ไม่มีข้อมูล waveform');
+      const len = wf[leadKeys[0]].length;
+      demoDataRef.current = { wf, leadKeys, len, idx: 0 };
+      setIsDemoMode(true);
+      showToast('▶ Demo Mode: AFIB (00017_hr) — สัญญาณ ECG จริง', 'success');
+
+      const BATCH = 50;
+      demoIntervalRef.current = setInterval(() => {
+        const d = demoDataRef.current;
+        if (!d) return;
+        const lead_i  = wf['I']?.[d.idx]  ?? wf[leadKeys[0]]?.[d.idx] ?? 0;
+        const lead_ii = wf['II']?.[d.idx] ?? wf[leadKeys[1] || leadKeys[0]]?.[d.idx] ?? 0;
+        const v5      = wf['V5']?.[d.idx] ?? wf[leadKeys[Math.min(10, leadKeys.length - 1)]]?.[d.idx] ?? 0;
+        
+        d.idx = (d.idx + BATCH) % d.len;
+
+        const payload = {
+          leads: { lead_i, lead_ii, v5 },
+          is_hardware: false,
+          is_demo: true,
+          heart_rate: 85, // AFIB elevated HR
+          qtc: 440,
+          pr_interval: 0, // AFIB has absent P-waves
+          qrs_duration: 90,
+          ai_confidence: 0.94
+        };
+
+        if (streamEvents) {
+          streamEvents.dispatchEvent(new CustomEvent('data', { detail: payload }));
+        }
+      }, 100);
+    } catch (e) {
+      showToast(`Demo Mode ล้มเหลว: ${e.message}`, 'error');
+    }
+  };
 
   // Generate real-time event logs dynamically from WebSocket connection and AI state
   useEffect(() => {
@@ -343,6 +427,24 @@ const LiveMonitoring = () => {
                 <span>{isSerialConnected ? 'Connected USB' : 'Connect USB Serial'}</span>
               </button>
             )}
+
+            {/* Demo Mode Button */}
+            <button
+              type="button"
+              onClick={startDemo}
+              title="เล่น ECG จากข้อมูลจริง (AFIB 00017_hr) โดยไม่ต้องใช้ Hardware"
+              className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all active:scale-95 ${
+                isDemoMode
+                  ? 'bg-violet-600 border-violet-500 text-white'
+                  : dk
+                  ? 'border-white/[0.07] text-slate-300 hover:bg-white/[0.04] bg-slate-900/40'
+                  : 'border-slate-200 text-slate-700 hover:bg-slate-50 bg-white'
+              }`}
+            >
+              {isDemoMode
+                ? <><span className="h-2 w-2 rounded-full bg-white animate-ping" /><span>■ Stop Demo</span></>
+                : <><Activity size={14} /><span>▶ Demo Mode</span></>}
+            </button>
 
             {/* Freeze */}
             <button
