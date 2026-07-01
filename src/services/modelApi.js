@@ -24,6 +24,12 @@ const parseJson = async (response) => {
 
 const ECG_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_UPLOAD_MAX_BYTES || 2_000_000);
 
+// Clinical /ecg endpoints require JWT (PHI). Attach the stored token.
+const authHeaders = () => {
+  const token = localStorage.getItem('bio_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const modelApi = {
   health: async () => parseJson(await fetch(`${MODEL_API_BASE}/api/v1/health`)),
 
@@ -66,19 +72,25 @@ export const modelApi = {
     form.append('file', file);
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
+      headers: authHeaders(),
       body: form,
     }));
   },
 
-  ecgFormats: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/formats`)),
+  ecgFormats: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/formats`, {
+    headers: authHeaders(),
+  })),
 
-  ecgSamples: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/samples`)),
+  ecgSamples: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/samples`, {
+    headers: authHeaders(),
+  })),
 
   analyzeEcgSample: async (sampleId) => {
     const form = new FormData();
     form.append('sample_id', sampleId);
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
+      headers: authHeaders(),
       body: form,
     }));
   },
