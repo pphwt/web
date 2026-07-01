@@ -1,5 +1,5 @@
 /**
- * DiagnosticService
+ * ReferralSupportService
  * Handles communication with the backend for capturing snapshots and retrieving history.
  */
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
@@ -14,7 +14,7 @@ const getAuthHeaders = () => {
 
 export const diagnosticService = {
   /**
-   * Capture current diagnostic state
+   * Capture current decision-support state
    */
   async captureSnapshot(data) {
     try {
@@ -71,7 +71,7 @@ export const diagnosticService = {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Diagnostic_Report_${reportId.substring(0, 8)}.pdf`;
+      a.download = `Referral_Support_Report_${reportId.substring(0, 8)}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

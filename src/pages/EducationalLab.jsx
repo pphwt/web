@@ -185,7 +185,7 @@ const EducationalLab = () => {
             <VitalCard icon={Activity} label="QRS Duration" value={qrs} unit="ms"  normal={[60, 120]}  sublabel="QRS" />
             <VitalCard icon={Clock}    label="PR Interval" value={pr}  unit="ms"  normal={[120, 200]} sublabel="PR" />
             <VitalCard icon={Zap}      label="Corrected QT" value={qtc} unit="ms"  normal={[350, 450]} sublabel="QTc" />
-            <VitalCard             label="AI Confidence" value={conf} unit="%"   color="#0ea5e9"     sublabel="PINN" />
+            <VitalCard             label="Support Confidence" value={conf} unit="%"   color="#0ea5e9"     sublabel="PINN" />
           </div>
         </div>
 

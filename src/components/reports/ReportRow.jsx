@@ -9,7 +9,16 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
 
   // Map database organ_type to icons
   const Icon = Heart;
-  const statusColor = report.ai_confidence > 0.9 ? '#10b981' : '#fbbf24';
+  const referral = report.physics_params?.referral_support || {};
+  const quality = referral.signal_quality || {};
+  const riskLevel = referral.risk_level || 'REVIEW';
+  const statusColor = riskLevel === 'HIGH'
+    ? '#ef4444'
+    : riskLevel === 'MODERATE'
+    ? '#f59e0b'
+    : report.ai_confidence > 0.9
+    ? '#10b981'
+    : '#fbbf24';
 
   const handleDownload = async (e) => {
     e.stopPropagation();
@@ -60,7 +69,7 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
           <p className={`text-sm font-bold tracking-tight leading-none mb-1 ${textTitle}`}>
             {report.patientName || report.patient_id}
           </p>
-          <p className={`text-[10px] uppercase tracking-tighter ${textSub}`}>{report.organ_type} DIAGNOSTIC</p>
+          <p className={`text-[10px] uppercase tracking-tighter ${textSub}`}>{report.organ_type} REFERRAL SUPPORT</p>
         </div>
 
         <span 
@@ -71,7 +80,7 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
             borderColor: `${statusColor}30`
           }}
         >
-          {report.ai_confidence > 0.9 ? 'VERIFIED' : 'REVIEW NEEDED'}
+          {riskLevel === 'HIGH' ? 'REFER' : riskLevel === 'MODERATE' ? 'REVIEW' : 'FOLLOW-UP'}
         </span>
 
         <div className={`text-[10px] font-medium flex items-center gap-1.5 ml-4 ${textSub}`}>
@@ -89,14 +98,22 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
         <div className="p-6 pt-0 ml-[60px] flex flex-col gap-6">
           <div className="flex gap-4 flex-wrap">
             <div className={`${detailCardBg} rounded-xl p-4 min-w-[140px]`}>
-              <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>AI Confidence</p>
+              <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Support Confidence</p>
               <p className="text-xl font-bold tracking-tight text-sky-400">{(report.ai_confidence * 100).toFixed(2)}%</p>
             </div>
             <div className={`${detailCardBg} rounded-xl p-4 min-w-[140px]`}>
               <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Localization</p>
               <p className={`text-sm font-mono ${textBody}`}>
-                X: {report.localization_coords?.x.toFixed(2)}, Y: {report.localization_coords?.y.toFixed(2)}
+                X: {Number(report.localization_coords?.x ?? 0).toFixed(2)}, Y: {Number(report.localization_coords?.y ?? 0).toFixed(2)}
               </p>
+            </div>
+            <div className={`${detailCardBg} rounded-xl p-4 min-w-[140px]`}>
+              <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Risk</p>
+              <p className="text-xl font-bold tracking-tight" style={{ color: statusColor }}>{riskLevel}</p>
+            </div>
+            <div className={`${detailCardBg} rounded-xl p-4 min-w-[160px]`}>
+              <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Signal Quality</p>
+              <p className={`text-sm font-bold ${textBody}`}>{quality.status || 'N/A'} {quality.score != null ? `· ${quality.score}/100` : ''}</p>
             </div>
             {report.notes && (
               <div className={`${detailCardBg} rounded-xl p-4 flex-1`}>

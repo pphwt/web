@@ -72,6 +72,20 @@ const HelpManual = () => {
           </div>
         </header>
 
+        <div className={`rounded-2xl border p-4 ${
+          dk ? 'bg-amber-500/[0.06] border-amber-500/20' : 'bg-amber-50 border-amber-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <Info size={16} className={`mt-0.5 shrink-0 ${dk ? 'text-amber-400' : 'text-amber-700'}`} />
+            <div>
+              <p className={`text-xs font-bold ${dk ? 'text-amber-300' : 'text-amber-800'}`}>ใช้เพื่อคัดกรองและสนับสนุนการส่งต่อ</p>
+              <p className={`mt-1 text-[11px] leading-relaxed ${dk ? 'text-amber-200/80' : 'text-amber-800/80'}`}>
+                ระบบนี้ให้ข้อมูลเบื้องต้นแก่เจ้าหน้าที่ พยาบาล และแพทย์ทั่วไปในหน่วยบริการปฐมภูมิ ผลลัพธ์ต้องยืนยันโดยแพทย์และไม่ใช่คำวินิจฉัยสุดท้าย
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Module 1 */}
         <div className={`rounded-2xl border p-5 ${surface}`}>
           <SectionHeader dk={dk}
@@ -83,7 +97,7 @@ const HelpManual = () => {
             <InstructionCard dk={dk} title={t('man_instr1_title')}>
               <p>{t('man_instr1_body')}</p>
               <div className={`mt-2 space-y-1 text-[10px] ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
-                {t('man_instr1_list').split('•').filter(Boolean).map((item, i) => (
+                {t('man_instr1_list').split(/[•โ€ข]/).filter(Boolean).map((item, i) => (
                   <p key={i}>• {item.trim()}</p>
                 ))}
               </div>
@@ -163,7 +177,7 @@ const HelpManual = () => {
         {/* Footer */}
         <div className={`text-center py-3 border-t ${divider}`}>
           <p className={`text-[10px] font-semibold ${secLabel}`}>Bioelectric PINN v1.0.4 Clinical Build</p>
-          <p className={`text-[9px] mt-1 ${dk ? 'text-slate-700' : 'text-slate-300'}`}>Designed for Cardiologists & Clinical Professionals</p>
+          <p className={`text-[9px] mt-1 ${dk ? 'text-slate-700' : 'text-slate-300'}`}>Designed for Primary-Care Triage and Clinician Review</p>
         </div>
       </div>
     </div>

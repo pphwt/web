@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, User, CheckCircle2 } from 'lucide-react';
+import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, User, CheckCircle2, FileText } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
 import { modelApi } from '../services/modelApi';
+import { diagnosticService } from '../services/diagnosticService';
 
 const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
 
@@ -54,6 +55,7 @@ const Analysis = () => {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
   const [datasetInfo, setDatasetInfo] = useState(null);
 
   // Auto-match patient to a sample signal
@@ -105,8 +107,44 @@ const Analysis = () => {
     }
   };
 
+  const saveReferralReport = async () => {
+    if (!selectedPatient?.id) {
+      showToast('เลือกผู้ป่วยก่อนบันทึกรายงานส่งต่อ', 'warning');
+      return;
+    }
+    if (!result?.source) {
+      showToast('ยังไม่มีผลคัดกรองที่พร้อมบันทึกรายงาน', 'warning');
+      return;
+    }
+    setSavingReport(true);
+    try {
+      const [x, y, z] = result.source.xyz_mm;
+      const payload = {
+        patient_id: selectedPatient.id,
+        organ_type: 'heart',
+        ai_confidence: result.confidence ?? 0,
+        localization_coords: { x, y, z },
+        physics_params: { a: 0, k: 0, D: 0 },
+        notes: 'Referral decision-support snapshot. Final diagnosis must be confirmed by a physician.',
+        risk_level: result.region?.risk,
+        triage_status: result.triage_status,
+        signal_quality: result.signal_quality,
+        referral_recommendation: result.referral_recommendation || referralAdvice,
+        model_version: 'CardiacLocalizer prototype',
+        source_name: result.source_name,
+        heart_rate_bpm: result.heart_rate_bpm,
+      };
+      const saved = await diagnosticService.captureSnapshot(payload);
+      showToast(saved?.report_id ? 'บันทึกรายงานส่งต่อสำเร็จ' : 'บันทึกรายงานส่งต่อแล้ว', 'success');
+    } catch (e) {
+      showToast(`บันทึกรายงานส่งต่อไม่สำเร็จ: ${e.message}`, 'error');
+    } finally {
+      setSavingReport(false);
+    }
+  };
+
   const heartResult = useMemo(() => {
-    if (!result) return null;
+    if (!result?.source) return null;
     return {
       localization_coords: result.source.norm,
       ai_confidence: result.confidence,
@@ -126,6 +164,25 @@ const Analysis = () => {
   const region = result?.region;
   const risk = region?.risk || 'LOW';
   const riskColor = RISK_COLOR[risk] || '#60a5fa';
+  const referralAdvice = result?.referral_recommendation || {
+    HIGH: {
+      title: 'ควรส่งต่อหรือปรึกษาแพทย์โดยเร็ว',
+      body: 'ผลคัดกรองพบแนวโน้มเสี่ยงสูง ให้ใช้ร่วมกับอาการ สัญญาณชีพ และดุลยพินิจของบุคลากรเพื่อพิจารณาส่งต่อโรงพยาบาลที่มีเครื่องมือหัวใจพร้อม',
+    },
+    MODERATE: {
+      title: 'ควรติดตามใกล้ชิดและพิจารณาส่งต่อ',
+      body: 'ผลคัดกรองอยู่ในระดับปานกลาง ควรทบทวน ECG ซ้ำ ประเมินอาการร่วม และพิจารณาส่งต่อหากมีอาการหรือปัจจัยเสี่ยงเพิ่มเติม',
+    },
+    LOW: {
+      title: 'ติดตามตามดุลยพินิจทางคลินิก',
+      body: 'ผลคัดกรองยังไม่พบสัญญาณเสี่ยงสูง แต่ไม่ใช่คำยืนยันว่าไม่มีโรค ควรติดตามตามอาการและแนวทางของหน่วยบริการ',
+    },
+  }[risk] || {
+    title: 'ใช้เป็นข้อมูลประกอบการคัดกรอง',
+    body: 'ผลลัพธ์นี้เป็น decision support สำหรับบุคลากรทางการแพทย์ ไม่ใช่คำวินิจฉัยสุดท้าย',
+  };
+  const signalQuality = result?.signal_quality;
+  const signalIssues = signalQuality?.issues || [];
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
@@ -138,12 +195,12 @@ const Analysis = () => {
               <HeartPulse size={17} />
             </div>
             <div>
-              <h1 className={`text-sm font-bold ${mainText}`}>วิเคราะห์ ECG จริง — ระบุตำแหน่งต้นกำเนิดในหัวใจ</h1>
-              <p className={`mt-0.5 text-xs ${subText}`}>เลือกตัวอย่างหรืออัปโหลด ECG → CardiacLocalizer ประมาณตำแหน่ง 3D</p>
+              <h1 className={`text-sm font-bold ${mainText}`}>คัดกรอง ECG เพื่อประกอบการส่งต่อ — ระบุตำแหน่ง 3D</h1>
+              <p className={`mt-0.5 text-xs ${subText}`}>เลือกตัวอย่างหรืออัปโหลด ECG เพื่อประเมินแนวโน้มเบื้องต้น ไม่ใช่คำวินิจฉัยสุดท้าย</p>
             </div>
           </div>
           <span className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold ${dk ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-emerald-300 text-emerald-700 bg-emerald-50'}`}>
-            REAL MODEL
+            REFERRAL SUPPORT
           </span>
         </header>
 
@@ -154,7 +211,7 @@ const Analysis = () => {
             <div className={`rounded-2xl border overflow-hidden ${surface}`}>
               <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
                 <span className={`text-xs font-semibold ${secLabel}`}>ตำแหน่งต้นกำเนิด 3D (Heart)</span>
-                {result && (
+                {result?.source && (
                   <span className="text-[10px] font-mono" style={{ color: riskColor }}>
                     {region?.label} · {region?.territory}
                   </span>
@@ -166,7 +223,7 @@ const Analysis = () => {
                   : (
                     <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
                       <Activity size={28} className="opacity-40" />
-                      <p className="text-xs">เลือก ECG แล้วกด “วิเคราะห์” เพื่อแสดงตำแหน่ง</p>
+                      <p className="text-xs">เลือก ECG แล้วกด “ประเมินเพื่อคัดกรอง” เพื่อแสดงตำแหน่ง</p>
                     </div>
                   )}
               </div>
@@ -257,7 +314,7 @@ const Analysis = () => {
                 className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${loading ? 'bg-sky-600/60 text-white cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700 text-white'}`}
               >
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                {loading ? 'กำลังวิเคราะห์...' : '2 · วิเคราะห์'}
+                {loading ? 'กำลังวิเคราะห์...' : '2 · ประเมินเพื่อคัดกรอง'}
               </button>
             </div>
 
@@ -266,31 +323,92 @@ const Analysis = () => {
               <div className={`rounded-2xl border p-4 ${surface}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <MapPin size={14} style={{ color: riskColor }} />
-                  <span className={`text-xs font-semibold ${secLabel}`}>3 · ผลการประเมิน</span>
+                  <span className={`text-xs font-semibold ${secLabel}`}>3 · ผลคัดกรองเพื่อส่งต่อ</span>
                 </div>
 
-                <div className="rounded-xl border p-3 mb-3" style={{ borderColor: `${riskColor}55`, background: `${riskColor}11` }}>
-                  <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: riskColor }}>{risk} RISK</div>
-                  <div className={`text-sm font-bold ${mainText}`}>{region?.label}</div>
-                  <div className={`text-[11px] ${subText}`}>Segment {region?.segment} · {region?.territory} territory</div>
-                  {region?.note && <div className={`text-[11px] mt-1 ${subText}`}>{region.note}</div>}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <Stat label="Confidence" value={`${Math.round(result.confidence * 100)}%`} dk={dk} />
-                  <Stat label="Heart rate"
-                    value={result.heart_rate_bpm ? `${Math.round(result.heart_rate_bpm)} bpm` : 'n/a'}
-                    hint={result.hr_note} dk={dk} />
-                </div>
-
-                <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
-                  {['x', 'y', 'z'].map((ax, i) => (
-                    <div key={ax} className="text-center">
-                      <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
-                      <p className={`font-bold mt-0.5 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{result.source.xyz_mm[i].toFixed(1)}</p>
+                {signalQuality && (
+                  <div className={`rounded-xl border p-3 mb-3 ${
+                    signalQuality.status === 'FAIL'
+                      ? dk ? 'bg-rose-500/[0.08] border-rose-500/25' : 'bg-rose-50 border-rose-200'
+                      : signalQuality.status === 'WARN'
+                      ? dk ? 'bg-amber-500/[0.08] border-amber-500/25' : 'bg-amber-50 border-amber-200'
+                      : dk ? 'bg-emerald-500/[0.07] border-emerald-500/25' : 'bg-emerald-50 border-emerald-200'
+                  }`}>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${
+                      signalQuality.status === 'FAIL'
+                        ? dk ? 'text-rose-300' : 'text-rose-700'
+                        : signalQuality.status === 'WARN'
+                        ? dk ? 'text-amber-300' : 'text-amber-700'
+                        : dk ? 'text-emerald-300' : 'text-emerald-700'
+                    }`}>
+                      Signal Quality · {signalQuality.status} · {signalQuality.score}/100
                     </div>
-                  ))}
+                    <div className={`mt-1 text-[11px] ${subText}`}>
+                      {signalQuality.active_leads}/{signalQuality.n_leads} active leads · {signalQuality.duration_sec}s · noise {signalQuality.noise_ratio}
+                    </div>
+                    {signalIssues.length > 0 && (
+                      <ul className={`mt-2 space-y-1 text-[10px] leading-relaxed ${subText}`}>
+                        {signalIssues.map((issue) => (
+                          <li key={issue.code}>• {issue.message}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {result?.source && (
+                  <div className="rounded-xl border p-3 mb-3" style={{ borderColor: `${riskColor}55`, background: `${riskColor}11` }}>
+                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: riskColor }}>{risk} RISK</div>
+                    <div className={`text-sm font-bold ${mainText}`}>{region?.label}</div>
+                    <div className={`text-[11px] ${subText}`}>Segment {region?.segment} · {region?.territory} territory</div>
+                    {region?.note && <div className={`text-[11px] mt-1 ${subText}`}>{region.note}</div>}
+                  </div>
+                )}
+
+                {result?.source && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <Stat label="Support confidence" value={`${Math.round(result.confidence * 100)}%`} dk={dk} />
+                    <Stat label="Heart rate"
+                      value={result.heart_rate_bpm ? `${Math.round(result.heart_rate_bpm)} bpm` : 'n/a'}
+                      hint={result.hr_note} dk={dk} />
+                  </div>
+                )}
+
+                <div className={`mb-3 rounded-xl border p-3 ${
+                  dk ? 'bg-sky-500/[0.06] border-sky-500/20' : 'bg-sky-50 border-sky-200'
+                }`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
+                    Referral Decision Support
+                  </div>
+                  <div className={`mt-1 text-sm font-bold ${mainText}`}>{referralAdvice.title}</div>
+                  <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>
+                    {referralAdvice.body}
+                  </p>
                 </div>
+
+                {result?.source && (
+                  <button
+                    onClick={saveReferralReport}
+                    disabled={savingReport}
+                    className={`mb-3 w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${
+                      savingReport ? 'bg-emerald-600/60 text-white cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานประกอบการส่งต่อ'}
+                  </button>
+                )}
+
+                {result?.source && (
+                  <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                    {['x', 'y', 'z'].map((ax, i) => (
+                      <div key={ax} className="text-center">
+                        <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
+                        <p className={`font-bold mt-0.5 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{result.source.xyz_mm[i].toFixed(1)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {result.ground_truth && (
                   <div className={`mt-3 rounded-xl border p-3 ${dk ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>

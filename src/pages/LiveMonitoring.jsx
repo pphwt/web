@@ -71,7 +71,7 @@ const LiveMonitoring = () => {
   const [isFrozen, setIsFrozen]         = useState(false);
   const [events, setEvents]             = useState([
     { id: 1, time: '10:02:15', type: 'System',   detail: 'Cardiac Link Established',          color: 'bg-sky-400' },
-    { id: 2, time: '10:05:42', type: 'AI Alert', detail: 'Slight QTc Prolongation Detected', color: 'bg-amber-400' },
+    { id: 2, time: '10:05:42', type: 'Triage Alert', detail: 'Slight QTc Prolongation Detected', color: 'bg-amber-400' },
   ]);
 
   useEffect(() => {
@@ -131,7 +131,7 @@ const LiveMonitoring = () => {
   const subText   = dk ? 'text-slate-400'                    : 'text-slate-500';
   const ecgBg     = dk ? 'bg-[#060d18]'                      : 'bg-slate-50';
 
-  // AI diagnosis color
+  // AI triage color
   const diagColor = isCritical
     ? { ring: 'border-rose-500/30',   bg: dk ? 'bg-rose-500/[0.08]'    : 'bg-rose-50',    text: dk ? 'text-rose-400'    : 'text-rose-700',    icon: <AlertCircle size={18} /> }
     : isNormal
@@ -180,7 +180,7 @@ const LiveMonitoring = () => {
                 )}
               </div>
               <p className={`mt-0.5 text-xs ${subText}`}>
-                {selectedPatient ? selectedPatient.name : 'ไม่ได้เลือกผู้ป่วย'} · Signal 98%
+                {selectedPatient ? selectedPatient.name : 'ไม่ได้เลือกผู้ป่วย'} · Signal 98% · Decision-support stream
               </p>
             </div>
           </div>
@@ -268,14 +268,17 @@ const LiveMonitoring = () => {
               </div>
             </div>
 
-            {/* AI diagnosis strip */}
+            {/* AI triage strip */}
             <div className={`flex items-center gap-3 rounded-2xl border px-5 py-4 ${diagColor.bg} ${diagColor.ring}`}>
               <span className={diagColor.text}>{diagColor.icon}</span>
               <div className="flex-1 min-w-0">
                 <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${diagColor.text} opacity-70`}>
-                  Real-time Clinical Insight
+                  Real-time Triage Support
                 </p>
                 <p className={`text-base font-bold truncate ${diagColor.text}`}>{clinicalState.diagnosis}</p>
+                <p className={`mt-1 text-[10px] leading-relaxed ${diagColor.text} opacity-70`}>
+                  ใช้เฝ้าระวังและคัดกรองเบื้องต้น ไม่ใช่คำวินิจฉัยสุดท้าย
+                </p>
               </div>
               <span className={`shrink-0 text-xs font-semibold ${diagColor.text} opacity-60`}>
                 Confidence {fmt(metrics?.confidence)}%

@@ -56,7 +56,7 @@ const Reports = () => {
     ? reportsList.map(r => getReportHR(r)) 
     : [72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72, 72];
 
-  const accuracyTrend = reportsList.length > 0 
+  const supportConfidenceTrend = reportsList.length > 0 
     ? reportsList.map(r => (r.ai_confidence ?? 0.95) * 100) 
     : [95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95, 95];
 
@@ -149,8 +149,8 @@ const Reports = () => {
             ]}
           />
           <AnalyticCard
-            title="Avg AI Confidence" badge="PINN" badgeColor="#10b981"
-            data={accuracyTrend} color="#10b981"
+            title="Avg Support Confidence" badge="PINN" badgeColor="#10b981"
+            data={supportConfidenceTrend} color="#10b981"
             stats={[
               { label: 'Confidence', value: avgAccuracy, color: '#10b981' },
               { label: 'Latency',    value: avgLatency,  color: '#a78bfa' },

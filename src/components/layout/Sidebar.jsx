@@ -20,7 +20,7 @@ const buildSections = (t) => [
     ],
   },
   {
-    label: 'วินิจฉัย',
+    label: 'คัดกรอง',
     items: [
       { icon: Database,    label: t('sandbox_title'),     path: '/page/sandbox' },
       { icon: ShieldCheck, label: t('ai_diag_title'),      path: '/page/ai-diagnostics' },

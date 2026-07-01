@@ -252,9 +252,9 @@ const Login = () => {
                 Bioelectric PINN
               </div>
               <div className="mt-16 max-w-md">
-                <h2 className="text-4xl font-bold leading-tight">เข้าสู่ระบบสำหรับงานวิเคราะห์คลื่นไฟฟ้าหัวใจอย่างปลอดภัย</h2>
+                <h2 className="text-4xl font-bold leading-tight">เข้าสู่ระบบช่วยคัดกรองและส่งต่อผู้ป่วยโรคหัวใจอย่างปลอดภัย</h2>
                 <p className="mt-5 text-base leading-7 text-white/85">
-                  เข้าสู่แพลตฟอร์มเพื่อเฝ้าดูสัญญาณ ตรวจสอบรายงาน และจัดการงานวินิจฉัยผู้ป่วยได้ในที่เดียว
+                  เข้าสู่แพลตฟอร์มเพื่อคัดกรอง ECG เบื้องต้น ติดตามสัญญาณ และจัดทำข้อมูลประกอบการส่งต่อได้ในที่เดียว
                 </p>
               </div>
             </div>
@@ -266,7 +266,7 @@ const Login = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/70">Bioelectric</p>
-                  <p className="text-sm text-white/80">ระบบวิเคราะห์คลื่นไฟฟ้าหัวใจขั้นสูง</p>
+                  <p className="text-sm text-white/80">ระบบช่วยคัดกรองคลื่นไฟฟ้าหัวใจเบื้องต้น</p>
                 </div>
               </div>
             </div>

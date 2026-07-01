@@ -177,7 +177,7 @@ const PatientArchives = () => {
                   <div className={`rounded-2xl border p-4 ${surface}`}>
                     <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${secLabel}`}>Observation</p>
                     <p className={`text-xs leading-relaxed ${subText}`}>
-                      Cardiac activation propagation during this session showed stable diffusion patterns with high AI classification accuracy.
+                      Cardiac activation propagation showed stable diffusion patterns. Use this record as referral-support context, not as a final diagnosis.
                     </p>
                   </div>
                   <div className={`rounded-2xl border p-4 ${surface}`}>
