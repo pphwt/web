@@ -80,5 +80,23 @@ export const diagnosticService = {
       console.error('Failed to download PDF:', error);
       throw error;
     }
+  },
+
+  async reviewReport(reportId, payload) {
+    try {
+      const response = await fetch(`${API_URL}/reports/${reportId}/review`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.detail || 'Failed to review report');
+      }
+      return result;
+    } catch (error) {
+      console.error('Failed to review report:', error);
+      throw error;
+    }
   }
 };

@@ -7,10 +7,10 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePatient } from '../context/PatientContext';
 
-const FILTERS = ['ALL', 'URGENT', 'ANALYZING', 'COMPLETED'];
+const FILTERS = ['ALL', 'PENDING_REVIEW', 'APPROVED', 'REFERRED', 'REJECTED', 'NEEDS_RETAKE'];
 
 const Reports = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { isDarkMode: dk } = useTheme();
   const { t } = useLanguage();
   const { patients } = usePatient();
@@ -32,8 +32,13 @@ const Reports = () => {
     finally  { setLoading(false); }
   };
 
+  const getReportStatus = (report) =>
+    report?.status ||
+    report?.physics_params?.referral_support?.review?.status ||
+    'PENDING_REVIEW';
+
   const filtered = Array.isArray(reports)
-    ? (filter === 'ALL' ? reports : reports.filter(r => r.status === filter))
+    ? (filter === 'ALL' ? reports : reports.filter(r => getReportStatus(r) === filter))
     : [];
   const reportsList = Array.isArray(reports) ? [...reports].sort((a, b) => new Date(a.timestamp || a.created_at) - new Date(b.timestamp || b.created_at)) : [];
 
@@ -190,9 +195,11 @@ const Reports = () => {
                 {filtered.map((r, i) => (
                   <ReportRow
                     key={r.id || i}
-                    report={{ ...r, patientName: getPatientName(r.patient_id), status: r.status || 'COMPLETED' }}
+                    report={{ ...r, patientName: getPatientName(r.patient_id), status: getReportStatus(r) }}
                     isOpen={openRow === i}
                     onToggle={() => setOpenRow(openRow === i ? null : i)}
+                    currentUser={user}
+                    onReviewed={fetchReports}
                   />
                 ))}
               </div>

@@ -3,14 +3,18 @@ import { Heart, Clock, ChevronDown, Download, Loader2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { diagnosticService } from '../../services/diagnosticService';
 
-export const ReportRow = ({ report, isOpen, onToggle }) => {
+export const ReportRow = ({ report, isOpen, onToggle, currentUser, onReviewed }) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState('');
   const { isDarkMode: dk } = useTheme();
 
   // Map database organ_type to icons
   const Icon = Heart;
   const referral = report.physics_params?.referral_support || {};
   const quality = referral.signal_quality || {};
+  const review = referral.review || {};
+  const canReview = ['doctor', 'admin'].includes(currentUser?.role);
   const riskLevel = referral.risk_level || 'REVIEW';
   const statusColor = riskLevel === 'HIGH'
     ? '#ef4444'
@@ -29,6 +33,23 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
       alert('Failed to download PDF');
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleReview = async (status, decision) => {
+    try {
+      setIsReviewing(true);
+      await diagnosticService.reviewReport(report.id, {
+        status,
+        review_decision: decision,
+        clinician_notes: reviewNotes || decision,
+        referral_destination: referral.referral_destination,
+      });
+      if (onReviewed) await onReviewed();
+    } catch (err) {
+      alert(err.message || 'Failed to review report');
+    } finally {
+      setIsReviewing(false);
     }
   };
 
@@ -115,6 +136,11 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
               <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Signal Quality</p>
               <p className={`text-sm font-bold ${textBody}`}>{quality.status || 'N/A'} {quality.score != null ? `· ${quality.score}/100` : ''}</p>
             </div>
+            <div className={`${detailCardBg} rounded-xl p-4 min-w-[180px]`}>
+              <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Review</p>
+              <p className={`text-sm font-bold ${textBody}`}>{review.status || report.status || 'PENDING_REVIEW'}</p>
+              {review.reviewed_by && <p className={`text-[10px] mt-1 ${textSub}`}>by {review.reviewed_by}</p>}
+            </div>
             {report.notes && (
               <div className={`${detailCardBg} rounded-xl p-4 flex-1`}>
                 <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Physician Notes</p>
@@ -122,6 +148,51 @@ export const ReportRow = ({ report, isOpen, onToggle }) => {
               </div>
             )}
           </div>
+
+          {canReview && (
+            <div className={`${detailCardBg} rounded-xl p-4`}>
+              <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Clinician Sign-Off</p>
+              <textarea
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                rows={2}
+                className={`w-full rounded-lg border px-3 py-2 text-xs resize-none mb-3 ${
+                  dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}
+                placeholder="สรุปความเห็นแพทย์ / เหตุผลการส่งต่อ / คำแนะนำเพิ่มเติม"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleReview('APPROVED', 'Reviewed and approved for clinical follow-up')}
+                  disabled={isReviewing}
+                  className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold disabled:opacity-50"
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => handleReview('REFERRED', 'Referral recommended')}
+                  disabled={isReviewing}
+                  className="rounded-lg bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 text-xs font-bold disabled:opacity-50"
+                >
+                  Mark Referred
+                </button>
+                <button
+                  onClick={() => handleReview('NEEDS_RETAKE', 'ECG retake required before review')}
+                  disabled={isReviewing}
+                  className="rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-xs font-bold disabled:opacity-50"
+                >
+                  Needs Retake
+                </button>
+                <button
+                  onClick={() => handleReview('REJECTED', 'Not appropriate for referral based on review')}
+                  disabled={isReviewing}
+                  className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-xs font-bold disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
           
           <div className="flex gap-3">
             <button 

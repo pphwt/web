@@ -43,6 +43,8 @@
 }
 
 :root {
+  --app-font-scale: 1;
+  --app-font-percent: 100%;
   /* Light Theme (Default) */
   --bg-main: #f8fafc;
   --bg-card: #ffffff;
@@ -57,6 +59,10 @@
   --viz-bg: #ffffff;
   
   color-scheme: light;
+}
+
+html {
+  font-size: calc(16px * var(--app-font-scale));
 }
 
 .dark {
@@ -84,6 +90,7 @@ body {
   color: var(--text-main);
   transition: background-color 0.3s ease, color 0.3s ease;
   font-family: 'LINESeedSansTH', 'Inter', sans-serif;
+  font-size: 1rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -91,7 +98,23 @@ body {
 /* --- THAI LEGIBILITY UPGRADE --- */
 [lang="th"], .font-thai {
   line-height: 1.8 !important;
-  font-size: 1.15em !important; /* Global scale up for Thai */
+  font-size: 1.15em !important;
+}
+
+.text-\[8px\] {
+  font-size: calc(8px * var(--app-font-scale)) !important;
+}
+
+.text-\[9px\] {
+  font-size: calc(9px * var(--app-font-scale)) !important;
+}
+
+.text-\[10px\] {
+  font-size: calc(10px * var(--app-font-scale)) !important;
+}
+
+.text-\[11px\] {
+  font-size: calc(11px * var(--app-font-scale)) !important;
 }
 
 /* Fix for unreadable small labels in Thai */
@@ -99,7 +122,7 @@ body {
 [lang="th"] .text-\[9px\], 
 [lang="th"] .text-\[10px\],
 [lang="th"] .text-xs {
-  font-size: 14px !important; /* Force minimum readable size for Thai */
+  font-size: calc(14px * var(--app-font-scale)) !important;
   font-weight: 500 !important;
   letter-spacing: 0.02em !important;
 }

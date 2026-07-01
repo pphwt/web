@@ -42,6 +42,9 @@ const GENDER_OPTS  = ['ชาย (Male)', 'หญิง (Female)', 'อื่น
 const EMPTY_FORM = {
   name: '', id_card: '', dob: '', gender: 'ชาย (Male)',
   blood_type: 'O+', allergies: '', emergency_contact: '', case_type: 'General',
+  consent_given: false,
+  consent_scope: 'ECG screening and referral-support prototype',
+  consent_signed_by: '',
 };
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -155,7 +158,16 @@ const PatientList = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const ok = await addPatient({ ...formData, age: calculateAge(formData.dob) });
+    if (!formData.consent_given) {
+      showToast('ต้องบันทึก consent ก่อนลงทะเบียนผู้ป่วยสำหรับการคัดกรอง ECG', 'warning');
+      return;
+    }
+    const ok = await addPatient({
+      ...formData,
+      age: calculateAge(formData.dob),
+      consent_timestamp: new Date().toISOString(),
+      consent_signed_by: formData.consent_signed_by || formData.name,
+    });
     if (ok) { setIsModalOpen(false); setFormData(EMPTY_FORM); setActiveTab('basic'); }
   };
 
@@ -474,6 +486,29 @@ const PatientList = () => {
                           </div>
                           <div className="md:col-span-2">
                             <FormInput dk={dk} label={t('label_emergency')} icon={<Phone size={14}/>} value={formData.emergency_contact} onChange={(e) => patch('emergency_contact', e.target.value)} placeholder="ชื่อและเบอร์โทรผู้ติดต่อ" />
+                          </div>
+                          <div className={`md:col-span-2 rounded-xl border p-4 ${dk ? 'bg-amber-500/[0.06] border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                            <label className={`flex items-start gap-3 text-xs leading-relaxed ${dk ? 'text-amber-100' : 'text-amber-900'}`}>
+                              <input
+                                type="checkbox"
+                                checked={formData.consent_given}
+                                onChange={(e) => patch('consent_given', e.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-amber-400"
+                              />
+                              <span>
+                                ได้รับความยินยอมให้เก็บข้อมูลสุขภาพและ ECG เพื่อใช้คัดกรองเบื้องต้น สนับสนุนการส่งต่อ และใช้ใน prototype/research decision support โดยไม่ใช้แทนคำวินิจฉัยสุดท้าย
+                              </span>
+                            </label>
+                            <div className="mt-3">
+                              <FormInput
+                                dk={dk}
+                                label="ผู้ให้ความยินยอม / ผู้ลงนาม"
+                                icon={<CheckCircle2 size={14}/>}
+                                value={formData.consent_signed_by}
+                                onChange={(e) => patch('consent_signed_by', e.target.value)}
+                                placeholder="ชื่อผู้ป่วยหรือผู้แทน"
+                              />
+                            </div>
                           </div>
                         </motion.div>
                       )}

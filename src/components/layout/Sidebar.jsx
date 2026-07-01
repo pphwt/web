@@ -3,12 +3,13 @@ import { NavLink } from 'react-router-dom';
 import {
   Activity, FileText, LogOut, Users, Archive,
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
-  X, ChevronUp, HeartPulse,
+  X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAccessibility } from '../../context/AccessibilityContext';
 
 const buildSections = (t) => [
   {
@@ -46,6 +47,16 @@ export const Sidebar = ({ onClose }) => {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const {
+    fontScale,
+    fontPercent,
+    minScale,
+    maxScale,
+    setFontScale,
+    increaseFont,
+    decreaseFont,
+    resetFont,
+  } = useAccessibility();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -182,6 +193,57 @@ export const Sidebar = ({ onClose }) => {
                       {label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className={`my-1 h-px ${divider}`} />
+
+              <div className="px-1 py-1.5">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className={`flex items-center gap-1.5 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${secLabel}`}>
+                    <Type size={12} /> Text Size
+                  </p>
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                    dk ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {fontPercent}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={decreaseFont}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${dropdownItem.replace('w-full px-3 py-2.5 text-sm', '')}`}
+                    title="Decrease text size"
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <input
+                    type="range"
+                    min={minScale}
+                    max={maxScale}
+                    step="0.05"
+                    value={fontScale}
+                    onChange={(event) => setFontScale(event.target.value)}
+                    className="flex-1"
+                    aria-label="Text size"
+                  />
+                  <button
+                    type="button"
+                    onClick={increaseFont}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${dropdownItem.replace('w-full px-3 py-2.5 text-sm', '')}`}
+                    title="Increase text size"
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetFont}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${dropdownItem.replace('w-full px-3 py-2.5 text-sm', '')}`}
+                    title="Reset text size"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
                 </div>
               </div>
 

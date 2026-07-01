@@ -56,6 +56,8 @@ const Analysis = () => {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
+  const [referralDestination, setReferralDestination] = useState('โรงพยาบาลแม่ข่าย / แผนกหัวใจ');
+  const [clinicianNote, setClinicianNote] = useState('');
   const [datasetInfo, setDatasetInfo] = useState(null);
 
   // Auto-match patient to a sample signal
@@ -125,7 +127,7 @@ const Analysis = () => {
         ai_confidence: result.confidence ?? 0,
         localization_coords: { x, y, z },
         physics_params: { a: 0, k: 0, D: 0 },
-        notes: 'Referral decision-support snapshot. Final diagnosis must be confirmed by a physician.',
+        notes: clinicianNote || 'Referral decision-support snapshot. Final diagnosis must be confirmed by a physician.',
         risk_level: result.region?.risk,
         triage_status: result.triage_status,
         signal_quality: result.signal_quality,
@@ -133,6 +135,7 @@ const Analysis = () => {
         model_version: 'CardiacLocalizer prototype',
         source_name: result.source_name,
         heart_rate_bpm: result.heart_rate_bpm,
+        referral_destination: referralDestination,
       };
       const saved = await diagnosticService.captureSnapshot(payload);
       showToast(saved?.report_id ? 'บันทึกรายงานส่งต่อสำเร็จ' : 'บันทึกรายงานส่งต่อแล้ว', 'success');
@@ -385,6 +388,30 @@ const Analysis = () => {
                     {referralAdvice.body}
                   </p>
                 </div>
+
+                {result?.source && (
+                  <div className={`mb-3 rounded-xl border p-3 ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                    <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
+                      Referral Destination
+                    </label>
+                    <input
+                      value={referralDestination}
+                      onChange={(e) => setReferralDestination(e.target.value)}
+                      className={`w-full rounded-lg border px-3 py-2 text-xs mb-2 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                      placeholder="โรงพยาบาลแม่ข่าย / แผนกหัวใจ"
+                    />
+                    <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
+                      Clinician / Staff Note
+                    </label>
+                    <textarea
+                      value={clinicianNote}
+                      onChange={(e) => setClinicianNote(e.target.value)}
+                      rows={2}
+                      className={`w-full rounded-lg border px-3 py-2 text-xs resize-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                      placeholder="อาการสำคัญ สัญญาณชีพ หรือเหตุผลประกอบการส่งต่อ"
+                    />
+                  </div>
+                )}
 
                 {result?.source && (
                   <button

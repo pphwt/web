@@ -18,6 +18,15 @@ const readStoredToken = () => {
   }
 };
 
+const userFromToken = (value) => {
+  const payload = JSON.parse(atob(value.split('.')[1]));
+  return {
+    username: payload.sub || 'user',
+    role: payload.role || 'health_officer',
+    full_name: payload.full_name || payload.sub || 'User',
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(readStoredToken);
@@ -26,8 +35,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (token) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser({ username: payload.sub || 'user' });
+        setUser(userFromToken(token));
       } catch {
         setToken(null);
       }
@@ -38,7 +46,11 @@ export const AuthProvider = ({ children }) => {
   const login = (newToken, userData) => {
     localStorage.setItem('bio_token', newToken);
     setToken(newToken);
-    setUser(userData);
+    try {
+      setUser({ ...userFromToken(newToken), ...userData });
+    } catch {
+      setUser(userData);
+    }
   };
 
   const logout = () => {
