@@ -18,7 +18,7 @@ export const diagnosticService = {
    */
   async captureSnapshot(data) {
     try {
-      const response = await fetch(`${API_URL}/reports/capture/`, {
+      const response = await fetch(`${API_URL}/reports/capture`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -40,7 +40,7 @@ export const diagnosticService = {
    */
   async getHistory(patientId) {
     try {
-      const response = await fetch(`${API_URL}/reports/history/${patientId}/`, {
+      const response = await fetch(`${API_URL}/reports/history/${patientId}`, {
         headers: getAuthHeaders()
       });
       const result = await response.json();
@@ -59,7 +59,7 @@ export const diagnosticService = {
    */
   async downloadReportPDF(reportId) {
     try {
-      const response = await fetch(`${API_URL}/reports/export/${reportId}/`, {
+      const response = await fetch(`${API_URL}/reports/export/${reportId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('bio_token')}`
         }
