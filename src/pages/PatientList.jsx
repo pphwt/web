@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext';
 import {
   UserPlus, Search, User, CreditCard, Droplets,
   AlertTriangle, Phone, Calendar, ChevronRight, X, Users, Menu,
-  Leaf, Trash2, Globe, Share2, Info, ChevronDown, ChevronUp,
+  Leaf, Share2, Info, ChevronDown, ChevronUp,
   Activity, HeartPulse, FileText, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import { useMobileMenu } from '../components/layout/MainLayout';
@@ -189,8 +189,6 @@ const PatientList = () => {
     (report) => reviewStatusOf(report) === 'REFERRED'
   ).length;
   const reviewReadyCount = reportsWithReferralSupport.length;
-  const estimatedCostAvoidedThb = reviewReadyCount * 350;
-  const estimatedTravelAvoidedKm = Math.max(referredCount, highRiskCount) * 25;
   const impactStats = [
     {
       label: 'Primary-care cases',
@@ -214,10 +212,10 @@ const PatientList = () => {
       accent: dk ? 'text-rose-300 bg-rose-500/10 border-rose-400/20' : 'text-rose-700 bg-rose-50 border-rose-200',
     },
     {
-      label: 'Estimated savings',
-      value: `฿${estimatedCostAvoidedThb.toLocaleString('th-TH')}`,
-      detail: 'ประมาณการต้นทุนเบื้องต้นที่ลดได้จากการคัดกรองก่อนส่งต่อ',
-      icon: Leaf,
+      label: 'Marked referrals',
+      value: referredCount.toLocaleString('th-TH'),
+      detail: 'รายงานที่แพทย์หรือผู้มีสิทธิ์ review แล้ว mark เป็น REFERRED',
+      icon: CheckCircle2,
       accent: dk ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20' : 'text-emerald-700 bg-emerald-50 border-emerald-200',
     },
   ];
@@ -308,7 +306,7 @@ const PatientList = () => {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {['คัดกรองเร็วขึ้น', 'ส่งต่อชัดขึ้น', 'ลดการเดินทางซ้ำ', 'Decision support'].map((item) => (
+                {['ข้อมูลจริงจากระบบ', 'ส่งต่อชัดขึ้น', 'แพทย์ตรวจทานได้', 'Decision support'].map((item) => (
                   <span
                     key={item}
                     className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
@@ -352,10 +350,10 @@ const PatientList = () => {
                     </div>
                     <div>
                       <p className={`text-sm font-semibold ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
-                        Prototype impact estimate, ไม่ใช่ผลลัพธ์ทางคลินิกที่ยืนยันแล้ว
+                        Live operational data, ไม่มี mock หรือค่าประมาณที่สร้างขึ้นเอง
                       </p>
                       <p className={`mt-1 text-xs leading-5 ${dk ? 'text-slate-500' : 'text-slate-500'}`}>
-                        ตัวเลขนี้ใช้สำหรับ demo/pilot readiness โดยอิงจากจำนวนรายงานในระบบและสมมติฐานต้นทุนอย่างระมัดระวัง
+                        ตัวเลขทั้งหมดอ่านจากข้อมูลผู้ป่วย รายงาน referral-support และสถานะ review ที่บันทึกไว้จริงในระบบ
                       </p>
                     </div>
                   </div>
@@ -368,7 +366,7 @@ const PatientList = () => {
                         : 'border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
                   >
-                    {showImpactDetails ? 'ซ่อนรายละเอียด' : 'ดูสมมติฐาน'}
+                    {showImpactDetails ? 'ซ่อนรายละเอียด' : 'ดูที่มาข้อมูล'}
                     {showImpactDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 </div>
@@ -387,15 +385,15 @@ const PatientList = () => {
                       }`}>
                         <div className="flex items-start gap-2">
                           <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-500" />
-                          <span>ประหยัดต้นทุนประมาณ ฿350 ต่อเคสที่มี referral-support report พร้อมใช้</span>
+                          <span>Patient count มาจากรายการผู้ป่วยที่โหลดผ่านระบบจริงหลัง login</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <Globe size={14} className="mt-0.5 shrink-0 text-sky-500" />
-                          <span>ลดการเดินทางซ้ำประมาณ {estimatedTravelAvoidedKm.toLocaleString('th-TH')} กม. จากเคส high-risk/ส่งต่อ</span>
+                          <FileText size={14} className="mt-0.5 shrink-0 text-sky-500" />
+                          <span>Referral-ready, high-risk และ marked referral คำนวณจากรายงานที่บันทึกจริงเท่านั้น</span>
                         </div>
                         <div className="flex items-start gap-2">
-                          <Trash2 size={14} className="mt-0.5 shrink-0 text-emerald-500" />
-                          <span>ลดการใช้ทรัพยากรโดยคัดกรองก่อนส่งต่อ ไม่ claim แทนการวินิจฉัยหรือ outcome จริง</span>
+                          <Info size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                          <span>ผลกระทบด้านต้นทุน/การเดินทางจะไม่แสดงเป็นตัวเลขจนกว่าจะมี field จริงสำหรับเก็บข้อมูลนั้น</span>
                         </div>
                       </div>
                     </motion.div>
