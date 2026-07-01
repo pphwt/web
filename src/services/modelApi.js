@@ -9,6 +9,11 @@ export const MODEL_API_BASE = stripApiPrefix(
   'http://localhost:8010'
 );
 
+export const CLINICAL_API_BASE = stripApiPrefix(
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8020'
+);
+
 const parseJson = async (response) => {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -59,20 +64,20 @@ export const modelApi = {
     }
     const form = new FormData();
     form.append('file', file);
-    return parseJson(await fetch(`${MODEL_API_BASE}/api/v1/ecg/analyze`, {
+    return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
       body: form,
     }));
   },
 
-  ecgFormats: async () => parseJson(await fetch(`${MODEL_API_BASE}/api/v1/ecg/formats`)),
+  ecgFormats: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/formats`)),
 
-  ecgSamples: async () => parseJson(await fetch(`${MODEL_API_BASE}/api/v1/ecg/samples`)),
+  ecgSamples: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/samples`)),
 
   analyzeEcgSample: async (sampleId) => {
     const form = new FormData();
     form.append('sample_id', sampleId);
-    return parseJson(await fetch(`${MODEL_API_BASE}/api/v1/ecg/analyze`, {
+    return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
       body: form,
     }));
