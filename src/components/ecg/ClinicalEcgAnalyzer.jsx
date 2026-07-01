@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Upload, Play, Loader2, HeartPulse, AlertTriangle, Activity, Info, Database, CheckCircle2, FileDown,
+  Upload, Play, Loader2, HeartPulse, AlertTriangle, Activity, Info, Database, CheckCircle2, FileDown, Save,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { usePatient } from '../../context/PatientContext';
+import { useToast } from '../../context/ToastContext';
 import { modelApi } from '../../services/modelApi';
 
 // Measurement metrics → display config. `approx` marks values that come from
@@ -52,6 +54,8 @@ function LeadTrace({ name, values, dk }) {
 
 export default function ClinicalEcgAnalyzer() {
   const { isDarkMode: dk } = useTheme();
+  const { selectedPatient } = usePatient();
+  const { showToast } = useToast();
   const [file, setFile] = useState(null);
   const [samples, setSamples] = useState([]);
   const [sampleId, setSampleId] = useState('');
@@ -99,6 +103,27 @@ export default function ClinicalEcgAnalyzer() {
       setError(e.message || 'สร้าง PDF ไม่สำเร็จ');
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const [saving, setSaving] = useState(false);
+  const saveToRecord = async () => {
+    if (!selectedPatient?.id) {
+      showToast('เลือกผู้ป่วยก่อน (จากหน้า Patients) เพื่อบันทึกเข้าเวชระเบียน', 'warning');
+      return;
+    }
+    setSaving(true);
+    try {
+      await modelApi.saveEcgReport({
+        patient_id: selectedPatient.id,
+        result,
+        source_name: file ? file.name : sampleId,
+      });
+      showToast(`บันทึกเข้าเวชระเบียน ${selectedPatient.name} สำเร็จ`, 'success');
+    } catch (e) {
+      showToast(`บันทึกไม่สำเร็จ: ${e.message}`, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -187,6 +212,17 @@ export default function ClinicalEcgAnalyzer() {
                 }`}>
                   {result.lead_system} · {result.lead_names?.length} leads
                 </span>
+                <button
+                  onClick={saveToRecord}
+                  disabled={saving}
+                  title={selectedPatient ? `บันทึกเข้าเวชระเบียน ${selectedPatient.name}` : 'เลือกผู้ป่วยก่อน'}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition active:scale-95 ${
+                    dk ? 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                  }`}
+                >
+                  {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                  บันทึก
+                </button>
                 <button
                   onClick={downloadPdf}
                   disabled={pdfLoading}
