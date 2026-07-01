@@ -52,13 +52,28 @@ function LeadTrace({ name, values, dk }) {
   );
 }
 
+const DEFAULT_SAMPLES = [
+  { id: "00001_hr", primary_label: "Normal ECG", age: 56, sex: "F" },
+  { id: "00002_hr", primary_label: "Normal ECG", age: 19, sex: "M" },
+  { id: "00003_hr", primary_label: "Normal ECG", age: 37, sex: "F" },
+  { id: "00017_hr", primary_label: "Atrial fibrillation", age: 56, sex: "M" },
+  { id: "00152_hr", primary_label: "Atrial fibrillation", age: 70, sex: "F" },
+  { id: "00282_hr", primary_label: "Atrial fibrillation", age: null, sex: "M" },
+  { id: "00008_hr", primary_label: "Inferior MI", age: 48, sex: "M" },
+  { id: "00039_hr", primary_label: "Inferior MI", age: 56, sex: "M" },
+  { id: "00103_hr", primary_label: "Inferior MI", age: 39, sex: "M" },
+  { id: "00077_hr", primary_label: "Anterior MI", age: 43, sex: "M" },
+  { id: "00199_hr", primary_label: "Anterior MI", age: 19, sex: "F" },
+  { id: "00211_hr", primary_label: "Anterior MI", age: 85, sex: "F" }
+];
+
 export default function ClinicalEcgAnalyzer() {
   const { isDarkMode: dk } = useTheme();
   const { selectedPatient } = usePatient();
   const { showToast } = useToast();
   const [uploadedFiles, setUploadedFiles] = useState(null);
   const [attachments, setAttachments] = useState([]);
-  const [samples, setSamples] = useState([]);
+  const [samples, setSamples] = useState(DEFAULT_SAMPLES);
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -67,7 +82,11 @@ export default function ClinicalEcgAnalyzer() {
 
   useEffect(() => {
     modelApi.ecgSamples()
-      .then((d) => setSamples(d?.samples || []))
+      .then((d) => {
+        if (d?.samples && d.samples.length > 0) {
+          setSamples(d.samples);
+        }
+      })
       .catch(() => {});
   }, []);
 
