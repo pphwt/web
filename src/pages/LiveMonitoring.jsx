@@ -24,6 +24,7 @@ const StatusPill = ({ connected, dk }) => (
     connected
       ? dk ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
       : dk ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'         : 'bg-rose-50 text-rose-600 border-rose-200'
+
   }`}>
     <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
     {connected ? 'Live · 4.2ms' : 'Offline'}
@@ -70,10 +71,39 @@ const LiveMonitoring = () => {
   const [recordTime, setRecordTime]     = useState(0);
   const [saveStatus, setSaveStatus]     = useState(null);
   const [isFrozen, setIsFrozen]         = useState(false);
-  const [events, setEvents]             = useState([
-    { id: 1, time: '10:02:15', type: 'System',   detail: 'Cardiac Link Established',          color: 'bg-sky-400' },
-    { id: 2, time: '10:05:42', type: 'Triage Alert', detail: 'Slight QTc Prolongation Detected', color: 'bg-amber-400' },
-  ]);
+  const [events, setEvents]             = useState([]);
+
+  // Generate real-time event logs dynamically from WebSocket connection and AI state
+  useEffect(() => {
+    const timeStr = new Date().toTimeString().split(' ')[0];
+    setEvents(prev => [
+      {
+        id: Date.now(),
+        time: timeStr,
+        type: 'System',
+        detail: isConnected ? 'Cardiac Link Connected' : 'Cardiac Link Disconnected',
+        color: isConnected ? 'bg-emerald-400' : 'bg-rose-400'
+      },
+      ...prev.slice(0, 19) // limit to 20 events
+    ]);
+  }, [isConnected]);
+
+  useEffect(() => {
+    if (clinicalState?.diagnosis) {
+      const timeStr = new Date().toTimeString().split(' ')[0];
+      const isNormalRhythm = clinicalState.diagnosis === 'Normal Sinus Rhythm';
+      setEvents(prev => [
+        {
+          id: Date.now() + 1,
+          time: timeStr,
+          type: isNormalRhythm ? 'System' : 'Triage Alert',
+          detail: clinicalState.diagnosis,
+          color: isNormalRhythm ? 'bg-emerald-400' : isCritical ? 'bg-rose-400' : 'bg-amber-400'
+        },
+        ...prev.slice(0, 19)
+      ]);
+    }
+  }, [clinicalState?.diagnosis]);
 
   useEffect(() => {
     if (selectedPatient?.id) subscribe(selectedPatient.id);
@@ -90,14 +120,6 @@ const LiveMonitoring = () => {
       toggleRecording();
     }
   }, [isRecording, recordTime]);
-
-  useEffect(() => {
-    if (isRecording && streamData?.leads) {
-      recordingBuffer.current.lead_i.push(streamData.leads.lead_i);
-      recordingBuffer.current.lead_ii.push(streamData.leads.lead_ii);
-      recordingBuffer.current.v5.push(streamData.leads.v5);
-    }
-  }, [streamData, isRecording]);
 
   const toggleRecording = async () => {
     if (!isRecording) {
