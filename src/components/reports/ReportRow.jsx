@@ -1,13 +1,26 @@
-import React, { useState } from 'react';
-import { Heart, Clock, ChevronDown, Download, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, Clock, ChevronDown, Download, Loader2, FileText } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { diagnosticService } from '../../services/diagnosticService';
+import { modelApi } from '../../services/modelApi';
 
 export const ReportRow = ({ report, isOpen, onToggle, currentUser, onReviewed }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [attachments, setAttachments] = useState([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
   const { isDarkMode: dk } = useTheme();
+
+  useEffect(() => {
+    if (isOpen && report.id) {
+      setLoadingAttachments(true);
+      modelApi.getReportAttachments(report.id)
+        .then((data) => setAttachments(data || []))
+        .catch((err) => console.error("Failed to load attachments:", err))
+        .finally(() => setLoadingAttachments(false));
+    }
+  }, [isOpen, report.id]);
 
   // Map database organ_type to icons
   const Icon = Heart;
@@ -145,6 +158,29 @@ export const ReportRow = ({ report, isOpen, onToggle, currentUser, onReviewed })
               <div className={`${detailCardBg} rounded-xl p-4 flex-1`}>
                 <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>Physician Notes</p>
                 <p className={`text-xs italic ${textBody}`}>"{report.notes}"</p>
+              </div>
+            )}
+            {attachments.length > 0 && (
+              <div className={`${detailCardBg} rounded-xl p-4 min-w-[240px] flex-1`}>
+                <p className={`text-[9px] uppercase tracking-widest font-bold mb-2 ${textSub}`}>เอกสารแนบ (Attachments)</p>
+                <div className="flex flex-col gap-2">
+                  {attachments.map((att) => (
+                    <a
+                      key={att.id}
+                      href={att.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center gap-1.5 text-xs font-semibold hover:underline ${
+                        dk ? 'text-sky-400 hover:text-sky-300' : 'text-sky-600 hover:text-sky-700'
+                      }`}
+                      title={`ขนาด ${(att.file_size / 1024).toFixed(1)} KB`}
+                    >
+                      <FileText size={12} />
+                      <span className="truncate max-w-[200px]">{att.file_name}</span>
+                      <span className="text-[9px] font-normal opacity-60">({(att.file_size / 1024).toFixed(1)} KB)</span>
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
           </div>
