@@ -48,13 +48,14 @@ export const PatientProvider = ({ children }) => {
         body: JSON.stringify(patientData)
       });
       if (response.ok) {
+        const data = await response.json();
         await fetchPatients(); // Refresh list
-        return true;
+        return data;
       }
-      return false;
+      return null;
     } catch (error) {
       console.error('Failed to add patient:', error);
-      return false;
+      return null;
     }
   };
 

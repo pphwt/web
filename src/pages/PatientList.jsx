@@ -9,10 +9,11 @@ import {
   UserPlus, Search, User, CreditCard, Droplets,
   AlertTriangle, Phone, Calendar, ChevronRight, X, Users, Menu,
   Leaf, Share2, Info, ChevronDown, ChevronUp,
-  Activity, HeartPulse, FileText, CheckCircle2, AlertCircle,
+  Activity, HeartPulse, FileText, CheckCircle2, AlertCircle, Upload,
 } from 'lucide-react';
 import { useMobileMenu } from '../components/layout/MainLayout';
 import { motion, AnimatePresence } from 'framer-motion';
+import { modelApi } from '../services/modelApi';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,8 @@ const PatientList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab]     = useState('basic');
   const [formData, setFormData]       = useState(EMPTY_FORM);
+  const [consentFile, setConsentFile] = useState(null);
+  const [uploading, setUploading]     = useState(false);
   const [showImpactDetails, setShowImpactDetails] = useState(false);
   const [reports, setReports]         = useState([]);
 
@@ -162,13 +165,35 @@ const PatientList = () => {
       showToast('ต้องบันทึก consent ก่อนลงทะเบียนผู้ป่วยสำหรับการคัดกรอง ECG', 'warning');
       return;
     }
-    const ok = await addPatient({
-      ...formData,
-      age: calculateAge(formData.dob),
-      consent_timestamp: new Date().toISOString(),
-      consent_signed_by: formData.consent_signed_by || formData.name,
-    });
-    if (ok) { setIsModalOpen(false); setFormData(EMPTY_FORM); setActiveTab('basic'); }
+    setUploading(true);
+    try {
+      const newPatient = await addPatient({
+        ...formData,
+        age: calculateAge(formData.dob),
+        consent_timestamp: new Date().toISOString(),
+        consent_signed_by: formData.consent_signed_by || formData.name,
+      });
+      if (newPatient) {
+        if (consentFile) {
+          try {
+            await modelApi.uploadConsentFile(newPatient.id, consentFile);
+            showToast('อัปโหลดหนังสือยินยอมคัดกรองเรียบร้อยแล้ว', 'success');
+          } catch (err) {
+            showToast(`อัปโหลดหนังสือยินยอมไม่สำเร็จ: ${err.message}`, 'error');
+          }
+        }
+        setIsModalOpen(false);
+        setFormData(EMPTY_FORM);
+        setConsentFile(null);
+        setActiveTab('basic');
+      } else {
+        showToast('ไม่สามารถลงทะเบียนผู้ป่วยได้', 'error');
+      }
+    } catch (err) {
+      showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const filtered = patients.filter(p =>
@@ -446,6 +471,31 @@ const PatientList = () => {
                       <p className={`truncate font-semibold text-sm leading-tight ${cardName}`}>{p.name}</p>
                       <p className={`text-[11px] mt-0.5 ${cardMeta}`}>HN: {p.id_card?.substring(0, 8) || 'GEN-001'}</p>
                     </div>
+                    {p.consent_document_url && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const res = await modelApi.getConsentFile(p.id);
+                            if (res?.url) {
+                              window.open(res.url, '_blank');
+                            } else {
+                              showToast('ไม่พบลิงก์หนังสือยินยอม', 'warning');
+                            }
+                          } catch (err) {
+                            showToast(`ดึงไฟล์ล้มเหลว: ${err.message}`, 'error');
+                          }
+                        }}
+                        className={`shrink-0 rounded-lg p-1.5 border transition ${
+                          dk 
+                            ? 'bg-amber-500/[0.08] border-amber-500/20 text-amber-400 hover:bg-amber-500/[0.15]' 
+                            : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                        }`}
+                        title="ดูหนังสือยินยอมสะแกน"
+                      >
+                        <FileText size={12} />
+                      </button>
+                    )}
                     {isEmergency ? (
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 animate-pulse bg-rose-500/10 text-rose-500 border-rose-500/20`}>
                         <AlertCircle size={10} /> Emergency
@@ -671,6 +721,25 @@ const PatientList = () => {
                                 onChange={(e) => patch('consent_signed_by', e.target.value)}
                                 placeholder="ชื่อผู้ป่วยหรือผู้แทน"
                               />
+                            </div>
+                            <div className="mt-3 space-y-1.5">
+                              <span className={`text-xs font-semibold ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
+                                แนบไฟล์หนังสือยินยอมคัดกรอง (รองรับ PDF, PNG, JPG, JPEG)
+                              </span>
+                              <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs cursor-pointer ${
+                                dk ? 'border-white/[0.12] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                              }`}>
+                                <Upload size={13} />
+                                <span className="truncate">
+                                  {consentFile ? consentFile.name : 'เลือกไฟล์หนังสือยินยอม...'}
+                                </span>
+                                <input
+                                  type="file"
+                                  accept=".pdf,.png,.jpg,.jpeg"
+                                  className="hidden"
+                                  onChange={(e) => setConsentFile(e.target.files?.[0] || null)}
+                                />
+                              </label>
                             </div>
                           </div>
                         </motion.div>

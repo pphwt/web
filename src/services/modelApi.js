@@ -125,4 +125,36 @@ export const modelApi = {
       body: form,
     }));
   },
+
+  uploadConsentFile: async (patientId, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/attachments/patients/${patientId}/consent-file`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: form,
+    }));
+  },
+
+  getConsentFile: async (patientId) => {
+    return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/attachments/patients/${patientId}/consent-file`, {
+      headers: authHeaders(),
+    }));
+  },
+
+  uploadReportAttachment: async (reportId, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/attachments/reports/${reportId}/attachments`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: form,
+    }));
+  },
+
+  getReportAttachments: async (reportId) => {
+    return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/attachments/reports/${reportId}/attachments`, {
+      headers: authHeaders(),
+    }));
+  },
 };

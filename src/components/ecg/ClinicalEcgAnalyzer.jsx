@@ -57,6 +57,7 @@ export default function ClinicalEcgAnalyzer() {
   const { selectedPatient } = usePatient();
   const { showToast } = useToast();
   const [uploadedFiles, setUploadedFiles] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const [samples, setSamples] = useState([]);
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
@@ -118,14 +119,25 @@ export default function ClinicalEcgAnalyzer() {
     }
     setSaving(true);
     try {
-      await modelApi.saveEcgReport({
+      const res = await modelApi.saveEcgReport({
         patient_id: selectedPatient.id,
         result,
         source_name: uploadedFiles 
           ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : uploadedFiles.map(f => f.name).join(', ')) 
           : sampleId,
       });
+      const reportId = res.report_id;
+      if (reportId && attachments.length > 0) {
+        for (const file of attachments) {
+          try {
+            await modelApi.uploadReportAttachment(reportId, file);
+          } catch (uploadErr) {
+            showToast(`แนบไฟล์ ${file.name} ล้มเหลว: ${uploadErr.message}`, 'warning');
+          }
+        }
+      }
       showToast(`บันทึกเข้าเวชระเบียน ${selectedPatient.name} สำเร็จ`, 'success');
+      setAttachments([]);
     } catch (e) {
       showToast(`บันทึกไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
@@ -289,6 +301,42 @@ export default function ClinicalEcgAnalyzer() {
                 เป็น open-source delineation = <b>ค่าประมาณคร่าวๆ คลาดเคลื่อนได้มาก (โดยเฉพาะ QRS width)</b> ไม่ใช้วัดทางคลินิก.
                 <b>HR และ rhythm/วินิจฉัย</b> เชื่อถือได้กว่า.
               </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-150 dark:border-white/[0.05]">
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${secLabel}`}>
+                เอกสารแนบรายงานส่งต่อ (Attachments - สูงสุด 5 ไฟล์)
+              </p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {attachments.map((f, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${
+                    dk ? 'bg-white/[0.04] border-white/[0.08] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
+                    {f.name}
+                    <button
+                      onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))}
+                      className="ml-1 text-rose-500 hover:text-rose-600 font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <label className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-semibold cursor-pointer transition ${
+                dk ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}>
+                <Upload size={11} /> เพิ่มไฟล์ประวัติ/รายงานส่งต่อ...
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files || []);
+                    setAttachments([...attachments, ...list]);
+                  }}
+                />
+              </label>
             </div>
           </div>
 
