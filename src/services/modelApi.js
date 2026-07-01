@@ -81,6 +81,17 @@ export const modelApi = {
     headers: authHeaders(),
   })),
 
+  ecgReportBlob: async ({ file, sampleId }) => {
+    const form = new FormData();
+    if (file) form.append('file', file);
+    else form.append('sample_id', sampleId);
+    const res = await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/report`, {
+      method: 'POST', headers: authHeaders(), body: form,
+    });
+    if (!res.ok) throw new Error(`Report HTTP ${res.status}`);
+    return res.blob();
+  },
+
   ecgSamples: async () => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/samples`, {
     headers: authHeaders(),
   })),

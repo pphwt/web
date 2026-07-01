@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Upload, Play, Loader2, HeartPulse, AlertTriangle, Activity, Info, Database, CheckCircle2,
+  Upload, Play, Loader2, HeartPulse, AlertTriangle, Activity, Info, Database, CheckCircle2, FileDown,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { modelApi } from '../../services/modelApi';
@@ -85,6 +85,23 @@ export default function ClinicalEcgAnalyzer() {
     }
   };
 
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const downloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      const blob = await modelApi.ecgReportBlob(file ? { file } : { sampleId });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `ECG_Report_${sampleId || 'upload'}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e.message || 'สร้าง PDF ไม่สำเร็จ');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const orderedLeads = useMemo(() => {
     if (!result?.waveform) return [];
     const names = Object.keys(result.waveform);
@@ -162,13 +179,25 @@ export default function ClinicalEcgAnalyzer() {
                 <HeartPulse size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
                 <span className={`text-xs font-semibold ${secLabel}`}>3 · ค่าที่วัดได้ (Measurement Results)</span>
               </div>
-              <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase ${
-                result.lead_system === 'clinical_12'
-                  ? dk ? 'border-sky-500/30 text-sky-300 bg-sky-500/10' : 'border-sky-300 text-sky-700 bg-sky-50'
-                  : dk ? 'border-slate-600 text-slate-400 bg-white/[0.03]' : 'border-slate-300 text-slate-500 bg-slate-50'
-              }`}>
-                {result.lead_system} · {result.lead_names?.length} leads
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase ${
+                  result.lead_system === 'clinical_12'
+                    ? dk ? 'border-sky-500/30 text-sky-300 bg-sky-500/10' : 'border-sky-300 text-sky-700 bg-sky-50'
+                    : dk ? 'border-slate-600 text-slate-400 bg-white/[0.03]' : 'border-slate-300 text-slate-500 bg-slate-50'
+                }`}>
+                  {result.lead_system} · {result.lead_names?.length} leads
+                </span>
+                <button
+                  onClick={downloadPdf}
+                  disabled={pdfLoading}
+                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition active:scale-95 ${
+                    dk ? 'border-white/[0.1] text-slate-300 hover:bg-white/[0.05]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {pdfLoading ? <Loader2 size={11} className="animate-spin" /> : <FileDown size={11} />}
+                  PDF
+                </button>
+              </div>
             </div>
 
             {result.ground_truth_label && (
