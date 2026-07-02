@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { Menu, X } from 'lucide-react';
+import { CookieConsent } from './CookieConsent';
 
 export const MobileMenuContext = createContext(() => {});
 export const useMobileMenu = () => useContext(MobileMenuContext);
@@ -41,6 +42,9 @@ export const MainLayout = ({ children }) => {
             {children}
           </main>
         </div>
+
+        {/* PDPA Cookie Consent Banner */}
+        <CookieConsent />
       </div>
     </MobileMenuContext.Provider>
   );
