@@ -186,8 +186,10 @@ const Analysis = () => {
     }
     setReferralLoading(true);
     try {
-      const { VITE_CLINICAL_API_URL } = import.meta.env;
-      const base = VITE_CLINICAL_API_URL || '';
+      const base = import.meta.env.VITE_API_URL || '';
+      const endpoint = base.endsWith('/api/v1')
+        ? `${base}/ecg/referral-letter`
+        : `${base}/api/v1/ecg/referral-letter`;
       const form = new FormData();
       if (file) {
         form.append('file', file);
@@ -205,7 +207,7 @@ const Analysis = () => {
       form.append('referral_destination', referralDestination || '');
 
       const token = localStorage.getItem('token');
-      const res = await fetch(`${base}/api/v1/ecg/referral-letter`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: form,
