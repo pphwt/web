@@ -351,11 +351,11 @@ const Analysis = () => {
                   </div>
                 </div>
                 {activeSample && (
-                  <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[10px] ${
+                  <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[10px] ${
                     dk ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                   }`}>
-                    <CheckCircle2 size={12} className="shrink-0 text-emerald-500 animate-pulse" />
-                    <span className="font-medium">
+                    <CheckCircle2 size={12} className="shrink-0 text-emerald-500 mt-0.5 animate-pulse" />
+                    <span className="font-medium break-all">
                       เชื่อมต่อคลื่นไฟฟ้าคนไข้สำเร็จ (Auto-linked: {activeSample.name})
                     </span>
                   </div>
