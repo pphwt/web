@@ -8,16 +8,15 @@ import { MODEL_API_BASE } from '../../services/modelApi';
 const API_BASE = MODEL_API_BASE;
 const HEART_SCALE = 1.5;
 
-function normToScene(n, bbRef) {
+function normToScene(n, bbRef, cal) {
   if (!bbRef.current) return new THREE.Vector3(0, 0, 0);
   const { bb, scale } = bbRef.current;
   const mn = bb.min.clone().multiplyScalar(scale);
   const mx = bb.max.clone().multiplyScalar(scale);
   
-  // Calibrate coordinate cloud to fit inside/on the ventricle part of the GLTF heart model
-  const kx = 0.25 + n.x * 0.50; // Squeeze X range to [0.25, 0.75]
-  const ky = 0.15 + n.y * 0.40; // Squeeze Y range to [0.15, 0.55] (Ventricles region)
-  const kz = 0.25 + n.z * 0.50; // Squeeze Z range to [0.25, 0.75]
+  const kx = (cal?.xOffset ?? 0.25) + n.x * (cal?.xScale ?? 0.50);
+  const ky = (cal?.yOffset ?? 0.15) + n.y * (cal?.yScale ?? 0.40);
+  const kz = (cal?.zOffset ?? 0.25) + n.z * (cal?.zScale ?? 0.50);
 
   return new THREE.Vector3(
     mn.x + kx * (mx.x - mn.x),
@@ -25,6 +24,18 @@ function normToScene(n, bbRef) {
     mn.z + kz * (mx.z - mn.z)
   );
 }
+
+function getChamberName(coords) {
+  if (!coords) return 'Unknown';
+  const isUpper = coords.z >= 0.5;
+  const isLeft = coords.x >= 0.5;
+  if (isUpper) {
+    return isLeft ? 'Left Atrium (LA) / บนซ้าย' : 'Right Atrium (RA) / บนขวา';
+  } else {
+    return isLeft ? 'Left Ventricle (LV) / ล่างซ้าย' : 'Right Ventricle (RV) / ล่างขวา';
+  }
+}
+
 
 function regionFromAHA(seg) {
   if (!seg || seg === 0) return 'Localizing…';
@@ -85,7 +96,7 @@ function Heart({ bbRef }) {
 }
 
 // ── Activation sphere cluster ─────────────────────────────────────────────────
-function ActivationMap({ bbRef, nodePositions, activationMap }) {
+function ActivationMap({ bbRef, nodePositions, activationMap, calibration }) {
   const meshRef = useRef();
   const count   = nodePositions.length;
   const dummy   = useMemo(() => new THREE.Object3D(), []);
@@ -95,7 +106,7 @@ function ActivationMap({ bbRef, nodePositions, activationMap }) {
   useEffect(() => {
     if (!meshRef.current || !bbRef.current || count === 0) return;
     for (let i = 0; i < count; i++) {
-      const pos = normToScene(nodePositions[i].norm, bbRef);
+      const pos = normToScene(nodePositions[i].norm, bbRef, calibration);
       dummy.position.copy(pos);
       dummy.scale.setScalar(0.07);
       dummy.updateMatrix();
@@ -106,7 +117,7 @@ function ActivationMap({ bbRef, nodePositions, activationMap }) {
     }
     meshRef.current.instanceMatrix.needsUpdate = true;
     meshRef.current.geometry.attributes.color.needsUpdate = true;
-  }, [nodePositions, activationMap, bbRef, dummy, colors, color, count]);
+  }, [nodePositions, activationMap, bbRef, dummy, colors, color, count, calibration]);
 
   if (count === 0) return null;
 
@@ -121,10 +132,10 @@ function ActivationMap({ bbRef, nodePositions, activationMap }) {
 }
 
 // ── Top-5 markers ─────────────────────────────────────────────────────────────
-function Top5Markers({ bbRef, top5 }) {
+function Top5Markers({ bbRef, top5, calibration }) {
   if (!top5 || top5.length === 0) return null;
   return top5.map((node, rank) => {
-    const pos     = normToScene(node.coords, bbRef);
+    const pos     = normToScene(node.coords, bbRef, calibration);
     const opacity = 1 - rank * 0.18;
     const size    = 0.10 - rank * 0.015;
     return (
@@ -137,10 +148,11 @@ function Top5Markers({ bbRef, top5 }) {
 }
 
 // ── Primary pin marker ────────────────────────────────────────────────────────
-function PinMarker({ bbRef, result, onUpdate }) {
+function PinMarker({ bbRef, result, onUpdate, calibration }) {
   const groupRef        = useRef();
   const posRef          = useRef(null);
   const [info, setInfo] = useState(null);
+  const [currentDetail, setCurrentDetail] = useState(null);
   const { events }      = useStream();
 
   // Build pin info from a stream-shaped payload (live frame OR static analyze result)
@@ -150,7 +162,7 @@ function PinMarker({ bbRef, result, onUpdate }) {
     const aha    = detail?.aha;
     if (!coords || !bbRef.current) return;
 
-    posRef.current = normToScene(coords, bbRef);
+    posRef.current = normToScene(coords, bbRef, calibration);
 
     const territory = aha?.territory ?? '—';
     const risk      = aha?.risk ?? 'LOW';
@@ -168,25 +180,35 @@ function PinMarker({ bbRef, result, onUpdate }) {
       risk,
       confidence: Math.round(conf * 100),
       aha,
+      chamber:    getChamberName(coords),
     };
     setInfo(nextInfo);
     onUpdate?.(nextInfo);
   };
 
-  // Static mode: a single analyze result drives the pin (no live stream)
+  // Static mode
   useEffect(() => {
-    if (result) applyDetail(result);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, bbRef.current]);
+    if (result) {
+      setCurrentDetail(result);
+    }
+  }, [result]);
 
-  // Live mode: subscribe to the 20 Hz stream (only when no static result)
+  // Live mode
   useEffect(() => {
     if (result) return;
-    const handler = (e) => applyDetail(e.detail);
+    const handler = (e) => {
+      setCurrentDetail(e.detail);
+    };
     events?.addEventListener('data', handler);
     return () => events?.removeEventListener('data', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, bbRef, onUpdate, result]);
+  }, [events, result]);
+
+  // Apply when detail, calibration, or bbRef changes
+  useEffect(() => {
+    if (currentDetail) {
+      applyDetail(currentDetail);
+    }
+  }, [currentDetail, calibration, bbRef.current]);
 
   useFrame(() => {
     if (!groupRef.current || !posRef.current) return;
@@ -233,8 +255,11 @@ function PinMarker({ bbRef, result, onUpdate }) {
           <div style={{ color: riskColor, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, marginBottom: 2 }}>
             &#9899; {info.risk} RISK
           </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#f1f5f9', marginBottom: 2 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#f1f5f9', marginBottom: 1 }}>
             Seg {info.segment} &mdash; {info.region}
+          </div>
+          <div style={{ fontSize: 10, color: '#cbd5e1', marginBottom: 3, fontWeight: 'bold' }}>
+            {info.chamber}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
             <div style={{ width: 7, height: 7, borderRadius: 2, backgroundColor: terrColor }} />
@@ -291,6 +316,46 @@ const HeartModel3D = ({ result = null }) => {
   const [showActivation, setShowActivation] = useState(true);
   const [showTop5, setShowTop5] = useState(true);
 
+  // Calibration State
+  const [showCal, setShowCal] = useState(false);
+  const [calibration, setCalibration] = useState(() => {
+    const saved = localStorage.getItem('heart_3d_calibration');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      xOffset: 0.25,
+      xScale: 0.50,
+      yOffset: 0.15,
+      yScale: 0.40,
+      zOffset: 0.25,
+      zScale: 0.50
+    };
+  });
+
+  const updateCalibration = (key, val) => {
+    setCalibration(prev => {
+      const next = { ...prev, [key]: parseFloat(val) };
+      localStorage.setItem('heart_3d_calibration', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const resetCalibration = () => {
+    const defaults = {
+      xOffset: 0.25,
+      xScale: 0.50,
+      yOffset: 0.15,
+      yScale: 0.40,
+      zOffset: 0.25,
+      zScale: 0.50
+    };
+    setCalibration(defaults);
+    localStorage.setItem('heart_3d_calibration', JSON.stringify(defaults));
+  };
+
   const bbRef      = useRef(null);
   const { events } = useStream();
 
@@ -329,7 +394,7 @@ const HeartModel3D = ({ result = null }) => {
         padding: '8px 12px', fontFamily: 'ui-monospace,monospace',
         color: '#94a3b8', zIndex: 10, fontSize: 10,
         display: 'flex', flexDirection: 'column', gap: 6,
-        userSelect: 'none'
+        userSelect: 'none', maxWidth: 220
       }}>
         <div style={{ color: '#475569', fontSize: 9, fontWeight: 700, letterSpacing: 1.2, marginBottom: 2 }}>
           LAYERS OVERLAY
@@ -346,6 +411,72 @@ const HeartModel3D = ({ result = null }) => {
           <input type="checkbox" checked={showTop5} onChange={(e) => setShowTop5(e.target.checked)} />
           <span>🔵 Top-5 Candidates</span>
         </label>
+
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 6, marginTop: 4 }}>
+          <div 
+            style={{ color: '#475569', fontSize: 9, fontWeight: 700, letterSpacing: 1.2, marginBottom: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} 
+            onClick={() => setShowCal(!showCal)}
+          >
+            <span>{showCal ? '▼ CALIBRATION' : '► CALIBRATION'}</span>
+            <span style={{ fontSize: 8 }}>⚙️</span>
+          </div>
+          {showCal && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>X Off: {calibration.xOffset.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.0" max="1.0" step="0.01" value={calibration.xOffset} onChange={(e) => updateCalibration('xOffset', e.target.value)} style={{ width: '100%' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>X Scale: {calibration.xScale.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.1" max="1.5" step="0.01" value={calibration.xScale} onChange={(e) => updateCalibration('xScale', e.target.value)} style={{ width: '100%' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Y Off: {calibration.yOffset.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.0" max="1.0" step="0.01" value={calibration.yOffset} onChange={(e) => updateCalibration('yOffset', e.target.value)} style={{ width: '100%' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Y Scale: {calibration.yScale.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.1" max="1.5" step="0.01" value={calibration.yScale} onChange={(e) => updateCalibration('yScale', e.target.value)} style={{ width: '100%' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Z Off: {calibration.zOffset.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.0" max="1.0" step="0.01" value={calibration.zOffset} onChange={(e) => updateCalibration('zOffset', e.target.value)} style={{ width: '100%' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Z Scale: {calibration.zScale.toFixed(2)}</span>
+                </div>
+                <input type="range" min="0.1" max="1.5" step="0.01" value={calibration.zScale} onChange={(e) => updateCalibration('zScale', e.target.value)} style={{ width: '100%' }} />
+              </div>
+              <button 
+                onClick={resetCalibration}
+                style={{
+                  marginTop: 4,
+                  padding: '4px 6px',
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: 4,
+                  color: '#fca5a5',
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  textAlign: 'center'
+                }}
+              >
+                Reset Defaults
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Canvas
@@ -361,13 +492,13 @@ const HeartModel3D = ({ result = null }) => {
           <pointLight       position={[0, 4, 1]}     intensity={0.5} color="#e2e8f0" />
           <Heart bbRef={bbRef} />
           {showActivation && (
-            <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} />
+            <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
           )}
           {showTop5 && (
-            <Top5Markers bbRef={bbRef} top5={top5Nodes} />
+            <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
           )}
           {showPin && (
-            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} />
+            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
           )}
           <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
         </Suspense>

@@ -334,28 +334,28 @@ const Analysis = () => {
 
             {/* Selected Patient Context Card */}
             {selectedPatient && (
-              <div className={`rounded-2xl border p-4 transition-all duration-300 ${
+              <div className={`rounded-2xl border p-4 transition-all duration-300 min-w-0 ${
                 dk ? 'bg-sky-500/[0.02] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.02)]' : 'bg-sky-50/50 border-sky-200'
               }`}>
-                <div className="flex items-center gap-2.5 mb-2.5">
+                <div className="flex items-center gap-2.5 mb-2.5 min-w-0">
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
                     dk ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'
                   }`}>
                     <User size={14} />
                   </div>
-                  <div>
-                    <p className={`text-xs font-bold leading-none ${dk ? 'text-white' : 'text-slate-900'}`}>{selectedPatient.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-bold leading-none truncate ${dk ? 'text-white' : 'text-slate-900'}`} title={selectedPatient.name}>{selectedPatient.name}</p>
                     <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
                       HN: {selectedPatient.id_card?.substring(0, 8) || 'GEN-001'} · Age: {selectedPatient.age || 'n/a'}
                     </p>
                   </div>
                 </div>
                 {activeSample && (
-                  <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[10px] ${
+                  <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[10px] min-w-0 w-full ${
                     dk ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                   }`}>
                     <CheckCircle2 size={12} className="shrink-0 text-emerald-500 mt-0.5 animate-pulse" />
-                    <span className="font-medium break-all">
+                    <span className="font-medium break-all break-words min-w-0">
                       เชื่อมต่อคลื่นไฟฟ้าคนไข้สำเร็จ (Auto-linked: {activeSample.name})
                     </span>
                   </div>
