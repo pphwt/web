@@ -191,11 +191,6 @@ const Analysis = () => {
         ? `${base}/ecg/referral-letter`
         : `${base}/api/v1/ecg/referral-letter`;
       const form = new FormData();
-      if (file) {
-        form.append('file', file);
-      } else {
-        form.append('sample_id', sampleId);
-      }
       // Patient data from selected patient context
       form.append('patient_name', selectedPatient?.name || 'ผู้ป่วยไม่ระบุชื่อ');
       form.append('patient_id_card', selectedPatient?.id_card || '');
@@ -207,6 +202,16 @@ const Analysis = () => {
       form.append('referral_destination', referralDestination || '');
 
       const token = localStorage.getItem('token');
+      // Pass the pre-analyzed result so the backend does NOT need to re-analyze.
+      // This avoids a sample_id format mismatch between the AI model backend
+      // (npy path IDs) and the clinical backend (PTB-XL record IDs).
+      if (result) {
+        form.append('ecg_result_json', JSON.stringify(result));
+      } else if (file) {
+        form.append('file', file);
+      } else {
+        form.append('sample_id', sampleId);
+      }
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
