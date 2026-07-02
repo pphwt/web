@@ -279,6 +279,12 @@ const HeartModel3D = ({ result = null }) => {
   const [nodePositions, setNodePositions] = useState([]);
   const [activationMap, setActivationMap] = useState(Array(75).fill(0.5));
   const [top5Nodes,     setTop5Nodes]     = useState([]);
+  
+  // Interactive Layer Toggles
+  const [showPin, setShowPin] = useState(true);
+  const [showActivation, setShowActivation] = useState(true);
+  const [showTop5, setShowTop5] = useState(true);
+
   const bbRef      = useRef(null);
   const { events } = useStream();
 
@@ -309,6 +315,33 @@ const HeartModel3D = ({ result = null }) => {
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative">
+      {/* Interactive Layer controls */}
+      <div style={{
+        position: 'absolute', top: 12, right: 12,
+        background: 'rgba(4,10,24,0.85)', backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8,
+        padding: '8px 12px', fontFamily: 'ui-monospace,monospace',
+        color: '#94a3b8', zIndex: 10, fontSize: 10,
+        display: 'flex', flexDirection: 'column', gap: 6,
+        userSelect: 'none'
+      }}>
+        <div style={{ color: '#475569', fontSize: 9, fontWeight: 700, letterSpacing: 1.2, marginBottom: 2 }}>
+          LAYERS OVERLAY
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showPin} onChange={(e) => setShowPin(e.target.checked)} />
+          <span>📍 Source Pinpoint</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showActivation} onChange={(e) => setShowActivation(e.target.checked)} />
+          <span>⚡ PINN Activation Grid</span>
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showTop5} onChange={(e) => setShowTop5(e.target.checked)} />
+          <span>🔵 Top-5 Candidates</span>
+        </label>
+      </div>
+
       <Canvas
         shadows
         camera={{ position: [0, 0.5, 4], fov: 42 }}
@@ -321,9 +354,15 @@ const HeartModel3D = ({ result = null }) => {
           <directionalLight position={[-4, -2, -3]}  intensity={0.3} color="#8b5cf6" />
           <pointLight       position={[0, 4, 1]}     intensity={0.5} color="#e2e8f0" />
           <Heart bbRef={bbRef} />
-          <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} />
-          <Top5Markers bbRef={bbRef} top5={top5Nodes} />
-          <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} />
+          {showActivation && (
+            <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} />
+          )}
+          {showTop5 && (
+            <Top5Markers bbRef={bbRef} top5={top5Nodes} />
+          )}
+          {showPin && (
+            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} />
+          )}
           <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
         </Suspense>
       </Canvas>

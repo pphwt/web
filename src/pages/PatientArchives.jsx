@@ -90,7 +90,7 @@ const PatientArchives = () => {
               <span className={`text-xs font-semibold ${secLabel}`}>Snapshot History</span>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1.5 max-h-[600px]">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 max-h-[600px]">
               {loading && (
                 <div className="py-12 flex justify-center">
                   <div className={`h-6 w-6 rounded-full border-2 border-t-sky-400 animate-spin ${dk ? 'border-white/10' : 'border-slate-200'}`} />
@@ -101,42 +101,60 @@ const PatientArchives = () => {
                   {selectedPatient ? 'ไม่พบข้อมูลคลัง' : 'เลือกคนไข้ก่อน'}
                 </div>
               )}
-              {archives.map(arc => {
-                const active = selectedArchive?.id === arc.id;
-                return (
-                  <button
-                    key={arc.id}
-                    onClick={() => setSelectedArchive(arc)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all ${
-                      active
-                        ? dk ? 'bg-sky-500/[0.12] border-sky-500/25' : 'bg-sky-50 border-sky-200'
-                        : dk ? 'border-transparent hover:bg-white/[0.04]' : 'border-transparent hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[10px] font-semibold ${active ? (dk ? 'text-sky-300' : 'text-sky-700') : secLabel}`}>
-                        {new Date(arc.created_at).toLocaleDateString('th-TH')}
-                      </span>
-                      <span className={`text-[10px] font-mono ${dk ? 'text-slate-600' : 'text-slate-400'}`}>
-                        {arc.duration_seconds?.toFixed(1)}s
-                      </span>
-                    </div>
-                    <div className="flex gap-4">
-                      <div>
-                        <p className={`text-[9px] ${secLabel}`}>Avg BPM</p>
-                        <p className={`text-xs font-bold ${active ? (dk ? 'text-sky-300' : 'text-sky-700') : mainText}`}>{arc.bpm_avg}</p>
+              {!loading && archives.length > 0 && (
+                <div className="relative border-l-2 border-dashed border-sky-500/20 ml-2 pl-4 py-2 space-y-4">
+                  {archives.map((arc, index) => {
+                    const active = selectedArchive?.id === arc.id;
+                    const dateStr = new Date(arc.created_at).toLocaleString('th-TH', {
+                      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    });
+                    return (
+                      <div key={arc.id} className="relative">
+                        {/* Timeline Node Point */}
+                        <div className={`absolute -left-[23px] top-3.5 h-3.5 w-3.5 rounded-full border-2 transition-all ${
+                          active
+                            ? 'bg-sky-500 border-sky-400 scale-110 shadow-[0_0_8px_rgba(56,189,248,0.5)]'
+                            : dk ? 'bg-slate-900 border-white/20' : 'bg-white border-slate-300'
+                        }`} />
+                        
+                        <button
+                          onClick={() => setSelectedArchive(arc)}
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                            active
+                              ? dk ? 'bg-sky-500/[0.12] border-sky-500/25' : 'bg-sky-50 border-sky-200'
+                              : dk ? 'border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.04]' : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className={`text-[10px] font-bold ${active ? (dk ? 'text-sky-300' : 'text-sky-700') : secLabel}`}>
+                              {dateStr}
+                            </span>
+                            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full ${
+                              dk ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-200/50 text-slate-500'
+                            }`}>
+                              {arc.duration_seconds?.toFixed(0)}s
+                            </span>
+                          </div>
+                          <div className="flex gap-5">
+                            <div>
+                              <p className={`text-[9px] ${secLabel}`}>Avg Heart Rate</p>
+                              <p className={`text-sm font-bold ${active ? (dk ? 'text-sky-300' : 'text-sky-700') : mainText}`}>
+                                {arc.bpm_avg} <span className="text-[9px] font-normal opacity-70">BPM</span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className={`text-[9px] ${secLabel}`}>AI Confidence</p>
+                              <p className={`text-sm font-bold ${dk ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                {(arc.ai_confidence * 100).toFixed(0)}%
+                              </p>
+                            </div>
+                          </div>
+                        </button>
                       </div>
-                      <div>
-                        <p className={`text-[9px] ${secLabel}`}>Confidence</p>
-                        <p className={`text-xs font-bold ${dk ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                          {(arc.ai_confidence * 100).toFixed(0)}%
-                        </p>
-                      </div>
-                    </div>
-                    {active && <span className={`mt-1.5 inline-block h-0.5 w-full rounded-full ${dk ? 'bg-sky-500/30' : 'bg-sky-200'}`} />}
-                  </button>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
