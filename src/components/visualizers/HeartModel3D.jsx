@@ -13,10 +13,16 @@ function normToScene(n, bbRef) {
   const { bb, scale } = bbRef.current;
   const mn = bb.min.clone().multiplyScalar(scale);
   const mx = bb.max.clone().multiplyScalar(scale);
+  
+  // Calibrate coordinate cloud to fit inside/on the ventricle part of the GLTF heart model
+  const kx = 0.25 + n.x * 0.50; // Squeeze X range to [0.25, 0.75]
+  const ky = 0.15 + n.y * 0.40; // Squeeze Y range to [0.15, 0.55] (Ventricles region)
+  const kz = 0.25 + n.z * 0.50; // Squeeze Z range to [0.25, 0.75]
+
   return new THREE.Vector3(
-    mn.x + n.x * (mx.x - mn.x),
-    mn.y + n.y * (mx.y - mn.y),
-    mn.z + n.z * (mx.z - mn.z),
+    mn.x + kx * (mx.x - mn.x),
+    mn.y + ky * (mx.y - mn.y),
+    mn.z + kz * (mx.z - mn.z)
   );
 }
 
