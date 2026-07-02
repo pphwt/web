@@ -305,6 +305,55 @@ function ColorLegend() {
   );
 }
 
+class WebGLErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("WebGL Error caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          height: '100%', width: '100%',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: '#040a18', color: '#94a3b8',
+          fontFamily: 'sans-serif', fontSize: '11px',
+          padding: '20px', textAlign: 'center',
+          border: '1px dashed rgba(255,255,255,0.1)',
+          borderRadius: '12px'
+        }}>
+          <span style={{ fontSize: '20px', marginBottom: '8px' }}>⚠️</span>
+          <p style={{ fontWeight: 'bold', color: '#f1f5f9', marginBottom: '4px' }}>
+            WebGL context creation failed
+          </p>
+          <p style={{ maxWidth: '280px', lineHeight: '1.4' }}>
+            The browser has run out of WebGL contexts. Please reload the page or close other tabs to free up resources.
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{
+              marginTop: '12px', padding: '6px 12px',
+              background: '#38bdf8', color: '#040a18',
+              border: 'none', borderRadius: '4px',
+              fontWeight: 'bold', cursor: 'pointer'
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 const HeartModel3D = ({ result = null }) => {
   const [nodePositions, setNodePositions] = useState([]);
@@ -479,30 +528,32 @@ const HeartModel3D = ({ result = null }) => {
         </div>
       </div>
 
-      <Canvas
-        shadows
-        camera={{ position: [0, 0.5, 4], fov: 42 }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-        scene={{ background: new THREE.Color(0x040a18) }}
-      >
-        <Suspense fallback={null}>
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[3, 5, 4]}    intensity={1.3} castShadow />
-          <directionalLight position={[-4, -2, -3]}  intensity={0.3} color="#8b5cf6" />
-          <pointLight       position={[0, 4, 1]}     intensity={0.5} color="#e2e8f0" />
-          <Heart bbRef={bbRef} />
-          {showActivation && (
-            <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
-          )}
-          {showTop5 && (
-            <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
-          )}
-          {showPin && (
-            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
-          )}
-          <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
-        </Suspense>
-      </Canvas>
+      <WebGLErrorBoundary>
+        <Canvas
+          shadows
+          camera={{ position: [0, 0.5, 4], fov: 42 }}
+          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+          scene={{ background: new THREE.Color(0x040a18) }}
+        >
+          <Suspense fallback={null}>
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[3, 5, 4]}    intensity={1.3} castShadow />
+            <directionalLight position={[-4, -2, -3]}  intensity={0.3} color="#8b5cf6" />
+            <pointLight       position={[0, 4, 1]}     intensity={0.5} color="#e2e8f0" />
+            <Heart bbRef={bbRef} />
+            {showActivation && (
+              <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
+            )}
+            {showTop5 && (
+              <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
+            )}
+            {showPin && (
+              <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
+            )}
+            <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
+          </Suspense>
+        </Canvas>
+      </WebGLErrorBoundary>
       <ColorLegend />
     </div>
   );
