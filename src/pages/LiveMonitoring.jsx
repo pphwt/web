@@ -201,11 +201,14 @@ const LiveMonitoring = () => {
     }
     showToast('โหลดข้อมูล Demo ECG...', 'info');
     try {
-      const base = import.meta.env.VITE_CLINICAL_API_URL || '';
+      const base = import.meta.env.VITE_API_URL || '';
+      const endpoint = base.endsWith('/api/v1')
+        ? `${base}/ecg/analyze`
+        : `${base}/api/v1/ecg/analyze`;
       const token = localStorage.getItem('token');
       const form = new FormData();
       form.append('sample_id', '00017_hr'); // AFIB
-      const res = await fetch(`${base}/api/v1/ecg/analyze`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: form,
