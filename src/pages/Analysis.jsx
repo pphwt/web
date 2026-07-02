@@ -29,15 +29,54 @@ function WaveformPlot({ leads, dk }) {
   }, [leads]);
 
   if (!traces.length) return null;
-  const names = ['Lead 1', 'Lead 2', 'Lead 3'];
+  const names = ['Lead I', 'Lead II', 'Lead V5'];
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {traces.map((pts, i) => (
-        <div key={i} className={`rounded-lg border px-3 py-2 ${dk ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
-          <div className={`text-[9px] font-semibold uppercase tracking-wider mb-1 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>{names[i]}</div>
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-12">
-            <polyline points={pts} fill="none" stroke={dk ? '#38bdf8' : '#0284c7'} strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+        <div 
+          key={i} 
+          className={`rounded-xl border p-3 transition-all duration-300 relative overflow-hidden ${
+            dk 
+              ? 'bg-[#090f1d] border-white/[0.06] shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]' 
+              : 'bg-slate-50 border-slate-200'
+          }`}
+          style={dk ? {
+            backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
+            backgroundSize: '10px 10px'
+          } : {
+            backgroundImage: 'linear-gradient(rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.015) 1px, transparent 1px)',
+            backgroundSize: '10px 10px'
+          }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-400' : 'text-sky-700'}`}>
+              {names[i]}
+            </span>
+            <span className={`text-[8px] font-mono ${dk ? 'text-slate-600' : 'text-slate-400'}`}>
+              500 Hz · 1.0s
+            </span>
+          </div>
+          
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-14 overflow-visible">
+            <defs>
+              <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="0.8" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <polyline 
+              points={pts} 
+              fill="none" 
+              stroke={dk ? '#38bdf8' : '#0284c7'} 
+              strokeWidth="1.1" 
+              vectorEffect="non-scaling-stroke" 
+              filter={dk ? "url(#neon-glow)" : undefined}
+              className="transition-all duration-300"
+            />
           </svg>
         </div>
       ))}
@@ -339,8 +378,10 @@ const Analysis = () => {
 
             {/* Selected Patient Context Card */}
             {selectedPatient && (
-              <div className={`rounded-2xl border p-4 transition-all duration-300 min-w-0 ${
-                dk ? 'bg-sky-500/[0.02] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.02)]' : 'bg-sky-50/50 border-sky-200'
+              <div className={`rounded-2xl border-l-4 p-4 transition-all duration-300 min-w-0 hover:scale-[1.01] ${
+                dk 
+                  ? 'bg-sky-500/[0.02] border-sky-500/80 border-y-white/[0.06] border-r-white/[0.06] shadow-[0_0_20px_rgba(56,189,248,0.04)]' 
+                  : 'bg-sky-50/50 border-sky-500 border-y-sky-200 border-r-sky-200 shadow-sm'
               }`}>
                 <div className="flex items-center gap-2.5 mb-2.5 min-w-0">
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
@@ -369,7 +410,7 @@ const Analysis = () => {
             )}
 
             {/* Input */}
-            <div className={`rounded-2xl border p-4 ${surface}`}>
+            <div className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>
               <div className={`text-xs font-semibold mb-3 ${secLabel}`}>1 · เลือกข้อมูล ECG</div>
 
               <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>ตัวอย่างจากชุดข้อมูล</label>
@@ -377,7 +418,7 @@ const Analysis = () => {
                 value={sampleId}
                 onChange={(e) => { setSampleId(e.target.value); setFile(null); }}
                 disabled={!!file}
-                className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${file ? 'opacity-50' : ''}`}
+                className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 transition-colors ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200 focus:border-sky-500' : 'bg-slate-50 border-slate-200 text-slate-700 focus:border-sky-500'} ${file ? 'opacity-50' : ''}`}
               >
                 {samples.length === 0 && <option>— ไม่พบตัวอย่าง —</option>}
                 {/* Group samples by their split/category */}
@@ -398,7 +439,7 @@ const Analysis = () => {
               </select>
 
               <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>หรืออัปโหลดไฟล์ (.npy / .csv)</label>
-              <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs cursor-pointer mb-4 ${dk ? 'border-white/[0.12] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:bg-slate-50'}`}>
+              <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs cursor-pointer mb-4 transition-all ${dk ? 'border-white/[0.12] text-slate-400 hover:border-sky-500/40 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:border-sky-500 hover:bg-slate-50'}`}>
                 <Upload size={14} />
                 <span className="truncate">{file ? file.name : 'เลือกไฟล์ ECG'}</span>
                 <input type="file" accept=".npy,.csv" className="hidden"
@@ -413,7 +454,11 @@ const Analysis = () => {
               <button
                 onClick={analyze}
                 disabled={loading}
-                className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${loading ? 'bg-sky-600/60 text-white cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700 text-white'}`}
+                className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all shadow-lg active:scale-[0.98] hover:scale-[1.01] ${
+                  loading 
+                    ? 'bg-sky-600/60 text-white cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white shadow-sky-600/10 hover:shadow-sky-600/20 border border-sky-500/20'
+                }`}
               >
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
                 {loading ? 'กำลังวิเคราะห์...' : '2 · ประเมินเพื่อคัดกรอง'}
@@ -422,19 +467,19 @@ const Analysis = () => {
 
             {/* Result */}
             {result && (
-              <div className={`rounded-2xl border p-4 ${surface}`}>
+              <div className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>
                 <div className="flex items-center gap-2 mb-3">
                   <MapPin size={14} style={{ color: riskColor }} />
                   <span className={`text-xs font-semibold ${secLabel}`}>3 · ผลคัดกรองเพื่อส่งต่อ</span>
                 </div>
 
                 {signalQuality && (
-                  <div className={`rounded-xl border p-3 mb-3 ${
+                  <div className={`rounded-xl border p-3 mb-3 transition-all duration-300 hover:scale-[1.01] ${
                     signalQuality.status === 'FAIL'
-                      ? dk ? 'bg-rose-500/[0.08] border-rose-500/25' : 'bg-rose-50 border-rose-200'
+                      ? dk ? 'bg-rose-500/[0.08] border-rose-500/25 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'bg-rose-50 border-rose-200 shadow-sm'
                       : signalQuality.status === 'WARN'
-                      ? dk ? 'bg-amber-500/[0.08] border-amber-500/25' : 'bg-amber-50 border-amber-200'
-                      : dk ? 'bg-emerald-500/[0.07] border-emerald-500/25' : 'bg-emerald-50 border-emerald-200'
+                      ? dk ? 'bg-amber-500/[0.08] border-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.05)]' : 'bg-amber-50 border-amber-200 shadow-sm'
+                      : dk ? 'bg-emerald-500/[0.07] border-emerald-500/25 shadow-[0_0_15px_rgba(34,197,94,0.05)]' : 'bg-emerald-50 border-emerald-200 shadow-sm'
                   }`}>
                     <div className={`text-[10px] font-bold uppercase tracking-wider ${
                       signalQuality.status === 'FAIL'
@@ -459,7 +504,14 @@ const Analysis = () => {
                 )}
 
                 {result?.source && (
-                  <div className="rounded-xl border p-3 mb-3" style={{ borderColor: `${riskColor}55`, background: `${riskColor}11` }}>
+                  <div 
+                    className="rounded-xl border p-3 mb-3 transition-all duration-300 hover:scale-[1.01]" 
+                    style={{ 
+                      borderColor: `${riskColor}55`, 
+                      background: `linear-gradient(135deg, ${riskColor}12, ${riskColor}04)`,
+                      boxShadow: `0 0 15px ${riskColor}12`
+                    }}
+                  >
                     <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: riskColor }}>{risk} RISK</div>
                     <div className={`text-sm font-bold ${mainText}`}>{region?.label}</div>
                     <div className={`text-[11px] ${subText}`}>Segment {region?.segment} · {region?.territory} territory</div>
@@ -476,8 +528,8 @@ const Analysis = () => {
                   </div>
                 )}
 
-                <div className={`mb-3 rounded-xl border p-3 ${
-                  dk ? 'bg-sky-500/[0.06] border-sky-500/20' : 'bg-sky-50 border-sky-200'
+                <div className={`mb-3 rounded-xl border p-3 transition-all duration-300 hover:scale-[1.01] ${
+                  dk ? 'bg-sky-500/[0.04] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.03)]' : 'bg-sky-50 border-sky-200 shadow-sm'
                 }`}>
                   <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
                     Referral Decision Support
@@ -489,14 +541,14 @@ const Analysis = () => {
                 </div>
 
                 {result?.source && (
-                  <div className={`mb-3 rounded-xl border p-3 ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`mb-3 rounded-xl border p-3 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
                     <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
                       Referral Destination
                     </label>
                     <input
                       value={referralDestination}
                       onChange={(e) => setReferralDestination(e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-xs mb-2 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-xs mb-2 transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
                       placeholder="โรงพยาบาลแม่ข่าย / แผนกหัวใจ"
                     />
                     <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
@@ -506,7 +558,7 @@ const Analysis = () => {
                       value={clinicianNote}
                       onChange={(e) => setClinicianNote(e.target.value)}
                       rows={2}
-                      className={`w-full rounded-lg border px-3 py-2 text-xs resize-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-xs resize-none transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
                       placeholder="อาการสำคัญ สัญญาณชีพ หรือเหตุผลประกอบการส่งต่อ"
                     />
                   </div>
@@ -518,8 +570,10 @@ const Analysis = () => {
                       <button
                         onClick={saveReferralReport}
                         disabled={savingReport}
-                        className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${
-                          savingReport ? 'bg-emerald-600/60 text-white cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] hover:scale-[1.01] shadow-md ${
+                          savingReport 
+                            ? 'bg-emerald-600/60 text-white cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-500/20'
                         }`}
                       >
                         {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
@@ -530,8 +584,10 @@ const Analysis = () => {
                     <button
                       onClick={downloadReferralLetter}
                       disabled={referralLoading}
-                      className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-95 ${
-                        referralLoading ? 'bg-sky-700/60 text-white cursor-not-allowed' : 'bg-sky-700 hover:bg-sky-800 text-white'
+                      className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] hover:scale-[1.01] shadow-md ${
+                        referralLoading 
+                          ? 'bg-sky-700/60 text-white cursor-not-allowed' 
+                          : 'bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 text-white border border-sky-500/20'
                       }`}
                     >
                       {referralLoading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
@@ -541,7 +597,7 @@ const Analysis = () => {
                 )}
 
                 {result?.source && (
-                  <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs transition-all duration-300 hover:scale-[1.01] ${dk ? 'bg-white/[0.02] border-white/[0.05] shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
                     {['x', 'y', 'z'].map((ax, i) => (
                       <div key={ax} className="text-center">
                         <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
