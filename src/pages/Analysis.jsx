@@ -281,6 +281,7 @@ const Analysis = () => {
   const [datasetInfo, setDatasetInfo] = useState(null);
   const [referralLoading, setReferralLoading] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [activeVisualizerTab, setActiveVisualizerTab] = useState('3d');
 
   // Auto-match patient to a sample signal
   const activeSample = useMemo(() => {
@@ -337,6 +338,9 @@ const Analysis = () => {
           : await modelApi.analyzeFile(file)
         : await modelApi.analyzeSample(sampleId);
       setResult(analyzed);
+      if (analyzed?.source) {
+        setActiveVisualizerTab('3d');
+      }
     } catch (e) {
       showToast(`วิเคราะห์ไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
@@ -503,7 +507,33 @@ const Analysis = () => {
           <div className="lg:col-span-8 flex flex-col gap-5">
             <div className={`rounded-2xl border overflow-hidden ${surface}`}>
               <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
-                <span className={`text-xs font-semibold ${secLabel}`}>ตำแหน่งต้นกำเนิด 3D (Heart)</span>
+                <div className="flex items-center gap-4">
+                  <span className={`text-xs font-semibold ${secLabel}`}>การแสดงผล</span>
+                  {imagePreviewUrl && (
+                    <div className="flex rounded-lg bg-slate-100 p-0.5 dark:bg-white/5">
+                      <button
+                        onClick={() => setActiveVisualizerTab('3d')}
+                        className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all ${
+                          activeVisualizerTab === '3d'
+                            ? 'bg-white shadow-sm dark:bg-slate-800 text-sky-500'
+                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        โมเดลหัวใจ 3D
+                      </button>
+                      <button
+                        onClick={() => setActiveVisualizerTab('image')}
+                        className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all ${
+                          activeVisualizerTab === 'image'
+                            ? 'bg-white shadow-sm dark:bg-slate-800 text-sky-500'
+                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        ภาพ ECG ที่อัปโหลด
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {result?.source && (
                   <span className="text-[10px] font-mono" style={{ color: riskColor }}>
                     {region?.label} · {region?.territory}
@@ -511,27 +541,29 @@ const Analysis = () => {
                 )}
               </div>
               <div className="h-[460px]">
-                {heartResult
-                  ? <HeartModel3D result={heartResult} />
-                  : imagePreviewUrl ? (
-                    <div className="flex h-full flex-col gap-2 p-3">
-                      <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-                        <img
-                          src={imagePreviewUrl}
-                          alt="Uploaded ECG preview"
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-                      <p className={`text-[10px] leading-relaxed ${subText}`}>
-                        รูป ECG จะอ่านผ่าน image digitization และแสดงเป็น 12-lead preview ด้านล่าง; ตำแหน่ง 3D ใช้ได้กับไฟล์สัญญาณ .NPY/.CSV เท่านั้น
+                {activeVisualizerTab === '3d' && heartResult ? (
+                  <HeartModel3D result={heartResult} />
+                ) : imagePreviewUrl ? (
+                  <div className="flex h-full flex-col gap-2 p-3">
+                    <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Uploaded ECG preview"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    {heartResult && (
+                      <p className={`text-[10px] leading-relaxed text-emerald-500`}>
+                        ถอดรหัสคลื่น ECG และคำนวณตำแหน่ง 3D สำเร็จ! สลับไปที่แท็บ "โมเดลหัวใจ 3D" ด้านบนเพื่อดูตำแหน่ง
                       </p>
-                    </div>
-                  ) : (
-                    <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
-                      <Activity size={28} className="opacity-40" />
-                      <p className="text-xs">เลือก ECG แล้วกด “ประเมินเพื่อคัดกรอง” เพื่อแสดงตำแหน่ง</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                ) : (
+                  <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
+                    <Activity size={28} className="opacity-40" />
+                    <p className="text-xs">เลือก ECG แล้วกด “ประเมินเพื่อคัดกรอง” เพื่อแสดงตำแหน่ง</p>
+                  </div>
+                )}
               </div>
             </div>
 
