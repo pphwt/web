@@ -20,6 +20,83 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const fmt = (n) => String(n ?? '--');
 const MAX_CAPTURE_SECONDS = Number(import.meta.env.VITE_ECG_CAPTURE_MAX_SECONDS || 30);
+const LIVE_12_LEADS = [
+  { key: 'I', label: 'LEAD I', color: '#0ea5e9' },
+  { key: 'aVR', label: 'aVR', color: '#64748b' },
+  { key: 'V1', label: 'V1', color: '#14b8a6' },
+  { key: 'V4', label: 'V4', color: '#f97316' },
+  { key: 'II', label: 'LEAD II', color: '#2563eb' },
+  { key: 'aVL', label: 'aVL', color: '#64748b' },
+  { key: 'V2', label: 'V2', color: '#06b6d4' },
+  { key: 'V5', label: 'V5', color: '#8b5cf6' },
+  { key: 'III', label: 'LEAD III', color: '#2563eb' },
+  { key: 'aVF', label: 'aVF', color: '#64748b' },
+  { key: 'V3', label: 'V3', color: '#0d9488' },
+  { key: 'V6', label: 'V6', color: '#a855f7' },
+];
+
+const numericOrNull = (...values) => {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+};
+
+const buildLive12LeadFrame = (rawLeads = {}) => {
+  const I = numericOrNull(rawLeads.I, rawLeads.lead_i);
+  const II = numericOrNull(rawLeads.II, rawLeads.lead_ii);
+  const frame = { ...rawLeads };
+
+  if (I != null) frame.I = I;
+  if (II != null) frame.II = II;
+  if (I != null && II != null) {
+    frame.III = numericOrNull(rawLeads.III, II - I);
+    frame.aVR = numericOrNull(rawLeads.aVR, rawLeads.AVR, -(I + II) / 2);
+    frame.aVL = numericOrNull(rawLeads.aVL, rawLeads.AVL, I - II / 2);
+    frame.aVF = numericOrNull(rawLeads.aVF, rawLeads.AVF, II - I / 2);
+  }
+
+  ['V1', 'V2', 'V3', 'V4', 'V5', 'V6'].forEach((lead) => {
+    const lower = lead.toLowerCase();
+    const value = numericOrNull(rawLeads[lead], rawLeads[lower]);
+    if (value != null) frame[lead] = value;
+  });
+
+  if (frame.I != null) frame.lead_i = frame.I;
+  if (frame.II != null) frame.lead_ii = frame.II;
+  if (frame.V5 != null) frame.v5 = frame.V5;
+  return frame;
+};
+
+const pickWaveformValue = (waveform, lead, index) => {
+  const key = Object.keys(waveform || {}).find((name) => name.toUpperCase() === lead.toUpperCase());
+  return key ? numericOrNull(waveform[key]?.[index]) : null;
+};
+
+const buildFrameFromWaveform = (waveform, index) => {
+  const direct = {};
+  LIVE_12_LEADS.forEach(({ key }) => {
+    const value = pickWaveformValue(waveform, key, index);
+    if (value != null) direct[key] = value;
+  });
+  return buildLive12LeadFrame(direct);
+};
+
+const createRecordingBuffer = () => {
+  const buffer = { lead_i: [], lead_ii: [], v5: [] };
+  LIVE_12_LEADS.forEach(({ key }) => {
+    buffer[key] = [];
+  });
+  return buffer;
+};
+
+const appendRecordingFrame = (buffer, frame) => {
+  Object.entries(frame || {}).forEach(([key, value]) => {
+    if (!Array.isArray(buffer[key])) return;
+    if (Number.isFinite(Number(value))) buffer[key].push(Number(value));
+  });
+};
 
 const StatusPill = ({ connected, dk }) => (
   <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold border ${
@@ -69,7 +146,7 @@ const LiveMonitoring = () => {
   const [localStreamData, setLocalStreamData] = useState(null);
   const { metrics, clinicalState, isNormal, isCritical } = useDiagnosticSolver(localStreamData || streamData);
 
-  const recordingBuffer = useRef({ lead_i: [], lead_ii: [], v5: [] });
+  const recordingBuffer = useRef(createRecordingBuffer());
   const [isRecording, setIsRecording]   = useState(false);
   const [recordTime, setRecordTime]     = useState(0);
   const [saveStatus, setSaveStatus]     = useState(null);
@@ -92,7 +169,11 @@ const LiveMonitoring = () => {
   useEffect(() => {
     if (!streamEvents) return;
     const handler = (e) => {
-      setLocalStreamData(e.detail);
+      const detail = e.detail || {};
+      setLocalStreamData({
+        ...detail,
+        leads: buildLive12LeadFrame(detail.leads || {}),
+      });
     };
     streamEvents.addEventListener('data', handler);
     return () => streamEvents.removeEventListener('data', handler);
@@ -146,12 +227,13 @@ const LiveMonitoring = () => {
           const lead_i = tokens[0] ?? 0.0;
           const lead_ii = tokens[1] ?? 0.0;
           const v5 = tokens[2] ?? 0.0;
+          const leadFrame = buildLive12LeadFrame({ lead_i, lead_ii, v5 });
 
           // Dispatch event to local listeners via StreamContext event target
           if (streamEvents) {
             streamEvents.dispatchEvent(new CustomEvent('data', {
               detail: {
-                leads: { lead_i, lead_ii, v5 },
+                leads: leadFrame,
                 is_hardware: true,
                 heart_rate: 72,
                 qtc: 410,
@@ -163,9 +245,7 @@ const LiveMonitoring = () => {
           }
 
           if (isRecording) {
-            recordingBuffer.current.lead_i.push(lead_i);
-            recordingBuffer.current.lead_ii.push(lead_ii);
-            recordingBuffer.current.v5.push(v5);
+            appendRecordingFrame(recordingBuffer.current, leadFrame);
           }
         }
       }
@@ -225,14 +305,14 @@ const LiveMonitoring = () => {
       demoIntervalRef.current = setInterval(() => {
         const d = demoDataRef.current;
         if (!d) return;
-        const lead_i  = wf['I']?.[d.idx]  ?? wf[leadKeys[0]]?.[d.idx] ?? 0;
-        const lead_ii = wf['II']?.[d.idx] ?? wf[leadKeys[1] || leadKeys[0]]?.[d.idx] ?? 0;
-        const v5      = wf['V5']?.[d.idx] ?? wf[leadKeys[Math.min(10, leadKeys.length - 1)]]?.[d.idx] ?? 0;
+        const leadFrame = buildFrameFromWaveform(wf, d.idx);
+        if (leadFrame.I == null) leadFrame.I = wf[leadKeys[0]]?.[d.idx] ?? 0;
+        if (leadFrame.II == null) leadFrame.II = wf[leadKeys[1] || leadKeys[0]]?.[d.idx] ?? 0;
         
         d.idx = (d.idx + BATCH) % d.len;
 
         const payload = {
-          leads: { lead_i, lead_ii, v5 },
+          leads: buildLive12LeadFrame(leadFrame),
           is_hardware: false,
           is_demo: true,
           heart_rate: 85, // AFIB elevated HR
@@ -301,7 +381,7 @@ const LiveMonitoring = () => {
 
   const toggleRecording = async () => {
     if (!isRecording) {
-      recordingBuffer.current = { lead_i: [], lead_ii: [], v5: [] };
+      recordingBuffer.current = createRecordingBuffer();
       setRecordTime(0); setIsRecording(true); setSaveStatus(null);
     } else {
       setIsRecording(false);
@@ -310,7 +390,7 @@ const LiveMonitoring = () => {
   };
 
   const saveRecording = async () => {
-    if (!selectedPatient || recordingBuffer.current.lead_i.length === 0) return;
+    if (!selectedPatient || (recordingBuffer.current.I?.length || recordingBuffer.current.lead_i?.length || 0) === 0) return;
     setSaveStatus('saving');
     try {
       const res = await fetch(`${API_BASE}/archives/`, {
@@ -489,7 +569,7 @@ const LiveMonitoring = () => {
               <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
                 <div className="flex items-center gap-2">
                   <TrendingUp size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
-                  <span className={`text-xs font-semibold ${secLabel}`}>ECG-Physics Stream · 500 Hz</span>
+                  <span className={`text-xs font-semibold ${secLabel}`}>ECG-Physics Stream · 12-lead view · 500 Hz</span>
                 </div>
                 {isFrozen && (
                   <span className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold ${dk ? 'bg-indigo-500/15 text-indigo-400' : 'bg-indigo-50 text-indigo-700'}`}>
@@ -497,17 +577,34 @@ const LiveMonitoring = () => {
                   </span>
                 )}
               </div>
-              <div className={`${ecgBg} p-4 space-y-3`}>
-                {[
-                  { leadKey: 'lead_i',  label: 'LEAD I',  color: '#0ea5e9' },
-                  { leadKey: 'lead_ii', label: 'LEAD II', color: '#6366f1' },
-                  { leadKey: 'v5',      label: 'V5',      color: '#8b5cf6' },
-                ].map(({ leadKey, label, color }) => (
-                  <div key={label}>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-                    <ECGCanvas leadKey={leadKey} paused={isFrozen} label="" color={color} height={110} />
-                  </div>
-                ))}
+              <div className={`${ecgBg} p-4`}>
+                <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] ${subText}`}>
+                  <span>แสดงครบ 12 leads ตามตำแหน่งมาตรฐาน; limb leads คำนวณจาก I/II เมื่อ stream ส่งมาเป็น 3-channel</span>
+                  <span className={`rounded-full border px-2 py-0.5 font-semibold ${dk ? 'border-sky-500/20 text-sky-300' : 'border-sky-200 text-sky-700'}`}>
+                    12/12 lead slots
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+                  {LIVE_12_LEADS.map(({ key, label, color }) => (
+                    <div key={key} className="min-w-0">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                      <ECGCanvas
+                        leadKey={key}
+                        valueFrom={(leads) => buildLive12LeadFrame(leads)[key]}
+                        paused={isFrozen}
+                        label=""
+                        color={color}
+                        height={86}
+                        emptyMessage="Lead unavailable"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className={`mt-3 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${
+                  dk ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-200/85' : 'border-amber-200 bg-amber-50 text-amber-800'
+                }`}>
+                  Hardware/USB ที่ส่งมาแค่ I, II, V5 จะแสดง V lead อื่นเป็น unavailable จนกว่าจะมีข้อมูลจริงหรือใช้ Demo/clinical ECG ที่มีครบ 12 leads
+                </div>
               </div>
             </div>
 

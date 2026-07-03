@@ -4,7 +4,17 @@ import { useStream } from '../../context/StreamContext';
 
 const MAX_PTS = 200; // 10 seconds at 20 Hz
 
-const ECGCanvas = ({ data, leadKey, paused = false, initialData, color = '#0ea5e9', height = 100, label = '' }) => {
+const ECGCanvas = ({
+  data,
+  leadKey,
+  valueFrom,
+  paused = false,
+  initialData,
+  color = '#0ea5e9',
+  height = 100,
+  label = '',
+  emptyMessage = 'Acquiring signal...',
+}) => {
   const canvasRef = useRef(null);
   const dataRef   = useRef(initialData ? [...initialData] : []);
   const { isDarkMode: dk } = useTheme();
@@ -13,14 +23,15 @@ const ECGCanvas = ({ data, leadKey, paused = false, initialData, color = '#0ea5e
   useEffect(() => {
     if (!leadKey || !events || paused) return;
     const handler = (e) => {
-      const val = e.detail?.leads?.[leadKey];
+      const leads = e.detail?.leads || {};
+      const val = typeof valueFrom === 'function' ? valueFrom(leads, e.detail) : leads?.[leadKey];
       if (val == null) return;
       dataRef.current.push(val);
       if (dataRef.current.length > MAX_PTS) dataRef.current.shift();
     };
     events.addEventListener('data', handler);
     return () => events.removeEventListener('data', handler);
-  }, [events, leadKey, paused]);
+  }, [events, leadKey, paused, valueFrom]);
 
   useEffect(() => {
     if (leadKey) return;
@@ -116,7 +127,7 @@ const ECGCanvas = ({ data, leadKey, paused = false, initialData, color = '#0ea5e
         ctx.fillStyle = dk ? 'rgba(100,116,139,0.3)' : 'rgba(148,163,184,0.5)';
         ctx.font = '11px ui-monospace,monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('Acquiring signal…', w / 2, mid + 4);
+        ctx.fillText(emptyMessage, w / 2, mid + 4);
       }
 
       raf = requestAnimationFrame(render);
@@ -124,7 +135,7 @@ const ECGCanvas = ({ data, leadKey, paused = false, initialData, color = '#0ea5e
 
     render();
     return () => cancelAnimationFrame(raf);
-  }, [color, dk]);
+  }, [color, dk, emptyMessage]);
 
   return (
     <div>
