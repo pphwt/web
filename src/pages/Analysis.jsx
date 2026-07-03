@@ -712,9 +712,11 @@ const Analysis = () => {
               <span className={`text-xs font-semibold ${secLabel}`}>3 · ผลคัดกรองเพื่อส่งต่อ</span>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+            <div className="flex flex-col gap-3">
+            {/* Row 1: Metrics */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {signalQuality && (
-                <div className={`rounded-xl border p-3 xl:col-span-4 ${
+                <div className={`rounded-xl border p-3 ${
                   signalQuality.status === 'FAIL'
                     ? dk ? 'bg-rose-500/[0.08] border-rose-500/25 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'bg-rose-50 border-rose-200 shadow-sm'
                     : signalQuality.status === 'WARN'
@@ -743,9 +745,9 @@ const Analysis = () => {
                 </div>
               )}
 
-              {result?.source && (
+              {result?.source ? (
                 <div
-                  className="rounded-xl border p-3 xl:col-span-4"
+                  className="rounded-xl border p-3"
                   style={{
                     borderColor: `${riskColor}55`,
                     background: `linear-gradient(135deg, ${riskColor}12, ${riskColor}04)`,
@@ -757,39 +759,71 @@ const Analysis = () => {
                   <div className={`text-[11px] ${subText}`}>Segment {region?.segment} · {region?.territory} territory</div>
                   {region?.note && <div className={`text-[11px] mt-1 ${subText}`}>{region.note}</div>}
                 </div>
+              ) : (
+                <div className={`rounded-xl border p-3 flex flex-col justify-center items-center ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-200'}`}>
+                  <p className={`text-xs ${subText}`}>รอระบุตำแหน่ง 3D</p>
+                </div>
               )}
 
-              {result?.source && (
-                <div className="grid grid-cols-2 gap-2 xl:col-span-4">
+              {result?.source ? (
+                <div className="grid grid-cols-2 gap-2">
                   <Stat label="Support confidence" value={`${Math.round(result.confidence * 100)}%`} dk={dk} />
                   <Stat label="Heart rate"
                     value={result.heart_rate_bpm ? `${Math.round(result.heart_rate_bpm)} bpm` : 'n/a'}
                     hint={result.hr_note} dk={dk} />
                 </div>
-              )}
-
-              <div className={`rounded-xl border p-3 xl:col-span-6 ${
-                dk ? 'bg-sky-500/[0.04] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.03)]' : 'bg-sky-50 border-sky-200 shadow-sm'
-              }`}>
-                <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
-                  {language === 'th' ? 'เอกสารประกอบการส่งต่อ' : 'Referral Decision Support'}
+              ) : (
+                <div className={`rounded-xl border p-3 flex flex-col justify-center items-center ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-200'}`}>
+                  <p className={`text-xs ${subText}`}>รอคำนวณความมั่นใจ</p>
                 </div>
-                <div className={`mt-1 text-sm font-bold ${mainText}`}>{referralAdvice.title}</div>
-                <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>
-                  {referralAdvice.body}
-                </p>
+              )}
+            </div>
+
+            {/* Row 2: Referral Actions */}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* Left Column: Decision Support & XYZ */}
+              <div className="flex flex-col gap-3">
+                <div className={`rounded-xl border p-4 flex-1 ${
+                  dk ? 'bg-sky-500/[0.04] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.03)]' : 'bg-sky-50 border-sky-200 shadow-sm'
+                }`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
+                    {language === 'th' ? 'เอกสารประกอบการส่งต่อ' : 'Referral Decision Support'}
+                  </div>
+                  <div className={`mt-1 text-sm font-bold ${mainText}`}>{referralAdvice.title}</div>
+                  <p className={`mt-1.5 text-[11px] leading-relaxed ${subText}`}>
+                    {referralAdvice.body}
+                  </p>
+                </div>
+
+                {result?.source && (
+                  <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs ${dk ? 'bg-white/[0.02] border-white/[0.05] shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+                    {['x', 'y', 'z'].map((ax, i) => (
+                      <div key={ax} className="text-center">
+                        <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
+                        <p className={`font-bold mt-0.5 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{result.source.xyz_mm[i].toFixed(1)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className={`rounded-xl border p-3 xl:col-span-6 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
+              {/* Right Column: Referral Form */}
+              <div className={`rounded-xl border p-4 flex flex-col justify-between ${surface}`}>
+                <div className="flex-1">
+                  <div className={`text-[10px] font-bold uppercase tracking-wider mb-3 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
+                    {language === 'th' ? 'แบบฟอร์มการส่งต่อผู้ป่วย' : 'Patient Referral Form'}
+                  </div>
+                  
                   <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
                     {language === 'th' ? 'สถานพยาบาลปลายทาง' : 'Referral Destination'}
                   </label>
                   <input
                     value={referralDestination}
                     onChange={(e) => setReferralDestination(e.target.value)}
-                    className={`w-full rounded-lg border px-3 py-2 text-xs mb-2 transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                    className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
                     placeholder="โรงพยาบาลแม่ข่าย / แผนกหัวใจ"
                   />
+                  
                   <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
                     {language === 'th' ? 'บันทึกแพทย์ / เจ้าหน้าที่' : 'Clinician / Staff Note'}
                   </label>
@@ -797,52 +831,44 @@ const Analysis = () => {
                     value={clinicianNote}
                     onChange={(e) => setClinicianNote(e.target.value)}
                     rows={2}
-                    className={`w-full rounded-lg border px-3 py-2 text-xs resize-none transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                    className={`w-full rounded-lg border px-3 py-2 text-xs resize-none mb-4 transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
                     placeholder="อาการสำคัญ สัญญาณชีพ หรือเหตุผลประกอบการส่งต่อ"
                   />
-              </div>
+                </div>
 
-              <div className="flex flex-col gap-2 xl:col-span-8 xl:flex-row">
-                {result?.source && (
+                <div className="flex flex-col gap-2 sm:flex-row mt-2">
+                  {result?.source && (
+                    <button
+                      onClick={saveReferralReport}
+                      disabled={savingReport}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] shadow-md ${
+                        savingReport
+                          ? 'bg-emerald-600/60 text-white cursor-not-allowed'
+                          : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-500/20'
+                      }`}
+                    >
+                      {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                      {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานส่งต่อ'}
+                    </button>
+                  )}
                   <button
-                    onClick={saveReferralReport}
-                    disabled={savingReport}
-                    className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] shadow-md ${
-                      savingReport
-                        ? 'bg-emerald-600/60 text-white cursor-not-allowed'
-                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-500/20'
+                    onClick={downloadReferralLetter}
+                    disabled={referralLoading}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] shadow-md ${
+                      referralLoading
+                        ? 'bg-sky-700/60 text-white cursor-not-allowed'
+                        : 'bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 text-white border border-sky-500/20'
                     }`}
                   >
-                    {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-                    {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานประกอบการส่งต่อ'}
+                    {referralLoading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                    {referralLoading ? 'กำลังสร้างใบส่งตัว...' : 'ออกใบส่งตัวผู้ป่วย (PDF)'}
                   </button>
-                )}
-                <button
-                  onClick={downloadReferralLetter}
-                  disabled={referralLoading}
-                  className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] shadow-md ${
-                    referralLoading
-                      ? 'bg-sky-700/60 text-white cursor-not-allowed'
-                      : 'bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 text-white border border-sky-500/20'
-                  }`}
-                >
-                  {referralLoading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
-                  {referralLoading ? 'กำลังสร้างใบส่งตัว...' : 'ออกใบส่งตัวผู้ป่วย (PDF)'}
-                </button>
-              </div>
-
-              {result?.source && (
-                <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs xl:col-span-4 ${dk ? 'bg-white/[0.02] border-white/[0.05] shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
-                  {['x', 'y', 'z'].map((ax, i) => (
-                    <div key={ax} className="text-center">
-                      <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
-                      <p className={`font-bold mt-0.5 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{result.source.xyz_mm[i].toFixed(1)}</p>
-                    </div>
-                  ))}
                 </div>
-              )}
+              </div>
+            </div>
+          </div>
 
-              {result.ground_truth && (
+          {result.ground_truth && (
                 <div className={`rounded-xl border p-3 xl:col-span-12 ${dk ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
                   <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-emerald-300' : 'text-emerald-700'}`}>
                     Held-out test ground truth
