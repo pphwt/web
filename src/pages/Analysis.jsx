@@ -866,7 +866,6 @@ const Analysis = () => {
                 </div>
               </div>
             </div>
-          </div>
 
           {result.ground_truth && (
                 <div className={`rounded-xl border p-3 xl:col-span-12 ${dk ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
