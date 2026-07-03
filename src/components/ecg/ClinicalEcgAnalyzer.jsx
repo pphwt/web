@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Upload, Play, Loader2, AlertTriangle, Info, Database, CheckCircle2, FileDown,
-  ChevronDown, Bookmark, ThumbsUp, ThumbsDown,
+  ChevronDown, Bookmark, ThumbsUp, ThumbsDown, ZoomIn, Maximize2, Activity,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { usePatient } from '../../context/PatientContext';
@@ -163,7 +163,7 @@ function EcgPaperChart({ waveform, dk, compact = false }) {
         {colIndex === 0 && renderCalibration(left + 8, y)}
         <text x={x + 4} y={y + 42} fill={dk ? '#64748b' : '#71717a'} fontSize="14" fontWeight="700">{label}</text>
         {points ? (
-          <polyline points={points} fill="none" stroke={traceColor} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <polyline points={points} fill="none" stroke={traceColor} strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         ) : (
           <text x={x + 42} y={y + 70} fill={dk ? '#94a3b8' : '#94a3b8'} fontSize="13">Lead unavailable</text>
         )}
@@ -172,7 +172,12 @@ function EcgPaperChart({ waveform, dk, compact = false }) {
   };
 
   return (
-    <svg viewBox={`0 0 1200 ${totalHeight}`} className="h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80">
+    <svg
+      viewBox={`0 0 1200 ${totalHeight}`}
+      className="block h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80"
+      preserveAspectRatio="xMidYMid meet"
+      shapeRendering="geometricPrecision"
+    >
       <defs>
         <pattern id="ecg-minor-grid" width="10" height="10" patternUnits="userSpaceOnUse">
           <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#fecdd3" strokeWidth="0.7" />
@@ -191,6 +196,58 @@ function EcgPaperChart({ waveform, dk, compact = false }) {
   );
 }
 
+function ChartModeButton({ active, Icon, label, onClick, dk }) {
+  return (
+    <button
+      type="button"
+      title={label}
+      onClick={onClick}
+      className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-black transition ${
+        active
+          ? 'border-sky-500 bg-sky-600 text-white shadow-sm'
+          : dk
+            ? 'border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]'
+            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+      }`}
+    >
+      <Icon size={12} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function EcgChartViewer({ waveform, dk }) {
+  const [mode, setMode] = useState('readable');
+  const compact = mode === 'leadII';
+  const aspectRatio = compact ? '1200 / 236' : '1200 / 560';
+  const width = mode === 'fit' ? '100%' : compact ? '980px' : '1120px';
+  const minWidth = mode === 'fit' ? '640px' : width;
+
+  return (
+    <div className={`rounded-xl border p-2.5 ${dk ? 'border-white/[0.07] bg-slate-950/25' : 'border-slate-200 bg-slate-50'}`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold ${dk ? 'border-white/[0.08] text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
+          <Activity size={12} />
+          <span>25 mm/s</span>
+          <span className={dk ? 'text-slate-600' : 'text-slate-300'}>|</span>
+          <span>10 mm/mV</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <ChartModeButton active={mode === 'readable'} Icon={ZoomIn} label="Readable" onClick={() => setMode('readable')} dk={dk} />
+          <ChartModeButton active={mode === 'fit'} Icon={Maximize2} label="Fit" onClick={() => setMode('fit')} dk={dk} />
+          <ChartModeButton active={mode === 'leadII'} Icon={Activity} label="Lead II" onClick={() => setMode('leadII')} dk={dk} />
+        </div>
+      </div>
+
+      <div className={`overflow-x-auto rounded-lg ${dk ? 'bg-slate-950/30' : 'bg-rose-50/40'}`}>
+        <div className="max-w-none" style={{ width, minWidth, aspectRatio }}>
+          <EcgPaperChart waveform={waveform} dk={dk} compact={compact} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const panelStroke = (panel, highlighted) => {
   if (highlighted) return '#38bdf8';
   if (panel?.confidence === 'low_confidence' || panel?.reason) return '#ef4444';
@@ -199,34 +256,78 @@ const panelStroke = (panel, highlighted) => {
 };
 
 function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }) {
+  const [viewMode, setViewMode] = useState('panels');
   const width = Number(overlay?.image_size?.width || 0);
   const height = Number(overlay?.image_size?.height || 0);
   const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
+  const panels = overlay?.panels || [];
   const warnings = overlay?.warnings || [];
+  const recoveredCount = panels.filter((panel) => !panel?.reason && panel?.confidence !== 'low_confidence').length;
+  const lowConfidenceCount = panels.filter((panel) => panel?.reason || panel?.confidence === 'low_confidence').length;
+  const partialCount = panels.filter((panel) => panel?.confidence === 'interpolated').length;
+  const missingLeads = overlay?.missing_leads || [];
+  const viewModes = [
+    { key: 'original', label: 'Original' },
+    { key: 'panels', label: 'Panels' },
+    { key: 'trace', label: 'Trace' },
+  ];
+  const readableWarnings = warnings.map((warning) => ({
+    perspective_contour_too_small: 'Page border was weak; perspective correction may be approximate.',
+    deskew_unavailable: 'Deskew angle was not reliable.',
+    calibration_uncertain: 'Calibration is uncertain; interval values need clinician review.',
+  }[warning] || warning));
 
   return (
     <div className={`rounded-2xl border p-3 ${dk ? 'border-white/[0.06] bg-[#0d1525]' : 'border-slate-200 bg-white'}`}>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-wider ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
-          <Info size={12} /> ECG image audit overlay
-        </div>
-        {hasOverlay && (
-          <div className="flex flex-wrap gap-1">
-            {['Recovered', 'Partial', 'Low confidence'].map((label) => {
-              const color = label === 'Recovered' ? '#10b981' : label === 'Partial' ? '#f59e0b' : '#ef4444';
-              return (
-                <span key={label} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold" style={{ borderColor: `${color}55`, color }}>
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-                  {label}
-                </span>
-              );
-            })}
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-wider ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
+            <Info size={12} /> ECG image audit
           </div>
-        )}
+          {hasOverlay && (
+            <p className={`mt-1 text-[11px] font-semibold ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
+              {recoveredCount}/{panels.length} panels recovered
+              {lowConfidenceCount > 0 ? ` · ${lowConfidenceCount} need review` : ''}
+              {partialCount > 0 ? ` · ${partialCount} partial` : ''}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          {hasOverlay && (
+            <div className={`inline-flex rounded-lg border p-1 ${dk ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+              {viewModes.map((mode) => (
+                <button
+                  key={mode.key}
+                  type="button"
+                  onClick={() => setViewMode(mode.key)}
+                  className={`rounded-md px-2.5 py-1 text-[10px] font-black transition ${
+                    viewMode === mode.key
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-600 hover:bg-white'
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap justify-end gap-1">
+            {[
+              ['Recovered', '#10b981'],
+              ['Partial', '#f59e0b'],
+              ['Low confidence', '#ef4444'],
+            ].map(([label, color]) => (
+              <span key={label} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold" style={{ borderColor: `${color}55`, color }}>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="relative overflow-hidden rounded-lg border border-rose-200/70 bg-rose-50/60">
         <img src={imageUrl} alt="Uploaded ECG" className="block w-full" />
-        {hasOverlay && (
+        {hasOverlay && viewMode !== 'original' && (
           <svg
             viewBox={`0 0 ${width} ${height}`}
             className="absolute inset-0 h-full w-full"
@@ -245,7 +346,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                 strokeDasharray="6 4"
               />
             )}
-            {overlay.panels.map((panel, index) => {
+            {panels.map((panel, index) => {
               const [x0, y0, x1, y1] = panel.bbox || [0, 0, 0, 0];
               const highlighted = highlightedLead && panel.name?.toUpperCase() === highlightedLead.toUpperCase();
               const stroke = panelStroke(panel, highlighted);
@@ -257,17 +358,19 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                     y={y0}
                     width={Math.max(0, x1 - x0)}
                     height={Math.max(0, y1 - y0)}
-                    fill={highlighted ? 'rgba(14,165,233,0.12)' : 'rgba(255,255,255,0.02)'}
+                    fill={highlighted ? 'rgba(14,165,233,0.13)' : 'rgba(255,255,255,0.01)'}
                     stroke={stroke}
-                    strokeWidth={highlighted ? 4 : 2}
+                    strokeOpacity={highlighted ? 1 : 0.86}
+                    strokeWidth={highlighted ? 4 : 2.2}
                     vectorEffect="non-scaling-stroke"
                   />
-                  {points && (
+                  {viewMode === 'trace' && points && (
                     <polyline
                       points={points}
                       fill="none"
                       stroke={stroke}
-                      strokeWidth={highlighted ? 2.5 : 1.4}
+                      strokeOpacity={highlighted ? 0.95 : 0.72}
+                      strokeWidth={highlighted ? 2.4 : 1.15}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       vectorEffect="non-scaling-stroke"
@@ -291,10 +394,11 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
           </svg>
         )}
       </div>
-      {warnings.length > 0 && (
-        <p className={`mt-2 text-[10px] font-semibold ${dk ? 'text-amber-300' : 'text-amber-700'}`}>
-          Warnings: {warnings.join(', ')}
-        </p>
+      {(missingLeads.length > 0 || readableWarnings.length > 0) && (
+        <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          {missingLeads.length > 0 && <div>Missing leads: {missingLeads.join(', ')}</div>}
+          {readableWarnings.length > 0 && <div>Warnings: {readableWarnings.join(' ')}</div>}
+        </div>
       )}
     </div>
   );
@@ -766,8 +870,10 @@ export default function ClinicalEcgAnalyzer() {
                   </p>
                   {rhythmWhy && <p className={`mt-1 text-[11px] ${subText}`}>{rhythmWhy}</p>}
                 </div>
-                <div className="min-h-[230px]">
-                  <EcgPaperChart waveform={result.waveform} dk={dk} compact />
+                <div className={`overflow-x-auto rounded-xl border p-2 ${dk ? 'border-white/[0.07] bg-slate-950/25' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="max-w-none" style={{ width: '980px', minWidth: '680px', aspectRatio: '1200 / 236' }}>
+                    <EcgPaperChart waveform={result.waveform} dk={dk} compact />
+                  </div>
                 </div>
               </div>
             ) : (
@@ -802,7 +908,7 @@ export default function ClinicalEcgAnalyzer() {
                 <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {INTERVAL_METRICS.map((metric) => renderMetricTile(metric, true))}
                 </section>
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+                <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
                 <section>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -829,9 +935,7 @@ export default function ClinicalEcgAnalyzer() {
                       </button>
                     </div>
                   </div>
-                  <div className="h-[560px]">
-                    <EcgPaperChart waveform={result.waveform} dk={dk} />
-                  </div>
+                  <EcgChartViewer waveform={result.waveform} dk={dk} />
                 </section>
 
                 <aside>

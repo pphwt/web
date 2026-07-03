@@ -11,77 +11,175 @@ import { API_BASE } from '../utils/constants';
 
 const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
 
-// ── Static ECG waveform plot (real analyzed signal) ───────────────────────────
-function WaveformPlot({ leads, dk }) {
-  // leads: array[N][10]. Plot the first 3 channels as stacked traces.
-  const traces = useMemo(() => {
-    if (!leads || !leads.length) return [];
-    const N = leads.length;
-    const channels = [0, 1, 2];
-    return channels.map((c) => {
-      const series = leads.map((row) => row[c]);
-      const mn = Math.min(...series);
-      const mx = Math.max(...series);
-      const span = mx - mn || 1;
-      const pts = series
-        .map((v, i) => `${(i / (N - 1)) * 100},${100 - ((v - mn) / span) * 100}`)
-        .join(' ');
-      return pts;
-    });
-  }, [leads]);
+const STANDARD_12_LEADS = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+const SYNTHETIC_10_LEADS = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4'];
+const ECG_12_LAYOUT = [
+  ['I', 'aVR', 'V1', 'V4'],
+  ['II', 'aVL', 'V2', 'V5'],
+  ['III', 'aVF', 'V3', 'V6'],
+];
 
-  if (!traces.length) return null;
-  const names = ['Lead I', 'Lead II', 'Lead V5'];
+const makeLeadPolyline = (series, x, y, width, height, maxPoints = 180) => {
+  if (!series || series.length < 2) return '';
+  const step = Math.max(1, Math.floor(series.length / maxPoints));
+  const sampled = [];
+  for (let i = 0; i < series.length; i += step) sampled.push(Number(series[i]) || 0);
+  if (sampled.length < 2) return '';
+
+  const sorted = [...sampled].sort((a, b) => a - b);
+  const p10 = sorted[Math.floor(sorted.length * 0.10)] ?? sorted[0];
+  const p90 = sorted[Math.floor(sorted.length * 0.90)] ?? sorted[sorted.length - 1];
+  const mid = (p10 + p90) / 2;
+  const span = Math.max(Math.abs(p90 - p10), 0.08);
+  const gain = height * 0.48 / span;
+
+  return sampled
+    .map((value, index) => {
+      const px = x + (index / (sampled.length - 1)) * width;
+      const py = y + height / 2 - (value - mid) * gain;
+      return `${px.toFixed(1)},${Math.min(y + height - 4, Math.max(y + 4, py)).toFixed(1)}`;
+    })
+    .join(' ');
+};
+
+const deriveLead = (left, right, fn) => {
+  if (!left?.series || !right?.series) return null;
+  const n = Math.min(left.series.length, right.series.length);
+  return Array.from({ length: n }, (_, i) => fn(left.series[i], right.series[i]));
+};
+
+const buildLeadMap = (leads) => {
+  if (!leads?.length) return {};
+  const channelCount = Array.isArray(leads[0]) ? leads[0].length : 0;
+  const names = channelCount >= 12
+    ? STANDARD_12_LEADS
+    : channelCount === 10
+      ? SYNTHETIC_10_LEADS
+      : channelCount === 3
+        ? ['I', 'II', 'V5']
+        : STANDARD_12_LEADS.slice(0, channelCount);
+
+  const map = {};
+  names.forEach((name, index) => {
+    if (index >= channelCount) return;
+    map[name] = {
+      series: leads.map((row) => row[index]),
+      source: 'recorded',
+    };
+  });
+
+  if (!map.III) {
+    const series = deriveLead(map.I, map.II, (i, ii) => ii - i);
+    if (series) map.III = { series, source: 'derived' };
+  }
+  if (!map.aVR) {
+    const series = deriveLead(map.I, map.II, (i, ii) => -(i + ii) / 2);
+    if (series) map.aVR = { series, source: 'derived' };
+  }
+  if (!map.aVL) {
+    const series = deriveLead(map.I, map.II, (i, ii) => i - ii / 2);
+    if (series) map.aVL = { series, source: 'derived' };
+  }
+  if (!map.aVF) {
+    const series = deriveLead(map.I, map.II, (i, ii) => ii - i / 2);
+    if (series) map.aVF = { series, source: 'derived' };
+  }
+
+  return map;
+};
+
+// Static 12-lead ECG waveform plot for doctor-facing referral support.
+function WaveformPlot({ leads, dk }) {
+  const leadMap = useMemo(() => buildLeadMap(leads), [leads]);
+  const availableCount = STANDARD_12_LEADS.filter((lead) => leadMap[lead]?.series?.length).length;
+  const derivedCount = STANDARD_12_LEADS.filter((lead) => leadMap[lead]?.source === 'derived').length;
+  const channelCount = leads?.[0]?.length || 0;
+
+  if (!leads?.length) return null;
+
+  const rowHeight = 128;
+  const segmentWidth = 280;
+  const left = 36;
+  const top = 40;
+  const traceColor = dk ? '#334155' : '#3f3f46';
+  const labelColor = dk ? '#075985' : '#0369a1';
+  const mutedColor = dk ? '#94a3b8' : '#94a3b8';
+  const badgeFill = dk ? '#0f172a' : '#ffffff';
+  const totalHeight = 560;
+
+  const renderCalibration = (x, y) => (
+    <path
+      d={`M ${x} ${y + 78} L ${x + 12} ${y + 78} L ${x + 12} ${y + 34} L ${x + 32} ${y + 34} L ${x + 32} ${y + 78} L ${x + 48} ${y + 78}`}
+      fill="none"
+      stroke={traceColor}
+      strokeWidth="1.8"
+      vectorEffect="non-scaling-stroke"
+    />
+  );
+
+  const renderLead = (lead, rowIndex, colIndex, fullWidth = false) => {
+    const entry = leadMap[lead];
+    const x = left + (fullWidth ? 54 : colIndex * segmentWidth + 54);
+    const y = top + rowIndex * rowHeight;
+    const width = fullWidth ? 1068 : segmentWidth - 70;
+    const height = rowHeight - 20;
+    const points = makeLeadPolyline(entry?.series, x, y + 4, width, height, fullWidth ? 360 : 140);
+    const unavailable = !points;
+
+    return (
+      <g key={`${lead}-${rowIndex}-${colIndex}`}>
+        {colIndex === 0 && renderCalibration(left + 8, y)}
+        <text x={x + 4} y={y + 24} fill={unavailable ? mutedColor : labelColor} fontSize="13" fontWeight="800">
+          {lead}
+        </text>
+        {entry?.source === 'derived' && (
+          <g>
+            <rect x={x + 30} y={y + 10} width="52" height="18" rx="9" fill={badgeFill} stroke="#f59e0b" strokeWidth="1" />
+            <text x={x + 56} y={y + 23} textAnchor="middle" fill="#f59e0b" fontSize="9" fontWeight="800">derived</text>
+          </g>
+        )}
+        {points ? (
+          <polyline points={points} fill="none" stroke={traceColor} strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        ) : (
+          <text x={x + 34} y={y + 72} fill={mutedColor} fontSize="13" fontWeight="700">Unavailable</text>
+        )}
+      </g>
+    );
+  };
 
   return (
-    <div className="flex flex-col gap-3">
-      {traces.map((pts, i) => (
-        <div 
-          key={i} 
-          className={`rounded-xl border p-3 transition-all duration-300 relative overflow-hidden ${
-            dk 
-              ? 'bg-[#090f1d] border-white/[0.06] shadow-[inset_0_1px_3px_rgba(0,0,0,0.4)]' 
-              : 'bg-slate-50 border-slate-200'
-          }`}
-          style={dk ? {
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
-            backgroundSize: '10px 10px'
-          } : {
-            backgroundImage: 'linear-gradient(rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.015) 1px, transparent 1px)',
-            backgroundSize: '10px 10px'
-          }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-400' : 'text-sky-700'}`}>
-              {names[i]}
-            </span>
-            <span className={`text-[8px] font-mono ${dk ? 'text-slate-600' : 'text-slate-400'}`}>
-              500 Hz · 1.0s
-            </span>
-          </div>
-          
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-14 overflow-visible">
+    <div className={`rounded-xl border p-2.5 ${dk ? 'bg-[#090f1d] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className={`flex items-center gap-2 text-[10px] font-bold ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
+          <span className={`rounded-full border px-2 py-0.5 ${availableCount >= 12 ? 'border-emerald-300 text-emerald-600' : 'border-amber-300 text-amber-600'}`}>
+            {availableCount}/12 leads shown
+          </span>
+          {derivedCount > 0 && <span className="rounded-full border border-amber-300 px-2 py-0.5 text-amber-600">{derivedCount} derived</span>}
+          {channelCount === 10 && <span className="rounded-full border border-slate-300 px-2 py-0.5">synthetic 10-channel source</span>}
+        </div>
+        <span className={`text-[9px] font-mono ${dk ? 'text-slate-600' : 'text-slate-400'}`}>500 Hz · 1.0s · 25 mm/s · 10 mm/mV</span>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg">
+        <div className="max-w-none" style={{ width: '100%', minWidth: '760px', aspectRatio: '1200 / 560' }}>
+          <svg viewBox={`0 0 1200 ${totalHeight}`} className="block h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="0.8" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
+              <pattern id="analysis-ecg-minor-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#fecdd3" strokeWidth="0.65" />
+              </pattern>
+              <pattern id="analysis-ecg-major-grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                <rect width="50" height="50" fill="url(#analysis-ecg-minor-grid)" />
+                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#fda4af" strokeWidth="1" />
+              </pattern>
             </defs>
-            <polyline 
-              points={pts} 
-              fill="none" 
-              stroke={dk ? '#38bdf8' : '#0284c7'} 
-              strokeWidth="1.1" 
-              vectorEffect="non-scaling-stroke" 
-              filter={dk ? "url(#neon-glow)" : undefined}
-              className="transition-all duration-300"
-            />
+            <rect width="1200" height={totalHeight} fill="url(#analysis-ecg-major-grid)" />
+            {ECG_12_LAYOUT.map((row, rowIndex) => (
+              row.map((lead, colIndex) => renderLead(lead, rowIndex, colIndex))
+            ))}
+            {renderLead('II', 3, 0, true)}
           </svg>
         </div>
-      ))}
+      </div>
     </div>
   );
 }
@@ -364,7 +462,12 @@ const Analysis = () => {
 
             {result?.waveform?.leads && (
               <div className={`rounded-2xl border p-4 ${surface}`}>
-                <div className={`text-xs font-semibold mb-3 ${secLabel}`}>คลื่น ECG ที่วิเคราะห์ (สัญญาณจริง)</div>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className={`text-xs font-semibold ${secLabel}`}>คลื่น ECG ที่วิเคราะห์ · 12-lead view</div>
+                    <div className={`mt-0.5 text-[10px] ${subText}`}>แสดงตามตำแหน่งมาตรฐาน; lead ที่ไม่มีข้อมูลจริงจะขึ้น Unavailable</div>
+                  </div>
+                </div>
                 <WaveformPlot leads={result.waveform.leads} dk={dk} />
                 {datasetInfo && (
                   <div className={`mt-2 rounded-xl px-3 py-2 text-[10px] ${
