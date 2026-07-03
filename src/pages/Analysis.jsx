@@ -97,23 +97,23 @@ function WaveformPlot({ leads, dk }) {
 
   if (!leads?.length) return null;
 
-  const rowHeight = 128;
-  const segmentWidth = 370;
-  const left = 36;
-  const top = 40;
-  const traceColor = dk ? '#334155' : '#3f3f46';
-  const labelColor = dk ? '#075985' : '#0369a1';
-  const mutedColor = dk ? '#94a3b8' : '#94a3b8';
-  const badgeFill = dk ? '#0f172a' : '#ffffff';
+  const rowHeight = 210;
+  const segmentWidth = 380;
+  const left = 42;
+  const top = 86;
+  const traceColor = '#1f2933';
+  const labelColor = '#111827';
+  const mutedColor = '#6b7280';
+  const badgeFill = '#ffffff';
   const totalWidth = 1600;
-  const totalHeight = 560;
+  const totalHeight = 900;
 
   const renderCalibration = (x, y) => (
     <path
-      d={`M ${x} ${y + 78} L ${x + 12} ${y + 78} L ${x + 12} ${y + 34} L ${x + 32} ${y + 34} L ${x + 32} ${y + 78} L ${x + 48} ${y + 78}`}
+      d={`M ${x} ${y + 92} L ${x + 10} ${y + 92} L ${x + 10} ${y + 34} L ${x + 38} ${y + 34} L ${x + 38} ${y + 92} L ${x + 52} ${y + 92}`}
       fill="none"
       stroke={traceColor}
-      strokeWidth="1.8"
+      strokeWidth="2"
       vectorEffect="non-scaling-stroke"
     />
   );
@@ -123,54 +123,51 @@ function WaveformPlot({ leads, dk }) {
     const x = left + (fullWidth ? 54 : colIndex * segmentWidth + 54);
     const y = top + rowIndex * rowHeight;
     const width = fullWidth ? totalWidth - 130 : segmentWidth - 70;
-    const height = rowHeight - 20;
+    const height = fullWidth ? 118 : 116;
     const points = makeLeadPolyline(entry?.series, x, y + 4, width, height, fullWidth ? 360 : 140);
     const unavailable = !points;
 
     return (
       <g key={`${lead}-${rowIndex}-${colIndex}`}>
         {colIndex === 0 && renderCalibration(left + 8, y)}
-        <text x={x + 4} y={y + 24} fill={unavailable ? mutedColor : labelColor} fontSize="13" fontWeight="800">
+        <text x={x + 2} y={y + 86} fill={unavailable ? mutedColor : labelColor} fontSize="20" fontFamily="serif" fontWeight="700">
           {lead}
         </text>
         {entry?.source === 'derived' && (
           <g>
-            <rect x={x + 30} y={y + 10} width="52" height="18" rx="9" fill={badgeFill} stroke="#f59e0b" strokeWidth="1" />
-            <text x={x + 56} y={y + 23} textAnchor="middle" fill="#f59e0b" fontSize="9" fontWeight="800">derived</text>
+            <rect x={x + 36} y={y + 66} width="54" height="18" rx="2" fill={badgeFill} stroke="#9ca3af" strokeWidth="1" />
+            <text x={x + 63} y={y + 79} textAnchor="middle" fill="#4b5563" fontSize="9" fontWeight="800">derived</text>
           </g>
         )}
         {points ? (
-          <polyline points={points} fill="none" stroke={traceColor} strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <polyline points={points} fill="none" stroke={traceColor} strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         ) : (
-          <text x={x + 34} y={y + 72} fill={mutedColor} fontSize="13" fontWeight="700">Unavailable</text>
+          <text x={x + 38} y={y + 88} fill={mutedColor} fontSize="13" fontWeight="700">Unavailable</text>
         )}
       </g>
     );
   };
 
   return (
-    <div className={`rounded-xl border p-2.5 ${dk ? 'bg-[#090f1d] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className={`flex items-center gap-2 text-[10px] font-bold ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
-          <span className={`rounded-full border px-2 py-0.5 ${availableCount >= 12 ? 'border-emerald-300 text-emerald-600' : 'border-amber-300 text-amber-600'}`}>
-            {availableCount}/12 leads shown
-          </span>
-          {derivedCount > 0 && <span className="rounded-full border border-amber-300 px-2 py-0.5 text-amber-600">{derivedCount} derived</span>}
-          {channelCount === 10 && <span className="rounded-full border border-slate-300 px-2 py-0.5">synthetic 10-channel source</span>}
-        </div>
-        <span className={`text-[9px] font-mono ${dk ? 'text-slate-600' : 'text-slate-400'}`}>500 Hz · 1.0s · 25 mm/s · 10 mm/mV</span>
+    <div className={`rounded-xl border p-3 ${dk ? 'bg-[#090f1d] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-bold">
+        <span className={`rounded-full border px-2 py-0.5 ${availableCount >= 12 ? 'border-emerald-300 text-emerald-600' : 'border-amber-300 text-amber-600'}`}>
+          {availableCount}/12 leads shown
+        </span>
+        {derivedCount > 0 && <span className="rounded-full border border-slate-300 px-2 py-0.5 text-slate-600">{derivedCount} derived</span>}
+        {channelCount === 10 && <span className="rounded-full border border-slate-300 px-2 py-0.5 text-slate-600">synthetic 10-channel source</span>}
       </div>
 
-      <div className="overflow-x-auto rounded-lg">
-        <div className="max-w-none" style={{ width: '100%', minWidth: '1180px', aspectRatio: '1600 / 560' }}>
-          <svg viewBox={`0 0 ${totalWidth} ${totalHeight}`} className="block h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80" preserveAspectRatio="xMidYMid meet">
+      <div className="overflow-x-auto rounded-md">
+        <div className="max-w-none" style={{ width: '100%', minWidth: '1180px', aspectRatio: '1600 / 900' }}>
+          <svg viewBox={`0 0 ${totalWidth} ${totalHeight}`} className="block h-full w-full bg-white" preserveAspectRatio="xMidYMid meet">
             <defs>
               <pattern id="analysis-ecg-minor-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#fecdd3" strokeWidth="0.65" />
+                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#d4d4d4" strokeWidth="0.7" />
               </pattern>
               <pattern id="analysis-ecg-major-grid" width="50" height="50" patternUnits="userSpaceOnUse">
                 <rect width="50" height="50" fill="url(#analysis-ecg-minor-grid)" />
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#fda4af" strokeWidth="1" />
+                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#9ca3af" strokeWidth="1.15" />
               </pattern>
             </defs>
             <rect width={totalWidth} height={totalHeight} fill="url(#analysis-ecg-major-grid)" />
@@ -178,6 +175,11 @@ function WaveformPlot({ leads, dk }) {
               row.map((lead, colIndex) => renderLead(lead, rowIndex, colIndex))
             ))}
             {renderLead('II', 3, 0, true)}
+            <text x="48" y="872" fill="#111827" fontSize="22" fontFamily="serif">150 Hz</text>
+            <text x="160" y="872" fill="#111827" fontSize="22" fontFamily="serif">25.0 mm/s</text>
+            <text x="300" y="872" fill="#111827" fontSize="22" fontFamily="serif">10.0 mm/mV</text>
+            <text x="800" y="872" fill="#111827" fontSize="20" fontFamily="serif">4 by 2.5s + 1 rhythm ld</text>
+            <text x="1240" y="872" fill="#111827" fontSize="20" fontFamily="serif">BIOELECTRIC ECG PREVIEW</text>
           </svg>
         </div>
 
