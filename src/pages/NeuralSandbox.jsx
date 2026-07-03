@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePatient } from '../context/PatientContext';
 import { useTheme } from '../context/ThemeContext';
 import { modelApi } from '../services/modelApi';
+import { API_BASE } from '../utils/constants';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ const NeuralSandbox = () => {
 
   const fetchArchives = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}`, {
+      const res = await fetch(`${API_BASE}/archives/${selectedPatient.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setArchives(await res.json());

@@ -2,6 +2,14 @@
  * Bioelectric PINN Clinical Constants
  */
 
+// Single source of truth for the backend base URL. VITE_API_URL is documented
+// (bioelectric-web skill, .env.local) as the bare host with no /api/v1 suffix,
+// but several call sites historically appended paths straight onto the raw
+// env var and broke as soon as it lacked the suffix — this normalizes both
+// forms so it works either way instead of silently 404ing.
+const rawApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+export const API_BASE = rawApiUrl.endsWith('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`;
+
 export const CLINICAL_THRESHOLDS = {
     HEART_RATE: {
         BRADYCARDIA: 60,

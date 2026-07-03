@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { modelApi } from '../services/modelApi';
+import { API_BASE } from '../utils/constants';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ const AIDiagnostics = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/monitoring/stats`, {
+        const res = await fetch(`${API_BASE}/monitoring/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();

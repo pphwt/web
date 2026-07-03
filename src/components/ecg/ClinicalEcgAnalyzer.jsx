@@ -35,6 +35,13 @@ const REASON_TEXT = {
   bad_rr: 'RR ผิดปกติ',
 };
 
+const CLINICAL_STATUS_TEXT = {
+  eligible_for_review: 'พร้อมให้แพทย์ทบทวน',
+  repeat_required: 'ควรถ่าย/วัดซ้ำก่อนใช้ผล',
+  not_supported: 'ข้อมูลไม่พอสำหรับวิเคราะห์',
+  pending: 'รอผล',
+};
+
 const metricStatus = (metric, normal) => {
   if (!metric || metric.value === null || metric.value === undefined) return 'unavailable';
   if (!normal) return 'normal';
@@ -502,7 +509,7 @@ export default function ClinicalEcgAnalyzer() {
   const leadIIName = orderedLeads.find((name) => name?.toUpperCase() === 'II');
   const leadIIValues = leadIIName ? result?.waveform?.[leadIIName] : null;
 
-  const renderMetricTile = ({ key, label, unit, approx, normal }) => {
+  const renderMetricTile = ({ key, label, unit, approx, normal }, compact = false) => {
     const metric = measurements[key] || {};
     const machine = machineFields[key] || {};
     const usedMachine = machine.value !== null && machine.value !== undefined;
@@ -516,7 +523,11 @@ export default function ClinicalEcgAnalyzer() {
           <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>
             {label}{approx && !usedMachine && <span className="ml-1 opacity-60">~</span>}
           </p>
-          <StatusBadge status={status} dk={dk} />
+          {/* The number itself is already color-coded by status — repeating a
+              "Review" chip on every small interval tile just adds noise when
+              several tiles are abnormal at once. Reserve the explicit badge
+              for the primary Rate/Rhythm/Axis cards. */}
+          {!compact && <StatusBadge status={status} dk={dk} />}
         </div>
         {hasValue ? (
           <p className={`mt-1 text-xl font-bold ${token.text}`}>
@@ -559,29 +570,23 @@ export default function ClinicalEcgAnalyzer() {
     return metric?.value !== null && metric?.value !== undefined ? metric.value : fallback;
   };
   const primaryFinding = result?.findings?.primary;
-  const findingItems = result?.findings?.items || [];
   const topLabel = primaryFinding?.label || result?.classification?.top_label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
   const topProbability = result?.classification?.top_probability;
   const isPathological = primaryFinding
     ? !['normal', 'unavailable'].includes(primaryFinding.severity)
     : result?.classification?.top_label && result.classification.top_label !== 'NORM';
-  const predictionItems = [
-    ...findingItems.map((finding) => ({
-      label: finding.label,
-      probability: null,
-      status: finding.severity,
-    })),
-    rhythm.label ? { label: rhythm.label, probability: rhythm.afib_probability, status: rhythmStatus } : null,
-    axisCategory.category ? { label: `Axis: ${axisCategory.category}`, probability: null, status: axisCategory.category === 'Normal' ? 'normal' : 'abnormal' } : null,
-    ...((result?.classification?.labels || []).slice(0, 6).map((label) => {
-      const probability = result.classification.probabilities?.[label] ?? 0;
-      return {
-        label,
-        probability,
-        status: label === 'NORM' ? (probability > 0.5 ? 'normal' : 'unavailable') : (probability > 0.35 ? 'abnormal' : 'unavailable'),
-      };
-    })),
-  ].filter(Boolean);
+  // Only the classifier's own probability breakdown belongs here — findings,
+  // rhythm, and axis are already shown once each in their own detail cards
+  // above; repeating them in this list just restated the same conclusions
+  // in a second format without adding information.
+  const predictionItems = (result?.classification?.labels || []).slice(0, 6).map((label) => {
+    const probability = result.classification.probabilities?.[label] ?? 0;
+    return {
+      label,
+      probability,
+      status: label === 'NORM' ? (probability > 0.5 ? 'normal' : 'unavailable') : (probability > 0.35 ? 'abnormal' : 'unavailable'),
+    };
+  });
 
   return (
     <div className="flex flex-col gap-5">
@@ -632,7 +637,8 @@ export default function ClinicalEcgAnalyzer() {
         </label>
         <p className={`text-[10px] mb-3 ${subText}`}>
           รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
-          รูปถ่าย ECG (.png/.jpg) = <b>BETA</b> single-lead
+          รูปถ่าย/สแกน ECG (.png/.jpg) = digitize เต็ม 12-lead ได้ (รองรับหลาย layout: 3x4, 2x6, 4x3, มี/ไม่มี rhythm strip)
+          + อ่านค่าจากหัวกระดาษเครื่องด้วย OCR ถ้ามี — ความชัดเจนของรูปมีผลต่อผลลัพธ์
         </p>
         {ocrUnavailable && (
           <div className={`mb-3 flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
@@ -688,8 +694,8 @@ export default function ClinicalEcgAnalyzer() {
                 : clinicalUseStatus === 'not_supported' ? 'text-rose-500' : 'text-amber-500'
             }`} />
             <div>
-              <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
-                Clinical use status: {clinicalUseStatus}
+              <p className={`text-[11px] font-black tracking-wide ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
+                {CLINICAL_STATUS_TEXT[clinicalUseStatus] || clinicalUseStatus}
               </p>
               <p className={`mt-0.5 text-[10px] leading-relaxed ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
                 {(clinicalUse.reasons || []).length ? `Gate reasons: ${clinicalUse.reasons.join(', ')}` : 'Eligible for clinician review with sign-off.'}
@@ -739,19 +745,9 @@ export default function ClinicalEcgAnalyzer() {
                 </div>
                 <div className="grid grid-cols-1 gap-x-5 gap-y-1 sm:grid-cols-2">
                   <InfoPair dk={dk} label="Heart Rate:" value={`${getMetricValue('heart_rate_bpm')} bpm`} />
-                  <InfoPair
-                    dk={dk}
-                    label="Rhythm:"
-                    value={rhythm.label || REASON_TEXT[rhythm.reason] || 'Unavailable'}
-                    valueClassName={statusToken(rhythmStatus, dk).text}
-                  />
-                  <InfoPair
-                    dk={dk}
-                    label="Axis:"
-                    value={axisCategory.category ? `${axisCategory.category} (${axisCategory.degrees}°)` : (REASON_TEXT[axisCategory.reason] || 'Unavailable')}
-                    valueClassName={statusToken(axisCategory.category ? (axisCategory.category === 'Normal' ? 'normal' : 'abnormal') : 'unavailable', dk).text}
-                  />
                 </div>
+                {/* Rhythm/Axis/Intervals shown once, in the detail cards below — repeating them
+                    here as plain text just doubled the page without adding information. */}
                 <p className={`mt-2 text-[10px] font-semibold ${hasMachineReported ? (dk ? 'text-cyan-300' : 'text-cyan-700') : subText}`}>
                   Source: {hasMachineReported ? 'machine OCR header' : `computed waveform lead ${measurements.lead_used || '-'}`}
                 </p>
@@ -776,7 +772,7 @@ export default function ClinicalEcgAnalyzer() {
               </div>
             ) : (
               <div className="flex flex-col gap-5">
-                <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {renderMetricTile(RATE_METRIC)}
                   <div className={`rounded-xl border p-3 ${statusToken(rhythmStatus, dk).card}`}>
                     <div className="flex items-start justify-between gap-2">
@@ -802,10 +798,9 @@ export default function ClinicalEcgAnalyzer() {
                       </p>
                     )}
                   </div>
-                  {renderMetricTile(METRICS.find((m) => m.key === 'qrs_ms'))}
                 </section>
                 <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {INTERVAL_METRICS.map(renderMetricTile)}
+                  {INTERVAL_METRICS.map((metric) => renderMetricTile(metric, true))}
                 </section>
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
                 <section>
@@ -883,7 +878,7 @@ export default function ClinicalEcgAnalyzer() {
                           </ul>
                         )}
                       </div>
-                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Predicted Classes</p>
+                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Classifier probabilities (all 6 classes)</p>
                       <div className="grid grid-cols-1 gap-2">
                         {predictionItems.length ? predictionItems.map((item) => (
                           <PredictionChip key={`${item.label}-${item.probability}`} dk={dk} {...item} />

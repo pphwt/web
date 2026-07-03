@@ -8,6 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useDiagnosticSolver } from '../hooks/useDiagnosticSolver';
+import { API_BASE } from '../utils/constants';
 import {
   Activity, Zap, Save, Heart, TrendingUp, TrendingDown,
   Wifi, WifiOff, Snowflake, History, Dot, Circle,
@@ -201,11 +202,8 @@ const LiveMonitoring = () => {
     }
     showToast('โหลดข้อมูล Demo ECG...', 'info');
     try {
-      const base = import.meta.env.VITE_API_URL || '';
-      const endpoint = base.endsWith('/api/v1')
-        ? `${base}/ecg/analyze`
-        : `${base}/api/v1/ecg/analyze`;
-      const token = localStorage.getItem('token');
+      const endpoint = `${API_BASE}/ecg/analyze`;
+      const token = localStorage.getItem('bio_token');
       const form = new FormData();
       form.append('sample_id', '00017_hr'); // AFIB
       const res = await fetch(endpoint, {
@@ -315,7 +313,7 @@ const LiveMonitoring = () => {
     if (!selectedPatient || recordingBuffer.current.lead_i.length === 0) return;
     setSaveStatus('saving');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/`, {
+      const res = await fetch(`${API_BASE}/archives/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({

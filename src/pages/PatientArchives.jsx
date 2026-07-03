@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import ECGCanvas from '../components/visualizers/ECGCanvas';
+import { API_BASE } from '../utils/constants';
 
 const PatientArchives = () => {
   const { selectedPatient } = usePatient();
@@ -23,7 +24,7 @@ const PatientArchives = () => {
   const fetchArchives = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}`, {
+      const res = await fetch(`${API_BASE}/archives/${selectedPatient.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setArchives(await res.json());

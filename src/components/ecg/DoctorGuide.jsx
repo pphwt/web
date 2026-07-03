@@ -22,8 +22,8 @@ const RANGES = [
 const LIMITS = [
   ['ค่าที่มี ≈ (PR/QRS/QT/QTc)', 'open-source delineation (neurokit2) = ค่าประมาณคร่าวๆ คลาดเคลื่อนได้มาก โดยเฉพาะ QRS width (มักกว้างเกินจริง) — ไม่ใช้วัดทางคลินิก ยืนยันด้วยตาเสมอ. HR และ rhythm เชื่อได้กว่า'],
   ['3D localization', 'โมเดลเทรนจาก simulation → ปิดสำหรับ clinical ECG (แสดง null พร้อมเหตุผล) ไม่โชว์ตำแหน่งมั่ว'],
-  ['รูปถ่าย ECG (BETA)', 'digitize ได้ single-lead, รูป shape ใช้ได้ แต่เวลา/HR ประมาณจนกว่าจะ calibrate'],
-  ['วินิจฉัยเบื้องต้น (classifier)', 'decision support ต้องเทรน PTB-XL ก่อน; ถ้ายังไม่เทรนจะไม่แสดงผลปลอม'],
+  ['รูปถ่าย/สแกน ECG', 'digitize เต็ม 12-lead ได้ (3x4, 2x6, 4x3, มี/ไม่มี rhythm strip) — รูปเบลอ/แสงไม่พอ/มุมเอียงมาก อาจอ่านได้ไม่ครบ ระบบจะบอกจำนวน lead ที่อ่านได้จริงเสมอ ไม่เดา'],
+  ['วินิจฉัยเบื้องต้น (classifier)', 'เทรนจริงบน PTB-XL แล้ว (ดูเลข val macroAUC จริงต่อผลแต่ละครั้งในการ์ด AI Predictions) — ยังเป็น decision support เท่านั้น แพทย์ยืนยันผลสุดท้ายเสมอ'],
 ];
 
 export default function DoctorGuide() {

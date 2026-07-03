@@ -7,6 +7,7 @@ import { usePatient } from '../context/PatientContext';
 import { useLanguage } from '../context/LanguageContext';
 import { modelApi } from '../services/modelApi';
 import { diagnosticService } from '../services/diagnosticService';
+import { API_BASE } from '../utils/constants';
 
 const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
 
@@ -228,10 +229,7 @@ const Analysis = () => {
     }
     setReferralLoading(true);
     try {
-      const base = import.meta.env.VITE_API_URL || '';
-      const endpoint = base.endsWith('/api/v1')
-        ? `${base}/ecg/referral-letter`
-        : `${base}/api/v1/ecg/referral-letter`;
+      const endpoint = `${API_BASE}/ecg/referral-letter`;
       const form = new FormData();
       // Patient data from selected patient context
       form.append('patient_name', selectedPatient?.name || 'ผู้ป่วยไม่ระบุชื่อ');

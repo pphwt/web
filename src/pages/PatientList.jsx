@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useMobileMenu } from '../components/layout/MainLayout';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE } from '../utils/constants';
 import { modelApi } from '../services/modelApi';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -143,7 +144,7 @@ const PatientList = () => {
 
   useEffect(() => {
     if (token) {
-      fetch(`${import.meta.env.VITE_API_URL}/reports/`, {
+      fetch(`${API_BASE}/reports/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.ok ? res.json() : [])
@@ -208,7 +209,7 @@ const PatientList = () => {
 
   useEffect(() => {
     if (token) {
-      fetch(`${import.meta.env.VITE_API_URL}/reports/stats`, {
+      fetch(`${API_BASE}/reports/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.ok ? res.json() : null)

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE } from '../utils/constants';
 
 export const PatientContext = createContext();
 
@@ -13,7 +14,7 @@ export const PatientProvider = ({ children }) => {
     if (!token) return;
     try {
       setIsLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/patients/`, {
+      const response = await fetch(`${API_BASE}/patients/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -39,7 +40,7 @@ export const PatientProvider = ({ children }) => {
 
   const addPatient = async (patientData) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/patients/`, {
+      const response = await fetch(`${API_BASE}/patients/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

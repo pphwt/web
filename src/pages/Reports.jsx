@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePatient } from '../context/PatientContext';
+import { API_BASE } from '../utils/constants';
 
 const FILTERS = ['ALL', 'PENDING_REVIEW', 'APPROVED', 'REFERRED', 'REJECTED', 'NEEDS_RETAKE'];
 const CLAIM_WORDING = 'Bioelectric ECG Image Reader digitizes photographed or scanned 12-lead ECG printouts, extracts waveform/interval measurements, surfaces traceable screening findings, and supports clinician review/sign-off. It is decision-support only and does not provide an autonomous diagnosis.';
@@ -60,7 +61,7 @@ const Reports = () => {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/reports/`, {
+      const res = await fetch(`${API_BASE}/reports/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setReports(await res.json());

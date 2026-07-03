@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { HeartPulse, Eye, EyeOff, CheckCircle2, XCircle, Moon, Sun, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE } from '../utils/constants';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -67,7 +68,7 @@ const Login = () => {
       formData.append('username', username);
       formData.append('password', password);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'ngrok-skip-browser-warning': '69420' },
         body: formData,
@@ -135,7 +136,7 @@ const Login = () => {
     });
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/forgot-password`, {
+      const response = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
