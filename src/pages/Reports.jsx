@@ -8,11 +8,47 @@ import { useLanguage } from '../context/LanguageContext';
 import { usePatient } from '../context/PatientContext';
 
 const FILTERS = ['ALL', 'PENDING_REVIEW', 'APPROVED', 'REFERRED', 'REJECTED', 'NEEDS_RETAKE'];
+const CLAIM_WORDING = 'Bioelectric ECG Image Reader digitizes photographed or scanned 12-lead ECG printouts, extracts waveform/interval measurements, surfaces traceable screening findings, and supports clinician review/sign-off. It is decision-support only and does not provide an autonomous diagnosis.';
+const PAGE_TEXT = {
+  th: {
+    title: 'รายงานประกอบการส่งต่อ',
+    subtitle: 'สรุปรายงานคัดกรอง สถานะทบทวน และเอกสารส่งต่อ',
+    export: 'ส่งออก',
+    claim: 'ข้อกำกับ Clinician CDS',
+    recoveryTrend: 'แนวโน้มอัตราการเต้นหัวใจ',
+    avgPulse: 'ชีพจรเฉลี่ย',
+    variability: 'ความแปรปรวน',
+    anomalies: 'เคสต้องทบทวน',
+    confidenceTrend: 'ความมั่นใจเฉลี่ยของระบบ',
+    confidence: 'ความมั่นใจ',
+    reviewed: 'ทบทวนแล้ว',
+    stability: 'สถานะ',
+    journal: 'รายการรายงานทางคลินิก',
+    noRecords: 'ยังไม่มีรายงาน',
+  },
+  en: {
+    title: 'Referral Reports',
+    subtitle: 'Clinical summaries, review status, and referral documents',
+    export: 'Export',
+    claim: 'Clinician CDS claim',
+    recoveryTrend: 'Cardiovascular Recovery Trend',
+    avgPulse: 'Avg Pulse',
+    variability: 'Variability',
+    anomalies: 'Anomalies',
+    confidenceTrend: 'Avg Support Confidence',
+    confidence: 'Confidence',
+    reviewed: 'Reviewed',
+    stability: 'Stability',
+    journal: 'Clinical Journal',
+    noRecords: 'No Records Found',
+  },
+};
 
 const Reports = () => {
   const { token, user } = useAuth();
   const { isDarkMode: dk } = useTheme();
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const text = PAGE_TEXT[language === 'th' ? 'th' : 'en'];
   const { patients } = usePatient();
 
   const [reports, setReports]   = useState([]);
@@ -33,6 +69,8 @@ const Reports = () => {
   };
 
   const getReportStatus = (report) =>
+    report?.physics_params?.ecg_result?.review?.status ||
+    report?.physics_params?.ecg_result?.review_status ||
     report?.status ||
     report?.physics_params?.referral_support?.review?.status ||
     'PENDING_REVIEW';
@@ -43,7 +81,9 @@ const Reports = () => {
   const reportsList = Array.isArray(reports) ? [...reports].sort((a, b) => new Date(a.timestamp || a.created_at) - new Date(b.timestamp || b.created_at)) : [];
 
   const getReportHR = (r) => {
-    const hr = r.heart_rate_bpm ?? r.physics_params?.referral_support?.heart_rate_bpm;
+    const hr = r.heart_rate_bpm
+      ?? r.physics_params?.ecg_result?.measurements?.heart_rate_bpm?.value
+      ?? r.physics_params?.referral_support?.heart_rate_bpm;
     return Number.isFinite(Number(hr)) ? Number(hr) : null;
   };
 
@@ -72,7 +112,8 @@ const Reports = () => {
 
   const anomaliesCount = reportsList.filter(r => {
     const risk = r.risk_level || r.physics_params?.referral_support?.risk_level;
-    return risk === 'HIGH' || getReportStatus(r) === 'NEEDS_RETAKE';
+    const ecgSeverity = r.physics_params?.ecg_result?.findings?.primary?.severity;
+    return risk === 'HIGH' || ['urgent', 'abnormal', 'review'].includes(ecgSeverity) || getReportStatus(r) === 'NEEDS_RETAKE';
   }).length;
 
   const avgAccuracy = confidences.length > 0
@@ -109,35 +150,40 @@ const Reports = () => {
               <FileText size={17} />
             </div>
             <div>
-              <h1 className={`text-sm font-bold ${mainText}`}>{t('nav_reports')}</h1>
-              <p className={`mt-0.5 text-xs ${subText}`}>Clinical Summary &amp; Metrics</p>
+              <h1 className={`text-sm font-bold ${mainText}`}>{text.title}</h1>
+              <p className={`mt-0.5 text-xs ${subText}`}>{text.subtitle}</p>
             </div>
           </div>
           <button className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
             dk ? 'border-white/[0.07] text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-100'
           }`}>
-            <Download size={13} /> Export
+            <Download size={13} /> {text.export}
           </button>
         </header>
 
         {/* Analytic cards — derived from stored report snapshots */}
+        <div className={`rounded-2xl border p-3 ${surface}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>{text.claim}</p>
+          <p className={`mt-1 text-xs ${subText}`}>{CLAIM_WORDING}</p>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <AnalyticCard
-            title="Cardiovascular Recovery Trend" badge="HEART" badgeColor="#0ea5e9"
+            title={text.recoveryTrend} badge="HEART" badgeColor="#0ea5e9"
             data={recoveryTrend} color="#0ea5e9"
             stats={[
-              { label: 'Avg Pulse',    value: avgPulseVal,  color: '#0ea5e9' },
-              { label: 'Variability',  value: variabilityVal, color: '#fbbf24' },
-              { label: 'Anomalies',    value: anomaliesCount, color: '#94a3b8' },
+              { label: text.avgPulse,    value: avgPulseVal,  color: '#0ea5e9' },
+              { label: text.variability,  value: variabilityVal, color: '#fbbf24' },
+              { label: text.anomalies,    value: anomaliesCount, color: '#94a3b8' },
             ]}
           />
           <AnalyticCard
-            title="Avg Support Confidence" badge="PINN" badgeColor="#10b981"
+            title={text.confidenceTrend} badge="PINN" badgeColor="#10b981"
             data={supportConfidenceTrend} color="#10b981"
             stats={[
-              { label: 'Confidence', value: avgAccuracy, color: '#10b981' },
-              { label: 'Reviewed',   value: reviewedCount,  color: '#a78bfa' },
-              { label: 'Stability',  value: stabilityLabel,  color: '#94a3b8' },
+              { label: text.confidence, value: avgAccuracy, color: '#10b981' },
+              { label: text.reviewed,   value: reviewedCount,  color: '#a78bfa' },
+              { label: text.stability,  value: stabilityLabel,  color: '#94a3b8' },
             ]}
           />
         </div>
@@ -145,7 +191,7 @@ const Reports = () => {
         {/* Journal */}
         <div className={`rounded-2xl border ${surface}`}>
           <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3 border-b ${divider}`}>
-            <span className={`text-xs font-semibold ${secLabel}`}>Clinical Journal</span>
+            <span className={`text-xs font-semibold ${secLabel}`}>{text.journal}</span>
             <div className={`flex gap-1 rounded-xl border p-1 ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
               {FILTERS.map(f => (
                 <button
@@ -186,7 +232,7 @@ const Reports = () => {
                 dk ? 'border-white/[0.07]' : 'border-slate-200'
               }`}>
                 <FileText size={28} className={`mb-3 ${dk ? 'text-slate-700' : 'text-slate-300'}`} />
-                <p className={`text-sm font-semibold ${dk ? 'text-slate-600' : 'text-slate-400'}`}>No Records Found</p>
+                <p className={`text-sm font-semibold ${dk ? 'text-slate-600' : 'text-slate-400'}`}>{text.noRecords}</p>
               </div>
             )}
           </div>

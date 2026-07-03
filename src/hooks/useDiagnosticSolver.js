@@ -9,7 +9,7 @@ import { CLINICAL_THRESHOLDS } from '../utils/constants';
 export const useDiagnosticSolver = (streamData) => {
   const [clinicalState, setClinicalState] = useState({
     status: 'normal',
-    diagnosis: 'Normal Sinus Rhythm',
+    diagnosis: 'Simulated vitals within configured ranges',
     severity: 0,
     trend: 'stable' // 'rising', 'falling', 'stable'
   });
@@ -41,7 +41,7 @@ export const useDiagnosticSolver = (streamData) => {
     if (!metrics) return;
 
     let newStatus = 'normal';
-    let newDiag = 'Normal Sinus Rhythm';
+    let newDiag = 'Simulated vitals within configured ranges';
     let newSeverity = 0;
     let newTrend = 'stable';
 
@@ -52,13 +52,20 @@ export const useDiagnosticSolver = (streamData) => {
         metrics.hr > HEART_RATE.TACHYCARDIA || 
         metrics.hr < HEART_RATE.BRADYCARDIA) {
       newStatus = 'abnormal';
-      newDiag = 'Atypical Cardiac Pattern Detected';
+      newDiag = [
+        metrics.hr > HEART_RATE.TACHYCARDIA || metrics.hr < HEART_RATE.BRADYCARDIA
+          ? `HR outside ${HEART_RATE.BRADYCARDIA}-${HEART_RATE.TACHYCARDIA} bpm range`
+          : null,
+        metrics.qtc > QTC_INTERVAL.NORMAL_MAX
+          ? `QTc above ${QTC_INTERVAL.NORMAL_MAX} ms threshold`
+          : null,
+      ].filter(Boolean).join(' + ');
       newSeverity = 1;
     }
 
     if (metrics.qrs > QRS_DURATION.NORMAL_MAX) {
       newStatus = 'critical';
-      newDiag = 'Wide QRS Complex (Pathological)';
+      newDiag = `QRS above ${QRS_DURATION.NORMAL_MAX} ms threshold (simulated)`;
       newSeverity = 2;
     }
 

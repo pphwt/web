@@ -57,9 +57,10 @@ export const diagnosticService = {
   /**
    * Download a report as PDF
    */
-  async downloadReportPDF(reportId) {
+  async downloadReportPDF(reportId, locale = 'th-TH') {
     try {
-      const response = await fetch(`${API_URL}/reports/export/${reportId}`, {
+      const params = new URLSearchParams({ locale });
+      const response = await fetch(`${API_URL}/reports/export/${reportId}?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('bio_token')}`
         }
@@ -71,7 +72,9 @@ export const diagnosticService = {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Referral_Support_Report_${reportId.substring(0, 8)}.pdf`;
+      a.download = locale.startsWith('th')
+        ? `รายงานส่งต่อ_${reportId.substring(0, 8)}.pdf`
+        : `Referral_Support_Report_${reportId.substring(0, 8)}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

@@ -271,14 +271,14 @@ const LiveMonitoring = () => {
   useEffect(() => {
     if (clinicalState?.diagnosis) {
       const timeStr = new Date().toTimeString().split(' ')[0];
-      const isNormalRhythm = clinicalState.diagnosis === 'Normal Sinus Rhythm';
+      const isNormalThresholdState = clinicalState.status === 'normal';
       setEvents(prev => [
         {
           id: Date.now() + 1,
           time: timeStr,
-          type: isNormalRhythm ? 'System' : 'Triage Alert',
+          type: isNormalThresholdState ? 'System' : 'Threshold Alert',
           detail: clinicalState.diagnosis,
-          color: isNormalRhythm ? 'bg-emerald-400' : isCritical ? 'bg-rose-400' : 'bg-amber-400'
+          color: isNormalThresholdState ? 'bg-emerald-400' : isCritical ? 'bg-rose-400' : 'bg-amber-400'
         },
         ...prev.slice(0, 19)
       ]);
@@ -517,12 +517,21 @@ const LiveMonitoring = () => {
             <div className={`flex items-center gap-3 rounded-2xl border px-5 py-4 ${diagColor.bg} ${diagColor.ring}`}>
               <span className={diagColor.text}>{diagColor.icon}</span>
               <div className="flex-1 min-w-0">
-                <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${diagColor.text} opacity-70`}>
-                  Real-time Triage Support
-                </p>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <p className={`text-[10px] font-semibold uppercase tracking-wider ${diagColor.text} opacity-70`}>
+                    Simulation Threshold Support
+                  </p>
+                  {!streamData?.is_hardware && (
+                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                      dk ? 'border-violet-500/25 bg-violet-500/10 text-violet-300' : 'border-violet-200 bg-violet-50 text-violet-700'
+                    }`}>
+                      SIMULATION - not clinical diagnosis
+                    </span>
+                  )}
+                </div>
                 <p className={`text-base font-bold truncate ${diagColor.text}`}>{clinicalState.diagnosis}</p>
                 <p className={`mt-1 text-[10px] leading-relaxed ${diagColor.text} opacity-70`}>
-                  ใช้เฝ้าระวังและคัดกรองเบื้องต้น ไม่ใช่คำวินิจฉัยสุดท้าย
+                  Threshold/trend monitor only. Use the clinical ECG analyzer for measured waveform interpretation; clinician confirms all findings.
                 </p>
               </div>
               <span className={`shrink-0 text-xs font-semibold ${diagColor.text} opacity-60`}>
@@ -588,7 +597,7 @@ const LiveMonitoring = () => {
                       ⚠ Critical Alert
                     </p>
                     <p className={`text-xs mt-0.5 ${dk ? 'text-rose-300' : 'text-rose-600'}`}>
-                      Sudden Rhythm Change Detected
+                      Simulated threshold crossed
                     </p>
                   </div>
                 )}

@@ -4,6 +4,7 @@ import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
+import { useLanguage } from '../context/LanguageContext';
 import { modelApi } from '../services/modelApi';
 import { diagnosticService } from '../services/diagnosticService';
 
@@ -118,6 +119,8 @@ const Analysis = () => {
   const { isDarkMode: dk } = useTheme();
   const { showToast } = useToast();
   const { selectedPatient, patients } = usePatient();
+  const { language } = useLanguage();
+  const locale = language === 'th' ? 'th-TH' : 'en-US';
 
   const [samples, setSamples] = useState(DEFAULT_SAMPLES);
   const [sampleId, setSampleId] = useState(DEFAULT_SAMPLES[0].id);
@@ -239,8 +242,9 @@ const Analysis = () => {
       form.append('patient_allergies', selectedPatient?.allergies || '');
       form.append('clinician_note', clinicianNote || '');
       form.append('referral_destination', referralDestination || '');
+      form.append('locale', locale);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('bio_token') || localStorage.getItem('token');
       // Pass the pre-analyzed result so the backend does NOT need to re-analyze.
       // This avoids a sample_id format mismatch between the AI model backend
       // (npy path IDs) and the clinical backend (PTB-XL record IDs).
@@ -261,7 +265,9 @@ const Analysis = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Referral_${selectedPatient?.name || sampleId || 'ECG'}.pdf`;
+      a.download = locale.startsWith('th')
+        ? `ใบส่งตัว_${selectedPatient?.name || sampleId || 'ECG'}.pdf`
+        : `Referral_${selectedPatient?.name || sampleId || 'ECG'}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       showToast('ดาวน์โหลดใบส่งตัวผู้ป่วยสำเร็จ', 'success');
@@ -532,7 +538,7 @@ const Analysis = () => {
                   dk ? 'bg-sky-500/[0.04] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.03)]' : 'bg-sky-50 border-sky-200 shadow-sm'
                 }`}>
                   <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
-                    Referral Decision Support
+                    {language === 'th' ? 'เอกสารประกอบการส่งต่อ' : 'Referral Decision Support'}
                   </div>
                   <div className={`mt-1 text-sm font-bold ${mainText}`}>{referralAdvice.title}</div>
                   <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>
@@ -543,7 +549,7 @@ const Analysis = () => {
                 {result?.source && (
                   <div className={`mb-3 rounded-xl border p-3 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
                     <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
-                      Referral Destination
+                      {language === 'th' ? 'สถานพยาบาลปลายทาง' : 'Referral Destination'}
                     </label>
                     <input
                       value={referralDestination}
@@ -552,7 +558,7 @@ const Analysis = () => {
                       placeholder="โรงพยาบาลแม่ข่าย / แผนกหัวใจ"
                     />
                     <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
-                      Clinician / Staff Note
+                      {language === 'th' ? 'บันทึกแพทย์ / เจ้าหน้าที่' : 'Clinician / Staff Note'}
                     </label>
                     <textarea
                       value={clinicianNote}

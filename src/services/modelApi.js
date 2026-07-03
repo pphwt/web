@@ -98,13 +98,14 @@ export const modelApi = {
     }));
   },
 
-  ecgReportBlob: async ({ file, files, sampleId }) => {
+  ecgReportBlob: async ({ file, files, sampleId, locale = 'th-TH' }) => {
     const form = new FormData();
     if (file) form.append('file', file);
     else if (files) {
       files.forEach(f => form.append('files', f));
     }
     else form.append('sample_id', sampleId);
+    form.append('locale', locale);
     const res = await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/report`, {
       method: 'POST', headers: authHeaders(), body: form,
     });

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Upload, Play, Loader2, HeartPulse, AlertTriangle, Activity, Info, Database, CheckCircle2, FileDown, Save,
+  Upload, Play, Loader2, AlertTriangle, Info, Database, CheckCircle2, FileDown,
+  ChevronDown, Bookmark, ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { usePatient } from '../../context/PatientContext';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { modelApi } from '../../services/modelApi';
 
 // Measurement metrics → display config. `approx` marks values that come from
@@ -19,6 +21,9 @@ const METRICS = [
   { key: 'axis_deg', label: 'Axis', unit: '°', approx: false, normal: [-30, 90] },
 ];
 
+const RATE_METRIC = METRICS[0];
+const INTERVAL_METRICS = METRICS.filter((m) => ['pr_ms', 'qrs_ms', 'qt_ms', 'qtc_ms'].includes(m.key));
+
 const REASON_TEXT = {
   window_too_short: 'สัญญาณสั้นเกินไป',
   insufficient_beats: 'จับ R-peak ไม่พอ',
@@ -30,7 +35,263 @@ const REASON_TEXT = {
   bad_rr: 'RR ผิดปกติ',
 };
 
+const metricStatus = (metric, normal) => {
+  if (!metric || metric.value === null || metric.value === undefined) return 'unavailable';
+  if (!normal) return 'normal';
+  return metric.value < normal[0] || metric.value > normal[1] ? 'abnormal' : 'normal';
+};
+
+const statusToken = (status, dk) => {
+  if (status === 'urgent') {
+    return {
+      label: 'Urgent',
+      Icon: AlertTriangle,
+      card: dk ? 'border-rose-500/30 bg-rose-500/[0.10]' : 'border-rose-300 bg-rose-50',
+      text: dk ? 'text-rose-200' : 'text-rose-800',
+      badge: dk ? 'border-rose-500/40 bg-rose-500/15 text-rose-200' : 'border-rose-300 bg-white text-rose-800',
+    };
+  }
+  if (status === 'abnormal' || status === 'review') {
+    return {
+      label: 'Review',
+      Icon: AlertTriangle,
+      card: dk ? 'border-rose-500/25 bg-rose-500/[0.07]' : 'border-rose-300 bg-rose-50',
+      text: dk ? 'text-rose-300' : 'text-rose-700',
+      badge: dk ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-rose-300 bg-white text-rose-700',
+    };
+  }
+  if (status === 'unavailable') {
+    return {
+      label: 'Unavailable',
+      Icon: Info,
+      card: dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50',
+      text: dk ? 'text-slate-400' : 'text-slate-600',
+      badge: dk ? 'border-white/[0.08] bg-white/[0.04] text-slate-300' : 'border-slate-200 bg-white text-slate-600',
+    };
+  }
+  return {
+    label: 'Normal',
+    Icon: CheckCircle2,
+    card: dk ? 'border-emerald-500/20 bg-emerald-500/[0.06]' : 'border-emerald-200 bg-emerald-50',
+    text: dk ? 'text-emerald-300' : 'text-emerald-700',
+    badge: dk ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-white text-emerald-700',
+  };
+};
+
+function StatusBadge({ status, dk }) {
+  const token = statusToken(status, dk);
+  const Icon = token.Icon;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${token.badge}`}>
+      <Icon size={10} /> {token.label}
+    </span>
+  );
+}
+
 const LEAD_ORDER = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+
+const ECG_DISPLAY_ROWS = [
+  ['I', 'aVR', 'V1', 'V4'],
+  ['II', 'aVL', 'V2', 'V5'],
+  ['III', 'aVF', 'V3', 'V6'],
+];
+
+const pickWaveformLead = (waveform, label) => {
+  if (!waveform) return null;
+  const key = Object.keys(waveform).find((name) => name.toUpperCase() === label.toUpperCase());
+  return key ? waveform[key] : null;
+};
+
+const makePolyline = (values, x, y, width, height, maxPoints = 260) => {
+  if (!values || values.length < 2) return '';
+  const step = Math.max(1, Math.floor(values.length / maxPoints));
+  const sampled = [];
+  for (let i = 0; i < values.length; i += step) sampled.push(Number(values[i]) || 0);
+  if (sampled.length < 2) return '';
+
+  const sorted = [...sampled].sort((a, b) => a - b);
+  const p10 = sorted[Math.floor(sorted.length * 0.10)] ?? sorted[0];
+  const p90 = sorted[Math.floor(sorted.length * 0.90)] ?? sorted[sorted.length - 1];
+  const mid = (p10 + p90) / 2;
+  const span = Math.max(Math.abs(p90 - p10), 0.2);
+  const gain = height * 0.55 / span;
+
+  return sampled
+    .map((value, index) => {
+      const px = x + (index / (sampled.length - 1)) * width;
+      const py = y + height / 2 - (value - mid) * gain;
+      return `${px.toFixed(1)},${Math.min(y + height - 4, Math.max(y + 4, py)).toFixed(1)}`;
+    })
+    .join(' ');
+};
+
+function EcgPaperChart({ waveform, dk, compact = false }) {
+  const rowHeight = compact ? 118 : 126;
+  const chartWidth = 1120;
+  const left = 34;
+  const top = 28;
+  const segmentWidth = chartWidth / 4;
+  const totalHeight = compact ? 236 : 560;
+  const traceColor = dk ? '#334155' : '#3f3f46';
+  const rows = compact ? [['II']] : ECG_DISPLAY_ROWS;
+
+  const renderCalibration = (x, y) => (
+    <path
+      d={`M ${x} ${y + rowHeight * 0.68} L ${x + 12} ${y + rowHeight * 0.68} L ${x + 12} ${y + rowHeight * 0.28} L ${x + 32} ${y + rowHeight * 0.28} L ${x + 32} ${y + rowHeight * 0.68} L ${x + 48} ${y + rowHeight * 0.68}`}
+      fill="none"
+      stroke={traceColor}
+      strokeWidth="2"
+      vectorEffect="non-scaling-stroke"
+    />
+  );
+
+  const renderLead = (label, rowIndex, colIndex, fullWidth = false) => {
+    const values = pickWaveformLead(waveform, label);
+    const x = left + (fullWidth ? 58 : colIndex * segmentWidth + 58);
+    const y = top + rowIndex * rowHeight;
+    const width = fullWidth ? chartWidth - 74 : segmentWidth - 78;
+    const points = makePolyline(values, x, y + 4, width, rowHeight - 18, fullWidth ? 520 : 220);
+    return (
+      <g key={`${label}-${rowIndex}-${colIndex}`}>
+        {colIndex === 0 && renderCalibration(left + 8, y)}
+        <text x={x + 4} y={y + 42} fill={dk ? '#64748b' : '#71717a'} fontSize="14" fontWeight="700">{label}</text>
+        {points ? (
+          <polyline points={points} fill="none" stroke={traceColor} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        ) : (
+          <text x={x + 42} y={y + 70} fill={dk ? '#94a3b8' : '#94a3b8'} fontSize="13">Lead unavailable</text>
+        )}
+      </g>
+    );
+  };
+
+  return (
+    <svg viewBox={`0 0 1200 ${totalHeight}`} className="h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80">
+      <defs>
+        <pattern id="ecg-minor-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+          <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#fecdd3" strokeWidth="0.7" />
+        </pattern>
+        <pattern id="ecg-major-grid" width="50" height="50" patternUnits="userSpaceOnUse">
+          <rect width="50" height="50" fill="url(#ecg-minor-grid)" />
+          <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#fda4af" strokeWidth="1.1" />
+        </pattern>
+      </defs>
+      <rect width="1200" height={totalHeight} fill="url(#ecg-major-grid)" />
+      {rows.map((row, rowIndex) => (
+        row.map((lead, colIndex) => renderLead(lead, rowIndex, colIndex, compact))
+      ))}
+      {!compact && renderLead('II', 3, 0, true)}
+    </svg>
+  );
+}
+
+const panelStroke = (panel, highlighted) => {
+  if (highlighted) return '#38bdf8';
+  if (panel?.confidence === 'low_confidence' || panel?.reason) return '#ef4444';
+  if (panel?.confidence === 'interpolated') return '#f59e0b';
+  return '#10b981';
+};
+
+function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }) {
+  const width = Number(overlay?.image_size?.width || 0);
+  const height = Number(overlay?.image_size?.height || 0);
+  const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
+  const warnings = overlay?.warnings || [];
+
+  return (
+    <div className={`rounded-2xl border p-3 ${dk ? 'border-white/[0.06] bg-[#0d1525]' : 'border-slate-200 bg-white'}`}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-wider ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
+          <Info size={12} /> ECG image audit overlay
+        </div>
+        {hasOverlay && (
+          <div className="flex flex-wrap gap-1">
+            {['Recovered', 'Partial', 'Low confidence'].map((label) => {
+              const color = label === 'Recovered' ? '#10b981' : label === 'Partial' ? '#f59e0b' : '#ef4444';
+              return (
+                <span key={label} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold" style={{ borderColor: `${color}55`, color }}>
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="relative overflow-hidden rounded-lg border border-rose-200/70 bg-rose-50/60">
+        <img src={imageUrl} alt="Uploaded ECG" className="block w-full" />
+        {hasOverlay && (
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            className="absolute inset-0 h-full w-full"
+            preserveAspectRatio="none"
+          >
+            {overlay.page_bbox && (
+              <rect
+                x={overlay.page_bbox[0]}
+                y={overlay.page_bbox[1]}
+                width={Math.max(0, overlay.page_bbox[2] - overlay.page_bbox[0])}
+                height={Math.max(0, overlay.page_bbox[3] - overlay.page_bbox[1])}
+                fill="none"
+                stroke="#0ea5e9"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+                strokeDasharray="6 4"
+              />
+            )}
+            {overlay.panels.map((panel, index) => {
+              const [x0, y0, x1, y1] = panel.bbox || [0, 0, 0, 0];
+              const highlighted = highlightedLead && panel.name?.toUpperCase() === highlightedLead.toUpperCase();
+              const stroke = panelStroke(panel, highlighted);
+              const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
+              return (
+                <g key={`${panel.name}-${panel.role}-${index}`} onClick={() => onHighlight(panel.name)} className="cursor-pointer">
+                  <rect
+                    x={x0}
+                    y={y0}
+                    width={Math.max(0, x1 - x0)}
+                    height={Math.max(0, y1 - y0)}
+                    fill={highlighted ? 'rgba(14,165,233,0.12)' : 'rgba(255,255,255,0.02)'}
+                    stroke={stroke}
+                    strokeWidth={highlighted ? 4 : 2}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {points && (
+                    <polyline
+                      points={points}
+                      fill="none"
+                      stroke={stroke}
+                      strokeWidth={highlighted ? 2.5 : 1.4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  <text
+                    x={x0 + 8}
+                    y={y0 + 18}
+                    fill={stroke}
+                    fontSize="14"
+                    fontWeight="800"
+                    stroke={dk ? '#0f172a' : '#ffffff'}
+                    strokeWidth="3"
+                    paintOrder="stroke"
+                  >
+                    {panel.name}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        )}
+      </div>
+      {warnings.length > 0 && (
+        <p className={`mt-2 text-[10px] font-semibold ${dk ? 'text-amber-300' : 'text-amber-700'}`}>
+          Warnings: {warnings.join(', ')}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function LeadTrace({ name, values, dk }) {
   const pts = useMemo(() => {
@@ -52,6 +313,28 @@ function LeadTrace({ name, values, dk }) {
   );
 }
 
+function InfoPair({ label, value, dk, valueClassName }) {
+  return (
+    <div className="grid grid-cols-[92px_1fr] gap-2 text-[11px] leading-5">
+      <span className={`font-bold ${dk ? 'text-slate-400' : 'text-slate-700'}`}>{label}</span>
+      <span className={`truncate text-right font-semibold ${valueClassName || (dk ? 'text-slate-200' : 'text-slate-600')}`}>{value ?? '-'}</span>
+    </div>
+  );
+}
+
+function PredictionChip({ label, probability, status, dk }) {
+  const token = statusToken(status, dk);
+  const percent = probability !== null && probability !== undefined ? `${Math.round(probability * 100)}%` : null;
+  return (
+    <div className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-100 bg-white shadow-sm'}`}>
+      <span className={`min-w-0 truncate text-[11px] font-bold ${dk ? 'text-slate-200' : 'text-slate-700'}`}>{label}</span>
+      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold ${token.badge}`}>
+        {percent || token.label}
+      </span>
+    </div>
+  );
+}
+
 const DEFAULT_SAMPLES = [
   { id: "00001_hr", primary_label: "Normal ECG", age: 56, sex: "F" },
   { id: "00002_hr", primary_label: "Normal ECG", age: 19, sex: "M" },
@@ -67,17 +350,25 @@ const DEFAULT_SAMPLES = [
   { id: "00211_hr", primary_label: "Anterior MI", age: 85, sex: "F" }
 ];
 
+const DEFAULT_CLAIM_WORDING = 'Bioelectric ECG Image Reader digitizes photographed or scanned 12-lead ECG printouts, extracts waveform/interval measurements, surfaces traceable screening findings, and supports clinician review/sign-off. It is decision-support only and does not provide an autonomous diagnosis.';
+
 export default function ClinicalEcgAnalyzer() {
   const { isDarkMode: dk } = useTheme();
   const { selectedPatient } = usePatient();
   const { showToast } = useToast();
+  const { language } = useLanguage();
+  const locale = language === 'th' ? 'th-TH' : 'en-US';
   const [uploadedFiles, setUploadedFiles] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [samples, setSamples] = useState(DEFAULT_SAMPLES);
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
+  const [erQuickMode, setErQuickMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [formatInfo, setFormatInfo] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [highlightedLead, setHighlightedLead] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -88,7 +379,23 @@ export default function ClinicalEcgAnalyzer() {
         }
       })
       .catch(() => {});
+    modelApi.ecgFormats()
+      .then(setFormatInfo)
+      .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const imageFile = Array.isArray(uploadedFiles)
+      ? uploadedFiles.find((file) => file?.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file?.name || ''))
+      : null;
+    if (!imageFile) {
+      setImagePreviewUrl('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [uploadedFiles]);
 
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
   const secLabel = dk ? 'text-slate-500' : 'text-slate-400';
@@ -115,12 +422,12 @@ export default function ClinicalEcgAnalyzer() {
     try {
       const blob = await modelApi.ecgReportBlob(
         uploadedFiles 
-          ? (uploadedFiles.length === 1 ? { file: uploadedFiles[0] } : { files: uploadedFiles }) 
-          : { sampleId }
+          ? (uploadedFiles.length === 1 ? { file: uploadedFiles[0], locale } : { files: uploadedFiles, locale }) 
+          : { sampleId, locale }
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `ECG_Report_${sampleId || 'upload'}.pdf`;
+      a.href = url; a.download = locale.startsWith('th') ? `รายงาน_ECG_${sampleId || 'upload'}.pdf` : `ECG_Report_${sampleId || 'upload'}.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -174,12 +481,118 @@ export default function ClinicalEcgAnalyzer() {
   }, [result]);
 
   const q = result?.signal_quality;
+  const measurements = result?.measurements || {};
+  const digitizationReport = result?.digitization_report || result?.meta?.digitization_report;
+  const digitizationOverlay = result?.digitization_overlay || result?.meta?.digitization_overlay;
+  const digitizedLeadRows = digitizationReport?.leads || [];
+  const recoveredDigitizedLeads = digitizedLeadRows.filter((lead) => lead?.reason === null || lead?.reason === undefined);
+  const digitizationQuality = digitizationReport?.quality || {};
+  const ocrUnavailable = formatInfo?.ocr && formatInfo.ocr.available === false;
+  const claimContext = result?.claim_context || formatInfo?.claim_context || {};
+  const claimText = claimContext.intended_use || DEFAULT_CLAIM_WORDING;
+  const clinicalUse = result?.clinical_use_status || {};
+  const clinicalUseStatus = clinicalUse.status || 'pending';
+  const machineFields = result?.machine_reported?.fields || {};
+  const hasMachineReported = Object.values(machineFields).some((field) => field?.value !== null && field?.value !== undefined);
+  const rhythm = result?.rhythm || {};
+  // Prefer the backend-resolved axis (falls back to machine-OCR'd axis when the
+  // signal-computed one is unavailable, e.g. single-lead image uploads) over the
+  // raw self-computed-only measurements.axis_category.
+  const axisCategory = result?.axis || measurements.axis_category || {};
+  const leadIIName = orderedLeads.find((name) => name?.toUpperCase() === 'II');
+  const leadIIValues = leadIIName ? result?.waveform?.[leadIIName] : null;
+
+  const renderMetricTile = ({ key, label, unit, approx, normal }) => {
+    const metric = measurements[key] || {};
+    const machine = machineFields[key] || {};
+    const usedMachine = machine.value !== null && machine.value !== undefined;
+    const value = usedMachine ? machine.value : metric.value;
+    const hasValue = value !== null && value !== undefined;
+    const status = metricStatus({ value }, normal);
+    const token = statusToken(status, dk);
+    return (
+      <div key={key} className={`rounded-xl border p-3 ${token.card}`}>
+        <div className="flex items-start justify-between gap-2">
+          <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>
+            {label}{approx && !usedMachine && <span className="ml-1 opacity-60">~</span>}
+          </p>
+          <StatusBadge status={status} dk={dk} />
+        </div>
+        {hasValue ? (
+          <p className={`mt-1 text-xl font-bold ${token.text}`}>
+            {value}<span className={`ml-1 text-[10px] font-normal ${subText}`}>{unit}</span>
+          </p>
+        ) : (
+          <p className={`mt-2 text-[11px] font-semibold ${subText}`}>
+            - <span className="text-[9px]">{REASON_TEXT[metric.reason] || metric.reason || 'unavailable'}</span>
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const rhythmWhy = [
+    rhythm.rr_cv !== null && rhythm.rr_cv !== undefined ? `RR CV ${rhythm.rr_cv}` : null,
+    rhythm.p_wave_fraction !== null && rhythm.p_wave_fraction !== undefined
+      ? `P wave ${rhythm.p_waves_detected}/${rhythm.beats_evaluated}`
+      : null,
+    rhythm.afib_probability !== null && rhythm.afib_probability !== undefined
+      ? `AFIB ${rhythm.afib_probability}`
+      : null,
+  ].filter(Boolean).join(' · ');
+  const rhythmStatus = rhythm.label
+    ? (rhythm.label.toLowerCase().startsWith('normal sinus') ? 'normal' : 'abnormal')
+    : 'unavailable';
+  const resultDate = new Date();
+  const patientInfo = {
+    mrn: selectedPatient?.id_card || selectedPatient?.id?.slice?.(0, 10) || 'ไม่ระบุ',
+    name: selectedPatient?.name || 'ไม่ระบุชื่อผู้ป่วย',
+    age: selectedPatient?.age ? `${selectedPatient.age} years old` : '-',
+    gender: selectedPatient?.gender || '-',
+    date: resultDate.toLocaleDateString('en-GB'),
+    time: resultDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+  };
+  const getMetricValue = (key, fallback = '-') => {
+    const machine = machineFields?.[key];
+    if (machine?.value !== null && machine?.value !== undefined) return machine.value;
+    const metric = measurements?.[key];
+    return metric?.value !== null && metric?.value !== undefined ? metric.value : fallback;
+  };
+  const primaryFinding = result?.findings?.primary;
+  const findingItems = result?.findings?.items || [];
+  const topLabel = primaryFinding?.label || result?.classification?.top_label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
+  const topProbability = result?.classification?.top_probability;
+  const isPathological = primaryFinding
+    ? !['normal', 'unavailable'].includes(primaryFinding.severity)
+    : result?.classification?.top_label && result.classification.top_label !== 'NORM';
+  const predictionItems = [
+    ...findingItems.map((finding) => ({
+      label: finding.label,
+      probability: null,
+      status: finding.severity,
+    })),
+    rhythm.label ? { label: rhythm.label, probability: rhythm.afib_probability, status: rhythmStatus } : null,
+    axisCategory.category ? { label: `Axis: ${axisCategory.category}`, probability: null, status: axisCategory.category === 'Normal' ? 'normal' : 'abnormal' } : null,
+    ...((result?.classification?.labels || []).slice(0, 6).map((label) => {
+      const probability = result.classification.probabilities?.[label] ?? 0;
+      return {
+        label,
+        probability,
+        status: label === 'NORM' ? (probability > 0.5 ? 'normal' : 'unavailable') : (probability > 0.35 ? 'abnormal' : 'unavailable'),
+      };
+    })),
+  ].filter(Boolean);
 
   return (
     <div className="flex flex-col gap-5">
       {/* Input */}
       <div className={`rounded-2xl border p-4 ${surface}`}>
         <div className={`text-xs font-semibold mb-3 ${secLabel}`}>1 · เลือก ECG จริง</div>
+
+        <div className={`mb-3 rounded-lg border p-2.5 ${dk ? 'border-sky-500/20 bg-sky-500/[0.06]' : 'border-sky-200 bg-sky-50'}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>Clinician CDS claim</p>
+          <p className={`mt-1 text-[10px] leading-relaxed ${dk ? 'text-slate-300' : 'text-slate-700'}`}>{claimText}</p>
+        </div>
 
         {samples.length > 0 && (
           <>
@@ -188,7 +601,7 @@ export default function ClinicalEcgAnalyzer() {
             </label>
             <select
               value={sampleId}
-              onChange={(e) => { setSampleId(e.target.value); setUploadedFiles(null); setError(''); }}
+              onChange={(e) => { setSampleId(e.target.value); setUploadedFiles(null); setHighlightedLead(null); setError(''); }}
               disabled={!!uploadedFiles}
               className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${uploadedFiles ? 'opacity-50' : ''}`}
             >
@@ -213,6 +626,7 @@ export default function ClinicalEcgAnalyzer() {
               const list = Array.from(e.target.files || []); 
               setUploadedFiles(list.length > 0 ? list : null); 
               setSampleId(''); 
+              setHighlightedLead(null);
               setError(''); 
             }} />
         </label>
@@ -220,6 +634,14 @@ export default function ClinicalEcgAnalyzer() {
           รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
           รูปถ่าย ECG (.png/.jpg) = <b>BETA</b> single-lead
         </p>
+        {ocrUnavailable && (
+          <div className={`mb-3 flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
+            <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${dk ? 'text-amber-400' : 'text-amber-600'}`} />
+            <p className={`text-[10px] leading-relaxed ${dk ? 'text-amber-300/90' : 'text-amber-700'}`}>
+              OCR unavailable, waveform digitization still works.
+            </p>
+          </div>
+        )}
         <button
           onClick={analyze}
           disabled={loading}
@@ -230,6 +652,16 @@ export default function ClinicalEcgAnalyzer() {
         </button>
         {error && <p className="mt-2 text-[11px] text-rose-500">{error}</p>}
       </div>
+
+      {imagePreviewUrl && (
+        <EcgImageOverlay
+          imageUrl={imagePreviewUrl}
+          overlay={digitizationOverlay}
+          dk={dk}
+          highlightedLead={highlightedLead}
+          onHighlight={setHighlightedLead}
+        />
+      )}
 
       {result && (
         <>
@@ -243,45 +675,30 @@ export default function ClinicalEcgAnalyzer() {
             </div>
           )}
 
-          {/* Lead system + measurements */}
-          <div className={`rounded-2xl border p-4 ${surface}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <HeartPulse size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
-                <span className={`text-xs font-semibold ${secLabel}`}>3 · ค่าที่วัดได้ (Measurement Results)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase ${
-                  result.lead_system === 'clinical_12'
-                    ? dk ? 'border-sky-500/30 text-sky-300 bg-sky-500/10' : 'border-sky-300 text-sky-700 bg-sky-50'
-                    : dk ? 'border-slate-600 text-slate-400 bg-white/[0.03]' : 'border-slate-300 text-slate-500 bg-slate-50'
-                }`}>
-                  {result.lead_system} · {result.lead_names?.length} leads
-                </span>
-                <button
-                  onClick={saveToRecord}
-                  disabled={saving}
-                  title={selectedPatient ? `บันทึกเข้าเวชระเบียน ${selectedPatient.name}` : 'เลือกผู้ป่วยก่อน'}
-                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition active:scale-95 ${
-                    dk ? 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
-                  }`}
-                >
-                  {saving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
-                  บันทึก
-                </button>
-                <button
-                  onClick={downloadPdf}
-                  disabled={pdfLoading}
-                  className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition active:scale-95 ${
-                    dk ? 'border-white/[0.1] text-slate-300 hover:bg-white/[0.05]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {pdfLoading ? <Loader2 size={11} className="animate-spin" /> : <FileDown size={11} />}
-                  PDF
-                </button>
-              </div>
+          <div className={`flex gap-2 rounded-xl border p-2.5 ${
+            clinicalUseStatus === 'eligible_for_review'
+              ? (dk ? 'border-emerald-500/25 bg-emerald-500/[0.06]' : 'border-emerald-300 bg-emerald-50')
+              : clinicalUseStatus === 'not_supported'
+                ? (dk ? 'border-rose-500/25 bg-rose-500/[0.07]' : 'border-rose-300 bg-rose-50')
+                : (dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50')
+          }`}>
+            <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${
+              clinicalUseStatus === 'eligible_for_review'
+                ? 'text-emerald-500'
+                : clinicalUseStatus === 'not_supported' ? 'text-rose-500' : 'text-amber-500'
+            }`} />
+            <div>
+              <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
+                Clinical use status: {clinicalUseStatus}
+              </p>
+              <p className={`mt-0.5 text-[10px] leading-relaxed ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
+                {(clinicalUse.reasons || []).length ? `Gate reasons: ${clinicalUse.reasons.join(', ')}` : 'Eligible for clinician review with sign-off.'}
+                {(clinicalUse.flags || []).length ? ` Flags: ${clinicalUse.flags.join(', ')}` : ''}
+              </p>
             </div>
+          </div>
 
+          <div className={`overflow-hidden rounded-[22px] border p-4 shadow-sm ${dk ? 'border-white/[0.07] bg-[#0b1220]' : 'border-slate-200 bg-white'}`}>
             {result.ground_truth_label && (
               <div className={`mb-3 flex items-center gap-2 rounded-xl border p-2.5 ${dk ? 'bg-emerald-500/[0.08] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
                 <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />
@@ -290,161 +707,307 @@ export default function ClinicalEcgAnalyzer() {
                 </span>
               </div>
             )}
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {METRICS.map(({ key, label, unit, approx, normal }) => {
-                const m = result.measurements?.[key] || {};
-                const has = m.value !== null && m.value !== undefined;
-                const abnormal = has && normal && (m.value < normal[0] || m.value > normal[1]);
-                return (
-                  <div key={key} className={`rounded-xl border p-2.5 ${dk ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
-                    <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>
-                      {label}{approx && <span className="ml-1 opacity-60">≈</span>}
-                    </p>
-                    {has ? (
-                      <p className={`text-lg font-bold mt-0.5 ${abnormal ? 'text-amber-500' : mainText}`}>
-                        {m.value}<span className={`text-[10px] font-normal ml-1 ${subText}`}>{unit}</span>
-                      </p>
-                    ) : (
-                      <p className={`text-xs font-semibold mt-1 ${subText}`}>— <span className="text-[9px]">{REASON_TEXT[m.reason] || m.reason}</span></p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className={`mt-3 flex gap-2 rounded-lg border p-2 ${dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50'}`}>
-              <Info size={12} className={`shrink-0 mt-0.5 ${subText}`} />
-              <p className={`text-[10px] leading-relaxed ${subText}`}>
-                วัดจาก lead <b>{result.measurements?.lead_used}</b> ด้วย neurokit2. ค่าที่มี <b>≈</b> (PR/QRS/QT/QTc)
-                เป็น open-source delineation = <b>ค่าประมาณคร่าวๆ คลาดเคลื่อนได้มาก (โดยเฉพาะ QRS width)</b> ไม่ใช้วัดทางคลินิก.
-                <b>HR และ rhythm/วินิจฉัย</b> เชื่อถือได้กว่า.
-              </p>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-150 dark:border-white/[0.05]">
-              <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${secLabel}`}>
-                เอกสารแนบรายงานส่งต่อ (Attachments - สูงสุด 5 ไฟล์)
-              </p>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {attachments.map((f, i) => (
-                  <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${
-                    dk ? 'bg-white/[0.04] border-white/[0.08] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                  }`}>
-                    {f.name}
-                    <button
-                      onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))}
-                      className="ml-1 text-rose-500 hover:text-rose-600 font-bold"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <label className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-semibold cursor-pointer transition ${
-                dk ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}>
-                <Upload size={11} /> เพิ่มไฟล์ประวัติ/รายงานส่งต่อ...
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  className="hidden"
-                  onChange={(e) => {
-                    const list = Array.from(e.target.files || []);
-                    setAttachments([...attachments, ...list]);
-                  }}
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Diagnostic classification (PTB-XL) */}
-          <div className={`rounded-2xl border p-4 ${surface}`}>
-            <div className={`text-xs font-semibold mb-3 flex items-center gap-2 ${secLabel}`}>
-              <HeartPulse size={14} /> วินิจฉัยเบื้องต้น (Interpretation)
-            </div>
-            {result.classification ? (
-              <div className="flex flex-col gap-2">
-                <div className={`text-sm font-bold ${mainText}`}>
-                  {result.classification.top_label}
-                  <span className={`text-[11px] font-normal ml-2 ${subText}`}>
-                    {Math.round(result.classification.top_probability * 100)}% · {result.classification.model}
-                  </span>
+            <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className={`rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">1</span>
+                  <h3 className={`text-sm font-bold ${mainText}`}>Patient Information</h3>
                 </div>
-                {result.classification.labels.map((lb) => {
-                  const p = result.classification.probabilities[lb] ?? 0;
-                  return (
-                    <div key={lb} className="flex items-center gap-2">
-                      <span className={`w-14 text-[10px] font-semibold ${subText}`}>{lb}</span>
-                      <div className={`flex-1 h-2 rounded-full overflow-hidden ${dk ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
-                        <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.round(p * 100)}%` }} />
-                      </div>
-                      <span className={`w-9 text-right text-[10px] font-mono ${subText}`}>{Math.round(p * 100)}%</span>
-                    </div>
-                  );
-                })}
+                <div className="grid grid-cols-1 gap-x-5 gap-y-1 sm:grid-cols-2">
+                  <InfoPair dk={dk} label="MRN:" value={patientInfo.mrn} />
+                  <InfoPair dk={dk} label="Gender:" value={patientInfo.gender} />
+                  <InfoPair dk={dk} label="Name:" value={patientInfo.name} />
+                  <InfoPair dk={dk} label="ECG Date:" value={patientInfo.date} />
+                  <InfoPair dk={dk} label="Age:" value={patientInfo.age} />
+                  <InfoPair dk={dk} label="ECG Time:" value={patientInfo.time} />
+                </div>
+              </div>
+
+              <div className={`rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">2</span>
+                    <h3 className={`text-sm font-bold ${mainText}`}>ECG Measurements</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setErQuickMode((v) => !v)}
+                    className={`text-[11px] font-bold ${erQuickMode ? 'text-rose-500' : dk ? 'text-sky-300' : 'text-sky-600'}`}
+                  >
+                    {erQuickMode ? 'Full View' : 'ER Quick'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-x-5 gap-y-1 sm:grid-cols-2">
+                  <InfoPair dk={dk} label="Heart Rate:" value={`${getMetricValue('heart_rate_bpm')} bpm`} />
+                  <InfoPair
+                    dk={dk}
+                    label="Rhythm:"
+                    value={rhythm.label || REASON_TEXT[rhythm.reason] || 'Unavailable'}
+                    valueClassName={statusToken(rhythmStatus, dk).text}
+                  />
+                  <InfoPair
+                    dk={dk}
+                    label="Axis:"
+                    value={axisCategory.category ? `${axisCategory.category} (${axisCategory.degrees}°)` : (REASON_TEXT[axisCategory.reason] || 'Unavailable')}
+                    valueClassName={statusToken(axisCategory.category ? (axisCategory.category === 'Normal' ? 'normal' : 'abnormal') : 'unavailable', dk).text}
+                  />
+                </div>
+                <p className={`mt-2 text-[10px] font-semibold ${hasMachineReported ? (dk ? 'text-cyan-300' : 'text-cyan-700') : subText}`}>
+                  Source: {hasMachineReported ? 'machine OCR header' : `computed waveform lead ${measurements.lead_used || '-'}`}
+                </p>
+              </div>
+            </div>
+
+            {erQuickMode ? (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_1fr]">
+                <div className={`rounded-xl border p-4 ${dk ? 'border-rose-500/25 bg-rose-500/[0.06]' : 'border-rose-200 bg-rose-50'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-rose-300' : 'text-rose-700'}`}>Emergency Lead-II Screen</p>
+                  <p className={`mt-2 text-5xl font-black leading-none ${dk ? 'text-white' : 'text-slate-950'}`}>
+                    {getMetricValue('heart_rate_bpm')}<span className={`ml-2 text-sm font-semibold ${subText}`}>bpm</span>
+                  </p>
+                  <p className={`mt-3 text-sm font-bold ${rhythmStatus === 'abnormal' ? 'text-rose-500' : dk ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                    {rhythm.label || REASON_TEXT[rhythm.reason] || 'Rhythm unavailable'}
+                  </p>
+                  {rhythmWhy && <p className={`mt-1 text-[11px] ${subText}`}>{rhythmWhy}</p>}
+                </div>
+                <div className="min-h-[230px]">
+                  <EcgPaperChart waveform={result.waveform} dk={dk} compact />
+                </div>
               </div>
             ) : (
-              <div className={`flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50'}`}>
-                <Info size={12} className={`shrink-0 mt-0.5 ${subText}`} />
-                <p className={`text-[10px] leading-relaxed ${subText}`}>{result.classification_note}</p>
+              <div className="flex flex-col gap-5">
+                <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {renderMetricTile(RATE_METRIC)}
+                  <div className={`rounded-xl border p-3 ${statusToken(rhythmStatus, dk).card}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>Rhythm</p>
+                      <StatusBadge status={rhythmStatus} dk={dk} />
+                    </div>
+                    <p className={`mt-1 text-base font-bold ${rhythm.label ? statusToken(rhythmStatus, dk).text : subText}`}>
+                      {rhythm.label || REASON_TEXT[rhythm.reason] || rhythm.reason || 'Unavailable'}
+                    </p>
+                    {rhythmWhy && <p className={`mt-1 text-[9px] ${subText}`}>{rhythmWhy}</p>}
+                  </div>
+                  <div className={`rounded-xl border p-3 ${statusToken(axisCategory.category ? (axisCategory.category === 'Normal' ? 'normal' : 'abnormal') : 'unavailable', dk).card}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>Axis</p>
+                      <StatusBadge status={axisCategory.category ? (axisCategory.category === 'Normal' ? 'normal' : 'abnormal') : 'unavailable'} dk={dk} />
+                    </div>
+                    <p className={`mt-1 text-base font-bold ${axisCategory.category ? statusToken(axisCategory.category === 'Normal' ? 'normal' : 'abnormal', dk).text : subText}`}>
+                      {axisCategory.category || REASON_TEXT[axisCategory.reason] || axisCategory.reason || 'Unavailable'}
+                    </p>
+                    {axisCategory.degrees !== null && axisCategory.degrees !== undefined && (
+                      <p className={`mt-1 text-[9px] ${subText}`}>
+                        {axisCategory.degrees}° frontal QRS axis{axisCategory.source === 'machine_ocr' && ' · จากเครื่อง (OCR)'}
+                      </p>
+                    )}
+                  </div>
+                  {renderMetricTile(METRICS.find((m) => m.key === 'qrs_ms'))}
+                </section>
+                <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {INTERVAL_METRICS.map(renderMetricTile)}
+                </section>
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+                <section>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">3</span>
+                      <h3 className={`text-base font-black ${mainText}`}>ECG Chart</h3>
+                      <Info size={13} className={subText} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={saveToRecord}
+                        disabled={saving}
+                        className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:opacity-60"
+                      >
+                        {saving ? <Loader2 size={13} className="animate-spin" /> : <Bookmark size={13} />}
+                        Saved
+                      </button>
+                      <button
+                        onClick={downloadPdf}
+                        disabled={pdfLoading}
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${dk ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                      >
+                        {pdfLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+                        PDF
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-[560px]">
+                    <EcgPaperChart waveform={result.waveform} dk={dk} />
+                  </div>
+                </section>
+
+                <aside>
+                  <div className="mb-3 flex items-center gap-2">
+                    <h3 className={`text-base font-black ${mainText}`}>AI Predictions</h3>
+                    <Info size={13} className={subText} />
+                    <span className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">4</span>
+                  </div>
+                  <div className={`overflow-hidden rounded-xl border ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
+                    <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500 px-3 py-3 text-white">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black">BIOELECTRIC ECG AI</p>
+                        <p className="text-[10px] font-semibold opacity-80">{result.classification?.model || 'signal-derived measurements'}</p>
+                        <p className="text-[9px] font-semibold opacity-70">
+                          {result.classification?.validation?.val_macro_auc != null
+                            ? `val macroAUC ${result.classification.validation.val_macro_auc.toFixed(3)} · n=${result.classification.validation.n_val_records} · ${result.classification.validation.full_dataset ? 'full dataset' : `subset=${result.classification.validation.subset_arg}`}`
+                            : result.classification
+                              ? 'ยังไม่มีเลข validation จริงบันทึกไว้ (checkpoint เก่า) — ห้ามเชื่อ % ด้านบนเป็นความแม่นยำ'
+                              : ''}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${isPathological ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                        {isPathological ? 'REVIEW' : 'SCREEN OK'}
+                      </span>
+                      <div className="flex items-center gap-1 opacity-80">
+                        <ThumbsUp size={13} />
+                        <ThumbsDown size={13} />
+                        <ChevronDown size={14} />
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <div className={`mb-3 rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-slate-950/40' : 'border-slate-100 bg-slate-50'}`}>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Primary output</p>
+                        <p className={`mt-1 text-lg font-black ${mainText}`}>{topLabel}</p>
+                        <p className={`text-[11px] ${subText}`}>
+                          {topProbability !== null && topProbability !== undefined ? `${Math.round(topProbability * 100)}% confidence · ` : ''}
+                          Axis {axisCategory.category || '-'} · Lead {measurements.lead_used || '-'}
+                        </p>
+                        {primaryFinding?.criteria?.length > 0 && (
+                          <ul className={`mt-2 space-y-1 text-[10px] ${subText}`}>
+                            {primaryFinding.criteria.slice(0, 3).map((criterion) => (
+                              <li key={criterion}>• {criterion}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Predicted Classes</p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {predictionItems.length ? predictionItems.map((item) => (
+                          <PredictionChip key={`${item.label}-${item.probability}`} dk={dk} {...item} />
+                        )) : (
+                          <div className={`rounded-lg border p-3 text-xs ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-100 text-slate-500'}`}>
+                            No classifier output available.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
               </div>
             )}
-          </div>
 
-          {/* 12-lead waveform */}
-          <div className={`rounded-2xl border p-4 ${surface}`}>
-            <div className={`text-xs font-semibold mb-3 flex items-center gap-2 ${secLabel}`}>
-              <Activity size={14} /> คลื่น ECG จริง ({orderedLeads.length}-lead · {result.sample_rate_hz} Hz)
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {orderedLeads.map((name) => (
-                <LeadTrace key={name} name={name} values={result.waveform[name]} dk={dk} />
-              ))}
-            </div>
-          </div>
-
-          {/* Signal quality */}
-          {q && (
-            <div className={`rounded-2xl border p-3 ${surface}`}>
-              <div className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>
-                Signal Quality · {q.status} · {q.score}/100
+            {digitizationReport && (
+              <div className={`mt-4 rounded-xl border p-3 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className={`text-[10px] font-black uppercase tracking-wider ${secLabel}`}>Digitization report</p>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${dk ? 'border-cyan-500/25 text-cyan-300 bg-cyan-500/10' : 'border-cyan-200 text-cyan-700 bg-white'}`}>
+                    {digitizationReport.layout} · {digitizationQuality.status || 'unknown'} · {recoveredDigitizedLeads.length}/{digitizedLeadRows.length} leads
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-1 gap-2 text-[10px] md:grid-cols-3">
+                  <div className={subText}>Calibration: <b>{digitizationReport.calibration?.source || '-'}</b></div>
+                  <div className={subText}>px/mm: <b>{digitizationReport.calibration?.px_per_mm ?? '-'}</b></div>
+                  <div className={subText}>
+                    Recovered:
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {(digitizationReport.recovered_leads || []).length ? (
+                        (digitizationReport.recovered_leads || []).map((lead) => (
+                          <button
+                            key={lead}
+                            type="button"
+                            onClick={() => setHighlightedLead(lead)}
+                            className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+                              highlightedLead?.toUpperCase() === lead.toUpperCase()
+                                ? 'border-sky-400 bg-sky-500/15 text-sky-400'
+                                : dk ? 'border-white/[0.08] text-slate-300' : 'border-slate-200 text-slate-600 bg-white'
+                            }`}
+                          >
+                            {lead}
+                          </button>
+                        ))
+                      ) : (
+                        <b>-</b>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {(digitizationQuality.missing_leads || []).length > 0 && (
+                  <p className={`mt-2 text-[10px] font-semibold ${dk ? 'text-amber-300' : 'text-amber-700'}`}>
+                    Missing leads: {digitizationQuality.missing_leads.join(', ')}
+                  </p>
+                )}
               </div>
-              <div className={`mt-1 text-[11px] ${subText}`}>
-                {q.active_leads}/{q.n_leads} active leads · {q.duration_sec}s · noise {q.noise_ratio}
+            )}
+
+            <div className={`mt-4 flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
+              <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${dk ? 'text-amber-400' : 'text-amber-600'}`} />
+              <p className={`text-[10px] leading-relaxed ${dk ? 'text-amber-300/80' : 'text-amber-700'}`}>
+                {result.disclaimer} OCR/machine values are kept separate from self-computed measurements.
+              </p>
+            </div>
+          </div>
+
+          {(q || result.localization_note || result.localization) && (
+            <div className={`rounded-2xl border p-3 ${surface}`}>
+              {q && (
+                <>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>
+                    Signal Quality · {q.status} · {q.score}/100
+                  </div>
+                  <div className={`mt-1 text-[11px] ${subText}`}>
+                    {q.active_leads}/{q.n_leads} active leads · {q.duration_sec}s · noise {q.noise_ratio}
+                  </div>
+                </>
+              )}
+              <div className={`${q ? 'mt-2 pt-2 border-t border-slate-150 dark:border-white/[0.05]' : ''} text-[11px] ${subText}`}>
+                <span className={`font-bold uppercase tracking-wider text-[10px] ${result.localization ? (dk ? 'text-sky-300' : 'text-sky-700') : (dk ? 'text-amber-300' : 'text-amber-700')}`}>
+                  3D Localization:
+                </span>{' '}
+                {result.localization
+                  ? `region ${result.localization.region?.label || '—'}`
+                  : result.localization_note}
               </div>
             </div>
           )}
 
-          {/* Localization gating — honest */}
-          <div className={`rounded-2xl border p-3 ${
-            result.localization
-              ? dk ? 'bg-sky-500/[0.06] border-sky-500/20' : 'bg-sky-50 border-sky-200'
-              : dk ? 'bg-amber-500/[0.06] border-amber-500/25' : 'bg-amber-50 border-amber-200'
-          }`}>
-            <div className={`text-[10px] font-bold uppercase tracking-wider ${
-              result.localization ? (dk ? 'text-sky-300' : 'text-sky-700') : (dk ? 'text-amber-300' : 'text-amber-700')
-            }`}>
-              3D Localization
-            </div>
-            {result.localization ? (
-              <p className={`mt-1 text-[11px] ${subText}`}>
-                รันบนสัญญาณ synthetic-compatible · region {result.localization.region?.label || '—'}
-              </p>
-            ) : (
-              <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>
-                {result.localization_note}
-              </p>
-            )}
-          </div>
-
-          {/* Disclaimer */}
-          <div className={`flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
-            <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${dk ? 'text-amber-400' : 'text-amber-600'}`} />
-            <p className={`text-[10px] leading-relaxed ${dk ? 'text-amber-300/80' : 'text-amber-700'}`}>
-              {result.disclaimer}
+          <div className={`rounded-2xl border p-4 ${surface}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${secLabel}`}>
+              เอกสารแนบรายงานส่งต่อ (Attachments - สูงสุด 5 ไฟล์)
             </p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {attachments.map((f, i) => (
+                <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md border ${
+                  dk ? 'bg-white/[0.04] border-white/[0.08] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  {f.name}
+                  <button
+                    onClick={() => setAttachments(attachments.filter((_, idx) => idx !== i))}
+                    className="ml-1 text-rose-500 hover:text-rose-600 font-bold"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <label className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-semibold cursor-pointer transition ${
+              dk ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}>
+              <Upload size={11} /> เพิ่มไฟล์ประวัติ/รายงานส่งต่อ...
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.png,.jpg,.jpeg"
+                className="hidden"
+                onChange={(e) => {
+                  const list = Array.from(e.target.files || []);
+                  setAttachments([...attachments, ...list]);
+                }}
+              />
+            </label>
           </div>
         </>
       )}
