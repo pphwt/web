@@ -338,9 +338,7 @@ const Analysis = () => {
           : await modelApi.analyzeFile(file)
         : await modelApi.analyzeSample(sampleId);
       setResult(analyzed);
-      if (analyzed?.source) {
-        setActiveVisualizerTab('3d');
-      }
+      setActiveVisualizerTab('3d');
     } catch (e) {
       showToast(`วิเคราะห์ไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
@@ -451,6 +449,24 @@ const Analysis = () => {
     };
   }, [result]);
 
+  const imageHeartContext = useMemo(() => {
+    if (!imagePreviewUrl) return null;
+    return {
+      localization_coords: null,
+      ai_confidence: 0,
+      aha: {
+        segment: 0,
+        label: 'ECG Image Review',
+        territory: 'Screening',
+        risk: 'LOW',
+      },
+      activation_map: Array(75).fill(0.5),
+      top5_nodes: [],
+    };
+  }, [imagePreviewUrl]);
+
+  const visualizerHeartResult = heartResult || imageHeartContext;
+
   // ── tokens ──────────────────────────────────────────────────────
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
   const divider = dk ? 'border-white/[0.06]' : 'border-slate-100';
@@ -541,9 +557,7 @@ const Analysis = () => {
                 )}
               </div>
               <div className="h-[460px]">
-                {activeVisualizerTab === '3d' && heartResult ? (
-                  <HeartModel3D result={heartResult} />
-                ) : imagePreviewUrl ? (
+                {activeVisualizerTab === 'image' && imagePreviewUrl ? (
                   <div className="flex h-full flex-col gap-2 p-3">
                     <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
                       <img
@@ -552,12 +566,9 @@ const Analysis = () => {
                         className="h-full w-full object-contain"
                       />
                     </div>
-                    {heartResult && (
-                      <p className={`text-[10px] leading-relaxed text-emerald-500`}>
-                        ถอดรหัสคลื่น ECG และคำนวณตำแหน่ง 3D สำเร็จ! สลับไปที่แท็บ "โมเดลหัวใจ 3D" ด้านบนเพื่อดูตำแหน่ง
-                      </p>
-                    )}
                   </div>
+                ) : visualizerHeartResult ? (
+                  <HeartModel3D result={visualizerHeartResult} />
                 ) : (
                   <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
                     <Activity size={28} className="opacity-40" />
@@ -645,7 +656,10 @@ const Analysis = () => {
                   onChange={(e) => {
                     const nextFile = e.target.files?.[0] || null;
                     setFile(nextFile);
-                    if (nextFile) setSampleId('');
+                    if (nextFile) {
+                      setSampleId('');
+                      setActiveVisualizerTab('3d');
+                    }
                   }}
                 />
               </label>
