@@ -19,6 +19,29 @@ const ECG_12_LAYOUT = [
   ['III', 'aVF', 'V3', 'V6'],
 ];
 
+const isImageEcgFile = (file) => {
+  if (!file) return false;
+  return file.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name || '');
+};
+
+const canonicalLeadName = (name) => {
+  const upper = String(name || '').trim().toUpperCase();
+  return {
+    I: 'I',
+    II: 'II',
+    III: 'III',
+    AVR: 'aVR',
+    AVL: 'aVL',
+    AVF: 'aVF',
+    V1: 'V1',
+    V2: 'V2',
+    V3: 'V3',
+    V4: 'V4',
+    V5: 'V5',
+    V6: 'V6',
+  }[upper] || String(name || '').trim();
+};
+
 const makeLeadPolyline = (series, x, y, width, height, maxPoints = 180) => {
   if (!series || series.length < 2) return '';
   const step = Math.max(1, Math.floor(series.length / maxPoints));
@@ -49,7 +72,20 @@ const deriveLead = (left, right, fn) => {
 };
 
 const buildLeadMap = (leads) => {
-  if (!leads?.length) return {};
+  if (leads?.leads) return buildLeadMap(leads.leads);
+  if (!leads) return {};
+
+  if (!Array.isArray(leads) && typeof leads === 'object') {
+    const map = {};
+    Object.entries(leads).forEach(([name, series]) => {
+      if (!Array.isArray(series)) return;
+      const lead = canonicalLeadName(name);
+      map[lead] = { series, source: 'recorded' };
+    });
+    return map;
+  }
+
+  if (!leads.length) return {};
   const channelCount = Array.isArray(leads[0]) ? leads[0].length : 0;
   const names = channelCount >= 12
     ? STANDARD_12_LEADS
@@ -88,14 +124,23 @@ const buildLeadMap = (leads) => {
   return map;
 };
 
+const waveformChannelCount = (waveform) => {
+  if (waveform?.leads) return waveformChannelCount(waveform.leads);
+  if (Array.isArray(waveform)) return Array.isArray(waveform[0]) ? waveform[0].length : 0;
+  if (waveform && typeof waveform === 'object') {
+    return Object.values(waveform).filter(Array.isArray).length;
+  }
+  return 0;
+};
+
 // Static 12-lead ECG waveform plot for doctor-facing referral support.
 function WaveformPlot({ leads, dk }) {
   const leadMap = useMemo(() => buildLeadMap(leads), [leads]);
   const availableCount = STANDARD_12_LEADS.filter((lead) => leadMap[lead]?.series?.length).length;
   const derivedCount = STANDARD_12_LEADS.filter((lead) => leadMap[lead]?.source === 'derived').length;
-  const channelCount = leads?.[0]?.length || 0;
+  const channelCount = waveformChannelCount(leads);
 
-  if (!leads?.length) return null;
+  if (availableCount === 0) return null;
 
   const rowHeight = 210;
   const segmentWidth = 380;
@@ -235,6 +280,7 @@ const Analysis = () => {
   const [clinicianNote, setClinicianNote] = useState('');
   const [datasetInfo, setDatasetInfo] = useState(null);
   const [referralLoading, setReferralLoading] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
 
   // Auto-match patient to a sample signal
   const activeSample = useMemo(() => {
@@ -250,6 +296,16 @@ const Analysis = () => {
       setSampleId(activeSample.id);
     }
   }, [activeSample, file]);
+
+  useEffect(() => {
+    if (!isImageEcgFile(file)) {
+      setImagePreviewUrl('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   useEffect(() => {
     modelApi.samples()
@@ -276,7 +332,9 @@ const Analysis = () => {
     setResult(null);
     try {
       const analyzed = file
-        ? await modelApi.analyzeFile(file)
+        ? isImageEcgFile(file)
+          ? await modelApi.analyzeEcgFile(file)
+          : await modelApi.analyzeFile(file)
         : await modelApi.analyzeSample(sampleId);
       setResult(analyzed);
     } catch (e) {
@@ -455,7 +513,20 @@ const Analysis = () => {
               <div className="h-[460px]">
                 {heartResult
                   ? <HeartModel3D result={heartResult} />
-                  : (
+                  : imagePreviewUrl ? (
+                    <div className="flex h-full flex-col gap-2 p-3">
+                      <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+                        <img
+                          src={imagePreviewUrl}
+                          alt="Uploaded ECG preview"
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <p className={`text-[10px] leading-relaxed ${subText}`}>
+                        รูป ECG จะอ่านผ่าน image digitization และแสดงเป็น 12-lead preview ด้านล่าง; ตำแหน่ง 3D ใช้ได้กับไฟล์สัญญาณ .NPY/.CSV เท่านั้น
+                      </p>
+                    </div>
+                  ) : (
                     <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
                       <Activity size={28} className="opacity-40" />
                       <p className="text-xs">เลือก ECG แล้วกด “ประเมินเพื่อคัดกรอง” เพื่อแสดงตำแหน่ง</p>
@@ -531,12 +602,20 @@ const Analysis = () => {
                 })}
               </select>
 
-              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>หรืออัปโหลดไฟล์ (.npy / .csv)</label>
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>หรืออัปโหลดไฟล์ ECG (.npy / .csv / .png / .jpg)</label>
               <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs cursor-pointer mb-4 transition-all ${dk ? 'border-white/[0.12] text-slate-400 hover:border-sky-500/40 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:border-sky-500 hover:bg-slate-50'}`}>
                 <Upload size={14} />
-                <span className="truncate">{file ? file.name : 'เลือกไฟล์ ECG'}</span>
-                <input type="file" accept=".npy,.csv" className="hidden"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                <span className="truncate">{file ? file.name : 'เลือกไฟล์ ECG หรือรูปภาพ'}</span>
+                <input
+                  type="file"
+                  accept=".npy,.csv,.png,.jpg,.jpeg,image/png,image/jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    const nextFile = e.target.files?.[0] || null;
+                    setFile(nextFile);
+                    if (nextFile) setSampleId('');
+                  }}
+                />
               </label>
               {file && (
                 <button onClick={() => setFile(null)} className={`text-[10px] mb-3 ${dk ? 'text-slate-500' : 'text-slate-400'} hover:underline`}>
@@ -561,7 +640,7 @@ const Analysis = () => {
           </div>
         </div>
 
-        {result?.waveform?.leads && (
+        {result?.waveform && (
           <div className={`rounded-2xl border p-4 ${surface}`}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -569,7 +648,7 @@ const Analysis = () => {
                 <div className={`mt-0.5 text-[10px] ${subText}`}>แสดงเต็มความกว้างตามตำแหน่งมาตรฐาน; lead ที่ไม่มีข้อมูลจริงจะขึ้น Unavailable</div>
               </div>
             </div>
-            <WaveformPlot leads={result.waveform.leads} dk={dk} />
+            <WaveformPlot leads={result.waveform} dk={dk} />
             {datasetInfo && (
               <div className={`mt-2 rounded-xl px-3 py-2 text-[10px] ${
                 dk ? 'bg-white/[0.03] text-slate-400 border border-white/[0.06]' : 'bg-white/70 text-slate-500 border border-slate-100'
@@ -655,8 +734,7 @@ const Analysis = () => {
                 </p>
               </div>
 
-              {result?.source && (
-                <div className={`rounded-xl border p-3 xl:col-span-6 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
+              <div className={`rounded-xl border p-3 xl:col-span-6 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
                   <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
                     {language === 'th' ? 'สถานพยาบาลปลายทาง' : 'Referral Destination'}
                   </label>
@@ -676,8 +754,7 @@ const Analysis = () => {
                     className={`w-full rounded-lg border px-3 py-2 text-xs resize-none transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
                     placeholder="อาการสำคัญ สัญญาณชีพ หรือเหตุผลประกอบการส่งต่อ"
                   />
-                </div>
-              )}
+              </div>
 
               <div className="flex flex-col gap-2 xl:col-span-8 xl:flex-row">
                 {result?.source && (

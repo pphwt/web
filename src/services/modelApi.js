@@ -23,6 +23,19 @@ const parseJson = async (response) => {
 };
 
 const ECG_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_UPLOAD_MAX_BYTES || 2_000_000);
+const ECG_IMAGE_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_IMAGE_UPLOAD_MAX_BYTES || 20_000_000);
+
+const isImageEcgFile = (file) => {
+  if (!file) return false;
+  return file.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name || '');
+};
+
+const assertEcgUploadSize = (file) => {
+  const limit = isImageEcgFile(file) ? ECG_IMAGE_UPLOAD_MAX_BYTES : ECG_UPLOAD_MAX_BYTES;
+  if (file.size > limit) {
+    throw new Error(`ECG file ${file.name || ''} is too large. Max ${(limit / 1024 / 1024).toFixed(1)} MB.`);
+  }
+};
 
 // Clinical /ecg endpoints require JWT (PHI). Attach the stored token.
 const authHeaders = () => {
@@ -68,15 +81,11 @@ export const modelApi = {
     const form = new FormData();
     if (Array.isArray(fileOrFiles)) {
       fileOrFiles.forEach(f => {
-        if (f.size > ECG_UPLOAD_MAX_BYTES) {
-          throw new Error(`ECG file ${f.name} is too large. Max ${(ECG_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(1)} MB.`);
-        }
+        assertEcgUploadSize(f);
         form.append('files', f);
       });
     } else if (fileOrFiles) {
-      if (fileOrFiles.size > ECG_UPLOAD_MAX_BYTES) {
-        throw new Error(`ECG file is too large. Max ${(ECG_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(1)} MB.`);
-      }
+      assertEcgUploadSize(fileOrFiles);
       form.append('file', fileOrFiles);
     }
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
