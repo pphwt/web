@@ -98,13 +98,14 @@ function WaveformPlot({ leads, dk }) {
   if (!leads?.length) return null;
 
   const rowHeight = 128;
-  const segmentWidth = 280;
+  const segmentWidth = 370;
   const left = 36;
   const top = 40;
   const traceColor = dk ? '#334155' : '#3f3f46';
   const labelColor = dk ? '#075985' : '#0369a1';
   const mutedColor = dk ? '#94a3b8' : '#94a3b8';
   const badgeFill = dk ? '#0f172a' : '#ffffff';
+  const totalWidth = 1600;
   const totalHeight = 560;
 
   const renderCalibration = (x, y) => (
@@ -121,7 +122,7 @@ function WaveformPlot({ leads, dk }) {
     const entry = leadMap[lead];
     const x = left + (fullWidth ? 54 : colIndex * segmentWidth + 54);
     const y = top + rowIndex * rowHeight;
-    const width = fullWidth ? 1068 : segmentWidth - 70;
+    const width = fullWidth ? totalWidth - 130 : segmentWidth - 70;
     const height = rowHeight - 20;
     const points = makeLeadPolyline(entry?.series, x, y + 4, width, height, fullWidth ? 360 : 140);
     const unavailable = !points;
@@ -161,8 +162,8 @@ function WaveformPlot({ leads, dk }) {
       </div>
 
       <div className="overflow-x-auto rounded-lg">
-        <div className="max-w-none" style={{ width: '100%', minWidth: '760px', aspectRatio: '1200 / 560' }}>
-          <svg viewBox={`0 0 1200 ${totalHeight}`} className="block h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80" preserveAspectRatio="xMidYMid meet">
+        <div className="max-w-none" style={{ width: '100%', minWidth: '1180px', aspectRatio: '1600 / 560' }}>
+          <svg viewBox={`0 0 ${totalWidth} ${totalHeight}`} className="block h-full w-full rounded-lg border border-rose-200/70 bg-rose-50/80" preserveAspectRatio="xMidYMid meet">
             <defs>
               <pattern id="analysis-ecg-minor-grid" width="10" height="10" patternUnits="userSpaceOnUse">
                 <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#fecdd3" strokeWidth="0.65" />
@@ -172,13 +173,14 @@ function WaveformPlot({ leads, dk }) {
                 <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#fda4af" strokeWidth="1" />
               </pattern>
             </defs>
-            <rect width="1200" height={totalHeight} fill="url(#analysis-ecg-major-grid)" />
+            <rect width={totalWidth} height={totalHeight} fill="url(#analysis-ecg-major-grid)" />
             {ECG_12_LAYOUT.map((row, rowIndex) => (
               row.map((lead, colIndex) => renderLead(lead, rowIndex, colIndex))
             ))}
             {renderLead('II', 3, 0, true)}
           </svg>
         </div>
+
       </div>
     </div>
   );
@@ -460,24 +462,6 @@ const Analysis = () => {
               </div>
             </div>
 
-            {result?.waveform?.leads && (
-              <div className={`rounded-2xl border p-4 ${surface}`}>
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className={`text-xs font-semibold ${secLabel}`}>คลื่น ECG ที่วิเคราะห์ · 12-lead view</div>
-                    <div className={`mt-0.5 text-[10px] ${subText}`}>แสดงตามตำแหน่งมาตรฐาน; lead ที่ไม่มีข้อมูลจริงจะขึ้น Unavailable</div>
-                  </div>
-                </div>
-                <WaveformPlot leads={result.waveform.leads} dk={dk} />
-                {datasetInfo && (
-                  <div className={`mt-2 rounded-xl px-3 py-2 text-[10px] ${
-                    dk ? 'bg-white/[0.03] text-slate-400 border border-white/[0.06]' : 'bg-white/70 text-slate-500 border border-slate-100'
-                  }`}>
-                    Model API: localizer.pt · {datasetInfo.doi}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Right: controls + honest result */}
@@ -572,177 +556,192 @@ const Analysis = () => {
               </button>
             </div>
 
-            {/* Result */}
-            {result && (
-              <div className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPin size={14} style={{ color: riskColor }} />
-                  <span className={`text-xs font-semibold ${secLabel}`}>3 · ผลคัดกรองเพื่อส่งต่อ</span>
-                </div>
+          </div>
+        </div>
 
-                {signalQuality && (
-                  <div className={`rounded-xl border p-3 mb-3 transition-all duration-300 hover:scale-[1.01] ${
-                    signalQuality.status === 'FAIL'
-                      ? dk ? 'bg-rose-500/[0.08] border-rose-500/25 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'bg-rose-50 border-rose-200 shadow-sm'
-                      : signalQuality.status === 'WARN'
-                      ? dk ? 'bg-amber-500/[0.08] border-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.05)]' : 'bg-amber-50 border-amber-200 shadow-sm'
-                      : dk ? 'bg-emerald-500/[0.07] border-emerald-500/25 shadow-[0_0_15px_rgba(34,197,94,0.05)]' : 'bg-emerald-50 border-emerald-200 shadow-sm'
-                  }`}>
-                    <div className={`text-[10px] font-bold uppercase tracking-wider ${
-                      signalQuality.status === 'FAIL'
-                        ? dk ? 'text-rose-300' : 'text-rose-700'
-                        : signalQuality.status === 'WARN'
-                        ? dk ? 'text-amber-300' : 'text-amber-700'
-                        : dk ? 'text-emerald-300' : 'text-emerald-700'
-                    }`}>
-                      Signal Quality · {signalQuality.status} · {signalQuality.score}/100
-                    </div>
-                    <div className={`mt-1 text-[11px] ${subText}`}>
-                      {signalQuality.active_leads}/{signalQuality.n_leads} active leads · {signalQuality.duration_sec}s · noise {signalQuality.noise_ratio}
-                    </div>
-                    {signalIssues.length > 0 && (
-                      <ul className={`mt-2 space-y-1 text-[10px] leading-relaxed ${subText}`}>
-                        {signalIssues.map((issue) => (
-                          <li key={issue.code}>• {issue.message}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-
-                {result?.source && (
-                  <div 
-                    className="rounded-xl border p-3 mb-3 transition-all duration-300 hover:scale-[1.01]" 
-                    style={{ 
-                      borderColor: `${riskColor}55`, 
-                      background: `linear-gradient(135deg, ${riskColor}12, ${riskColor}04)`,
-                      boxShadow: `0 0 15px ${riskColor}12`
-                    }}
-                  >
-                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: riskColor }}>{risk} RISK</div>
-                    <div className={`text-sm font-bold ${mainText}`}>{region?.label}</div>
-                    <div className={`text-[11px] ${subText}`}>Segment {region?.segment} · {region?.territory} territory</div>
-                    {region?.note && <div className={`text-[11px] mt-1 ${subText}`}>{region.note}</div>}
-                  </div>
-                )}
-
-                {result?.source && (
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <Stat label="Support confidence" value={`${Math.round(result.confidence * 100)}%`} dk={dk} />
-                    <Stat label="Heart rate"
-                      value={result.heart_rate_bpm ? `${Math.round(result.heart_rate_bpm)} bpm` : 'n/a'}
-                      hint={result.hr_note} dk={dk} />
-                  </div>
-                )}
-
-                <div className={`mb-3 rounded-xl border p-3 transition-all duration-300 hover:scale-[1.01] ${
-                  dk ? 'bg-sky-500/[0.04] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.03)]' : 'bg-sky-50 border-sky-200 shadow-sm'
-                }`}>
-                  <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
-                    {language === 'th' ? 'เอกสารประกอบการส่งต่อ' : 'Referral Decision Support'}
-                  </div>
-                  <div className={`mt-1 text-sm font-bold ${mainText}`}>{referralAdvice.title}</div>
-                  <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>
-                    {referralAdvice.body}
-                  </p>
-                </div>
-
-                {result?.source && (
-                  <div className={`mb-3 rounded-xl border p-3 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
-                    <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
-                      {language === 'th' ? 'สถานพยาบาลปลายทาง' : 'Referral Destination'}
-                    </label>
-                    <input
-                      value={referralDestination}
-                      onChange={(e) => setReferralDestination(e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-xs mb-2 transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
-                      placeholder="โรงพยาบาลแม่ข่าย / แผนกหัวใจ"
-                    />
-                    <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
-                      {language === 'th' ? 'บันทึกแพทย์ / เจ้าหน้าที่' : 'Clinician / Staff Note'}
-                    </label>
-                    <textarea
-                      value={clinicianNote}
-                      onChange={(e) => setClinicianNote(e.target.value)}
-                      rows={2}
-                      className={`w-full rounded-lg border px-3 py-2 text-xs resize-none transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
-                      placeholder="อาการสำคัญ สัญญาณชีพ หรือเหตุผลประกอบการส่งต่อ"
-                    />
-                  </div>
-                )}
-
-                {result && (
-                  <div className="flex flex-col gap-2 mb-3">
-                    {result?.source && (
-                      <button
-                        onClick={saveReferralReport}
-                        disabled={savingReport}
-                        className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] hover:scale-[1.01] shadow-md ${
-                          savingReport 
-                            ? 'bg-emerald-600/60 text-white cursor-not-allowed' 
-                            : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-500/20'
-                        }`}
-                      >
-                        {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-                        {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานประกอบการส่งต่อ'}
-                      </button>
-                    )}
-                    {/* Referral Letter — always available after analysis */}
-                    <button
-                      onClick={downloadReferralLetter}
-                      disabled={referralLoading}
-                      className={`w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] hover:scale-[1.01] shadow-md ${
-                        referralLoading 
-                          ? 'bg-sky-700/60 text-white cursor-not-allowed' 
-                          : 'bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 text-white border border-sky-500/20'
-                      }`}
-                    >
-                      {referralLoading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
-                      {referralLoading ? 'กำลังสร้างใบส่งตัว...' : '📋 ออกใบส่งตัวผู้ป่วย (PDF)'}
-                    </button>
-                  </div>
-                )}
-
-                {result?.source && (
-                  <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs transition-all duration-300 hover:scale-[1.01] ${dk ? 'bg-white/[0.02] border-white/[0.05] shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
-                    {['x', 'y', 'z'].map((ax, i) => (
-                      <div key={ax} className="text-center">
-                        <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
-                        <p className={`font-bold mt-0.5 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{result.source.xyz_mm[i].toFixed(1)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {result.ground_truth && (
-                  <div className={`mt-3 rounded-xl border p-3 ${dk ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
-                    <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                      Held-out test ground truth
-                    </div>
-                    <div className={`mt-1 grid grid-cols-2 gap-2 text-[11px] ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
-                      <div>True node: <b>{result.ground_truth.node_idx}</b></div>
-                      <div>Top-5 hit: <b>{result.ground_truth.top5_hit ? 'YES' : 'NO'}</b></div>
-                      <div className="col-span-2">
-                        Node error: <b>{result.ground_truth.predicted_node_error_mm?.toFixed(1)} mm</b>
-                      </div>
-                    </div>
-                    <p className={`mt-1 text-[10px] ${subText}`}>
-                      Paired VmData ground truth from the simulated intracardiac ECG dataset.
-                    </p>
-                  </div>
-                )}
-
-                {/* Honest disclaimer */}
-                <div className={`mt-3 flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
-                  <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${dk ? 'text-amber-400' : 'text-amber-600'}`} />
-                  <p className={`text-[10px] leading-relaxed ${dk ? 'text-amber-300/80' : 'text-amber-700'}`}>
-                    {result.disclaimer}
-                  </p>
-                </div>
+        {result?.waveform?.leads && (
+          <div className={`rounded-2xl border p-4 ${surface}`}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className={`text-xs font-semibold ${secLabel}`}>คลื่น ECG ที่วิเคราะห์ · 12-lead view</div>
+                <div className={`mt-0.5 text-[10px] ${subText}`}>แสดงเต็มความกว้างตามตำแหน่งมาตรฐาน; lead ที่ไม่มีข้อมูลจริงจะขึ้น Unavailable</div>
+              </div>
+            </div>
+            <WaveformPlot leads={result.waveform.leads} dk={dk} />
+            {datasetInfo && (
+              <div className={`mt-2 rounded-xl px-3 py-2 text-[10px] ${
+                dk ? 'bg-white/[0.03] text-slate-400 border border-white/[0.06]' : 'bg-white/70 text-slate-500 border border-slate-100'
+              }`}>
+                Model API: localizer.pt · {datasetInfo.doi}
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {result && (
+          <div className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>
+            <div className="mb-3 flex items-center gap-2">
+              <MapPin size={14} style={{ color: riskColor }} />
+              <span className={`text-xs font-semibold ${secLabel}`}>3 · ผลคัดกรองเพื่อส่งต่อ</span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+              {signalQuality && (
+                <div className={`rounded-xl border p-3 xl:col-span-4 ${
+                  signalQuality.status === 'FAIL'
+                    ? dk ? 'bg-rose-500/[0.08] border-rose-500/25 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'bg-rose-50 border-rose-200 shadow-sm'
+                    : signalQuality.status === 'WARN'
+                    ? dk ? 'bg-amber-500/[0.08] border-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.05)]' : 'bg-amber-50 border-amber-200 shadow-sm'
+                    : dk ? 'bg-emerald-500/[0.07] border-emerald-500/25 shadow-[0_0_15px_rgba(34,197,94,0.05)]' : 'bg-emerald-50 border-emerald-200 shadow-sm'
+                }`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${
+                    signalQuality.status === 'FAIL'
+                      ? dk ? 'text-rose-300' : 'text-rose-700'
+                      : signalQuality.status === 'WARN'
+                      ? dk ? 'text-amber-300' : 'text-amber-700'
+                      : dk ? 'text-emerald-300' : 'text-emerald-700'
+                  }`}>
+                    Signal Quality · {signalQuality.status} · {signalQuality.score}/100
+                  </div>
+                  <div className={`mt-1 text-[11px] ${subText}`}>
+                    {signalQuality.active_leads}/{signalQuality.n_leads} active leads · {signalQuality.duration_sec}s · noise {signalQuality.noise_ratio}
+                  </div>
+                  {signalIssues.length > 0 && (
+                    <ul className={`mt-2 space-y-1 text-[10px] leading-relaxed ${subText}`}>
+                      {signalIssues.map((issue) => (
+                        <li key={issue.code}>• {issue.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {result?.source && (
+                <div
+                  className="rounded-xl border p-3 xl:col-span-4"
+                  style={{
+                    borderColor: `${riskColor}55`,
+                    background: `linear-gradient(135deg, ${riskColor}12, ${riskColor}04)`,
+                    boxShadow: `0 0 15px ${riskColor}12`
+                  }}
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: riskColor }}>{risk} RISK</div>
+                  <div className={`text-sm font-bold ${mainText}`}>{region?.label}</div>
+                  <div className={`text-[11px] ${subText}`}>Segment {region?.segment} · {region?.territory} territory</div>
+                  {region?.note && <div className={`text-[11px] mt-1 ${subText}`}>{region.note}</div>}
+                </div>
+              )}
+
+              {result?.source && (
+                <div className="grid grid-cols-2 gap-2 xl:col-span-4">
+                  <Stat label="Support confidence" value={`${Math.round(result.confidence * 100)}%`} dk={dk} />
+                  <Stat label="Heart rate"
+                    value={result.heart_rate_bpm ? `${Math.round(result.heart_rate_bpm)} bpm` : 'n/a'}
+                    hint={result.hr_note} dk={dk} />
+                </div>
+              )}
+
+              <div className={`rounded-xl border p-3 xl:col-span-6 ${
+                dk ? 'bg-sky-500/[0.04] border-sky-500/20 shadow-[0_0_15px_rgba(56,189,248,0.03)]' : 'bg-sky-50 border-sky-200 shadow-sm'
+              }`}>
+                <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>
+                  {language === 'th' ? 'เอกสารประกอบการส่งต่อ' : 'Referral Decision Support'}
+                </div>
+                <div className={`mt-1 text-sm font-bold ${mainText}`}>{referralAdvice.title}</div>
+                <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>
+                  {referralAdvice.body}
+                </p>
+              </div>
+
+              {result?.source && (
+                <div className={`rounded-xl border p-3 xl:col-span-6 ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-100'}`}>
+                  <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
+                    {language === 'th' ? 'สถานพยาบาลปลายทาง' : 'Referral Destination'}
+                  </label>
+                  <input
+                    value={referralDestination}
+                    onChange={(e) => setReferralDestination(e.target.value)}
+                    className={`w-full rounded-lg border px-3 py-2 text-xs mb-2 transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                    placeholder="โรงพยาบาลแม่ข่าย / แผนกหัวใจ"
+                  />
+                  <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
+                    {language === 'th' ? 'บันทึกแพทย์ / เจ้าหน้าที่' : 'Clinician / Staff Note'}
+                  </label>
+                  <textarea
+                    value={clinicianNote}
+                    onChange={(e) => setClinicianNote(e.target.value)}
+                    rows={2}
+                    className={`w-full rounded-lg border px-3 py-2 text-xs resize-none transition-colors focus:border-sky-500/50 focus:ring-1 focus:ring-sky-500/50 outline-none ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                    placeholder="อาการสำคัญ สัญญาณชีพ หรือเหตุผลประกอบการส่งต่อ"
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 xl:col-span-8 xl:flex-row">
+                {result?.source && (
+                  <button
+                    onClick={saveReferralReport}
+                    disabled={savingReport}
+                    className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] shadow-md ${
+                      savingReport
+                        ? 'bg-emerald-600/60 text-white cursor-not-allowed'
+                        : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border border-emerald-500/20'
+                    }`}
+                  >
+                    {savingReport ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {savingReport ? 'กำลังบันทึกรายงาน...' : 'บันทึกรายงานประกอบการส่งต่อ'}
+                  </button>
+                )}
+                <button
+                  onClick={downloadReferralLetter}
+                  disabled={referralLoading}
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] shadow-md ${
+                    referralLoading
+                      ? 'bg-sky-700/60 text-white cursor-not-allowed'
+                      : 'bg-gradient-to-r from-sky-700 to-blue-700 hover:from-sky-600 hover:to-blue-600 text-white border border-sky-500/20'
+                  }`}
+                >
+                  {referralLoading ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                  {referralLoading ? 'กำลังสร้างใบส่งตัว...' : 'ออกใบส่งตัวผู้ป่วย (PDF)'}
+                </button>
+              </div>
+
+              {result?.source && (
+                <div className={`grid grid-cols-3 gap-2 rounded-xl border p-3 font-mono text-xs xl:col-span-4 ${dk ? 'bg-white/[0.02] border-white/[0.05] shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+                  {['x', 'y', 'z'].map((ax, i) => (
+                    <div key={ax} className="text-center">
+                      <p className={`text-[9px] font-semibold uppercase ${secLabel}`}>{ax} (mm)</p>
+                      <p className={`font-bold mt-0.5 ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{result.source.xyz_mm[i].toFixed(1)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {result.ground_truth && (
+                <div className={`rounded-xl border p-3 xl:col-span-12 ${dk ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                    Held-out test ground truth
+                  </div>
+                  <div className={`mt-1 grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-3 ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <div>True node: <b>{result.ground_truth.node_idx}</b></div>
+                    <div>Top-5 hit: <b>{result.ground_truth.top5_hit ? 'YES' : 'NO'}</b></div>
+                    <div>Node error: <b>{result.ground_truth.predicted_node_error_mm?.toFixed(1)} mm</b></div>
+                  </div>
+                  <p className={`mt-1 text-[10px] ${subText}`}>
+                    Paired VmData ground truth from the simulated intracardiac ECG dataset.
+                  </p>
+                </div>
+              )}
+
+              <div className={`flex gap-2 rounded-lg border p-2.5 xl:col-span-12 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
+                <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${dk ? 'text-amber-400' : 'text-amber-600'}`} />
+                <p className={`text-[10px] leading-relaxed ${dk ? 'text-amber-300/80' : 'text-amber-700'}`}>
+                  {result.disclaimer}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
