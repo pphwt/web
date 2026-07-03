@@ -12,7 +12,7 @@ export default function ClinicalEcg() {
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
-      <div className="max-w-[1360px] mx-auto flex flex-col gap-5">
+      <div className="max-w-[1800px] mx-auto flex flex-col gap-5">
         <header className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${surface}`}>
           <div className="flex items-center gap-3">
             <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${dk ? 'bg-sky-500/15 border-sky-500/20 text-sky-400' : 'bg-sky-50 border-sky-200 text-sky-600'}`}>
