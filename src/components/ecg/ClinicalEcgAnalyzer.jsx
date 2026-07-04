@@ -270,11 +270,17 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
     { key: 'original', label: 'Original' },
     { key: 'panels', label: 'Panels' },
     { key: 'trace', label: 'Trace' },
+    { key: 'both', label: 'Both' },
   ];
+  const showPanels = viewMode === 'panels' || viewMode === 'both';
+  const showTrace = viewMode === 'trace' || viewMode === 'both';
   const readableWarnings = warnings.map((warning) => ({
     perspective_contour_too_small: 'Page border was weak; perspective correction may be approximate.',
     deskew_unavailable: 'Deskew angle was not reliable.',
     calibration_uncertain: 'Calibration is uncertain; interval values need clinician review.',
+    layout_adaptive_trace_bands: 'Panel geometry was adapted from detected trace bands.',
+    rhythm_strip_from_trace_band: 'Rhythm strip bbox follows the detected trace band.',
+    bbox_low_trace_coverage: 'One or more panels have low trace coverage and need review.',
   }[warning] || warning));
 
   return (
@@ -351,20 +357,52 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
               const highlighted = highlightedLead && panel.name?.toUpperCase() === highlightedLead.toUpperCase();
               const stroke = panelStroke(panel, highlighted);
               const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
+              const [tx0, ty0, tx1, ty1] = panel.trace_bbox || [];
               return (
-                <g key={`${panel.name}-${panel.role}-${index}`} onClick={() => onHighlight(panel.name)} className="cursor-pointer">
-                  <rect
-                    x={x0}
-                    y={y0}
-                    width={Math.max(0, x1 - x0)}
-                    height={Math.max(0, y1 - y0)}
-                    fill={highlighted ? 'rgba(14,165,233,0.13)' : 'rgba(255,255,255,0.01)'}
-                    stroke={stroke}
-                    strokeOpacity={highlighted ? 1 : 0.86}
-                    strokeWidth={highlighted ? 4 : 2.2}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  {viewMode === 'trace' && points && (
+                <g
+                  key={`${panel.name}-${panel.role}-${index}`}
+                  onClick={() => onHighlight?.(panel.name)}
+                  onMouseEnter={() => onHighlight?.(panel.name)}
+                  onMouseLeave={() => onHighlight?.(null)}
+                  className="cursor-pointer"
+                >
+                  <title>
+                    {[
+                      panel.name,
+                      panel.role,
+                      panel.bbox_source,
+                      panel.coverage != null ? `coverage ${Number(panel.coverage).toFixed(3)}` : null,
+                      panel.reason,
+                    ].filter(Boolean).join(' · ')}
+                  </title>
+                  {showPanels && (
+                    <rect
+                      x={x0}
+                      y={y0}
+                      width={Math.max(0, x1 - x0)}
+                      height={Math.max(0, y1 - y0)}
+                      fill={highlighted ? 'rgba(14,165,233,0.13)' : 'rgba(255,255,255,0.01)'}
+                      stroke={stroke}
+                      strokeOpacity={highlighted ? 1 : 0.86}
+                      strokeWidth={highlighted ? 4 : 2.2}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {showTrace && panel.trace_bbox && (
+                    <rect
+                      x={tx0}
+                      y={ty0}
+                      width={Math.max(0, tx1 - tx0)}
+                      height={Math.max(0, ty1 - ty0)}
+                      fill="none"
+                      stroke={highlighted ? '#38bdf8' : stroke}
+                      strokeDasharray="4 4"
+                      strokeOpacity={highlighted ? 0.9 : 0.42}
+                      strokeWidth={highlighted ? 2.1 : 1.2}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )}
+                  {showTrace && points && (
                     <polyline
                       points={points}
                       fill="none"
@@ -376,18 +414,20 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                       vectorEffect="non-scaling-stroke"
                     />
                   )}
-                  <text
-                    x={x0 + 8}
-                    y={y0 + 18}
-                    fill={stroke}
-                    fontSize="14"
-                    fontWeight="800"
-                    stroke={dk ? '#0f172a' : '#ffffff'}
-                    strokeWidth="3"
-                    paintOrder="stroke"
-                  >
-                    {panel.name}
-                  </text>
+                  {showPanels && (
+                    <text
+                      x={x0 + 8}
+                      y={y0 + 18}
+                      fill={stroke}
+                      fontSize="14"
+                      fontWeight="800"
+                      stroke={dk ? '#0f172a' : '#ffffff'}
+                      strokeWidth="3"
+                      paintOrder="stroke"
+                    >
+                      {panel.name}
+                    </text>
+                  )}
                 </g>
               );
             })}
