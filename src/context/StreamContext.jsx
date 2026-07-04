@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 
 const StreamContext = createContext();
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1/ws/signals';
+export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1/ws/signals';
 
 export const StreamProvider = ({ children }) => {
   const [data, setData] = useState(null);

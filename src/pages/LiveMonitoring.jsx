@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import ECGCanvas from '../components/visualizers/ECGCanvas';
 import { usePatient } from '../context/PatientContext';
-import { useStream } from '../context/StreamContext';
+import { useStream, WS_URL } from '../context/StreamContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -145,6 +145,7 @@ const LiveMonitoring = () => {
 
   const [localStreamData, setLocalStreamData] = useState(null);
   const { metrics, clinicalState, isNormal, isCritical } = useDiagnosticSolver(localStreamData || streamData);
+  const isUnknown = clinicalState.status === 'unknown';
 
   const recordingBuffer = useRef(createRecordingBuffer());
   const [isRecording, setIsRecording]   = useState(false);
@@ -160,6 +161,7 @@ const LiveMonitoring = () => {
   const [isSerialConnected, setIsSerialConnected] = useState(false);
   const serialPortRef = useRef(null);
   const serialReaderRef = useRef(null);
+  const hardwareSocketRef = useRef(null);
 
   // Demo Mode state
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -189,6 +191,10 @@ const LiveMonitoring = () => {
         await serialPortRef.current.close();
         serialPortRef.current = null;
       }
+      if (hardwareSocketRef.current) {
+        hardwareSocketRef.current.close();
+        hardwareSocketRef.current = null;
+      }
       setIsSerialConnected(false);
       showToast('ปิดการเชื่อมต่อ USB Serial แล้ว', 'info');
     } catch (err) {
@@ -197,58 +203,185 @@ const LiveMonitoring = () => {
     }
   };
 
-  const connectSerial = async () => {
-    try {
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
-      serialPortRef.current = port;
-      setIsSerialConnected(true);
-      showToast('เชื่อมต่ออุปกรณ์ผ่าน USB สำเร็จ!', 'success');
+  // Auto-baud probe for devices we have no prior knowledge of: try common
+  // rates, keep whichever one produces legible ASCII text. This is what
+  // makes "plug in an arbitrary device, no pre-flashed firmware" possible
+  // at all -- the trade-off (explicitly accepted for this project) is that
+  // an unrecognized device's field order/meaning is a heuristic guess, not
+  // a validated protocol; see `verified_protocol` below, which keeps that
+  // distinction visible rather than silently presenting a guess as certain.
+  const BAUD_CANDIDATES = [115200, 9600, 57600, 38400];
 
+  const asciiLegibleRatio = (bytes) => {
+    if (!bytes.length) return 0;
+    let printable = 0;
+    for (const b of bytes) {
+      if ((b >= 0x20 && b <= 0x7e) || b === 0x0a || b === 0x0d) printable += 1;
+    }
+    return printable / bytes.length;
+  };
+
+  const detectBaudRate = async (port) => {
+    for (const baud of BAUD_CANDIDATES) {
+      try {
+        await port.open({ baudRate: baud });
+      } catch (err) {
+        continue;
+      }
       const reader = port.readable.getReader();
-      serialReaderRef.current = reader;
+      const chunks = [];
+      const deadline = Date.now() + 600;
+      try {
+        while (Date.now() < deadline) {
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) break;
+          const result = await Promise.race([
+            reader.read(),
+            new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), remaining)),
+          ]);
+          if (result.timeout || result.done) break;
+          if (result.value) chunks.push(result.value);
+        }
+      } catch (err) {
+        // fall through to the ratio check below on whatever was captured
+      }
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
 
-      const decoder = new TextDecoder();
-      let buffer = '';
+      const totalBytes = chunks.reduce((acc, c) => acc + c.length, 0);
+      const merged = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const c of chunks) { merged.set(c, offset); offset += c.length; }
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+      if (totalBytes > 10 && asciiLegibleRatio(merged) > 0.85) {
+        return baud; // legible text at this rate -- leave the port open here
+      }
+      await port.close().catch(() => {});
+    }
+    // Nothing looked legible at any candidate rate -- fall back to the most
+    // common one and let the format-warning toast in the main loop explain
+    // if it's still wrong, rather than refusing to connect at all.
+    await port.open({ baudRate: BAUD_CANDIDATES[0] }).catch(() => {});
+    return BAUD_CANDIDATES[0];
+  };
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          const tokens = trimmed.split(',').map(Number);
-          if (tokens.some(isNaN) || tokens.length === 0) continue;
+  // Shared by both a fresh "Connect USB Serial" click and silent
+  // auto-reconnect to a port the browser already has permission for (see
+  // the mount effect below) -- one read loop, one place to keep the parser
+  // and error feedback in sync.
+  const runSerialSession = async (port) => {
+    const baud = await detectBaudRate(port);
+    showToast(`ตรวจพบ baud rate ${baud} อัตโนมัติ`, 'info');
+    serialPortRef.current = port;
+    setIsSerialConnected(true);
+    showToast('เชื่อมต่ออุปกรณ์ผ่าน USB สำเร็จ!', 'success');
 
-          const lead_i = tokens[0] ?? 0.0;
-          const lead_ii = tokens[1] ?? 0.0;
-          const v5 = tokens[2] ?? 0.0;
-          const leadFrame = buildLive12LeadFrame({ lead_i, lead_ii, v5 });
+    // Forward real samples to the backend's hardware ingestion socket --
+    // that's what actually computes HR/QTc/PR/QRS (real R-peak detection +
+    // the CardiacLocalizer) and feeds it back over the already-subscribed
+    // /ws/signals connection as `streamData`. Do not fabricate those
+    // numbers here; showing a clinician a specific reading ("72 bpm")
+    // that was never measured from this device is worse than showing
+    // nothing until a real one arrives.
+    const hwUrl = WS_URL.replace(/\/ws\/signals.*$/, `/ws/hardware/${selectedPatient.id}`);
+    const hwSocket = new WebSocket(hwUrl);
+    hardwareSocketRef.current = hwSocket;
 
-          // Dispatch event to local listeners via StreamContext event target
-          if (streamEvents) {
-            streamEvents.dispatchEvent(new CustomEvent('data', {
-              detail: {
-                leads: leadFrame,
-                is_hardware: true,
-                heart_rate: 72,
-                qtc: 410,
-                pr_interval: 160,
-                qrs_duration: 95,
-                ai_confidence: 0.99
-              }
-            }));
+    const reader = port.readable.getReader();
+    serialReaderRef.current = reader;
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let goodLines = 0;
+    let badLines = 0;
+    let formatWarningShown = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Recognized device: our reference firmware for a cheap single-lead
+        // front-end (AD8232 + ESP32/Arduino, see docs/hardware-integration
+        // -protocol.md) self-identifies with an "AD8232," prefix and reports
+        // its own leads-off state -- a real, validated protocol, not a guess.
+        let parsed = null;
+        if (trimmed.startsWith('AD8232,')) {
+          const parts = trimmed.split(',');
+          const v = Number(parts[1]);
+          const off = parts[2] === '1';
+          if (Number.isFinite(v)) {
+            parsed = { lead_i: v, lead_ii: v, v5: v, single_lead: true, leads_off: off, verified_protocol: true };
           }
-
-          if (isRecording) {
-            appendRecordingFrame(recordingBuffer.current, leadFrame);
+        } else {
+          // Unrecognized device: accept whatever comma/semicolon/whitespace
+          // -separated numbers show up, on the assumption (never confirmed)
+          // that 1 field means a single channel and 2-3 fields mean
+          // lead_i/lead_ii/v5 in that order. This is a deliberate honesty
+          // trade-off for broader plug-and-play compatibility -- field
+          // *order* and *meaning* are unverified for a device we've never
+          // seen before, so `verified_protocol: false` follows this data
+          // downstream and the UI must keep saying so, not present it with
+          // the same confidence as a known device.
+          const tokens = trimmed.split(/[,;\s]+/).filter(Boolean).map(Number);
+          if (tokens.length > 0 && !tokens.some(isNaN)) {
+            parsed = tokens.length === 1
+              ? { lead_i: tokens[0], lead_ii: tokens[0], v5: tokens[0], single_lead: true, leads_off: false, verified_protocol: false }
+              : { lead_i: tokens[0] ?? 0.0, lead_ii: tokens[1] ?? 0.0, v5: tokens[2] ?? 0.0, single_lead: false, leads_off: false, verified_protocol: false };
           }
         }
+
+        if (!parsed) {
+          badLines += 1;
+          // A device sending truly non-numeric data (binary, text logs,
+          // etc.) looks identical to "nothing is happening" from the UI
+          // alone -- surface it once, concretely, rather than leaving the
+          // user to guess why the connection "succeeded" but shows no data.
+          if (badLines >= 20 && goodLines === 0 && !formatWarningShown) {
+            formatWarningShown = true;
+            showToast('อุปกรณ์เชื่อมต่อแล้วแต่ยังไม่มีข้อมูลตัวเลขที่อ่านได้ — ต้องส่งตัวเลข (คั่นด้วย comma/semicolon/space) หรือ "AD8232,<ค่า>,<leads_off>" ทาง serial', 'error');
+          }
+          continue;
+        }
+        goodLines += 1;
+
+        const { lead_i, lead_ii, v5, single_lead, leads_off, verified_protocol } = parsed;
+        const leadFrame = single_lead ? { II: lead_ii, lead_ii } : buildLive12LeadFrame({ lead_i, lead_ii, v5 });
+
+        if (hwSocket.readyState === WebSocket.OPEN) {
+          hwSocket.send(JSON.stringify({ lead_i, lead_ii, v5, single_lead, leads_off, verified_protocol }));
+        }
+
+        // Local dispatch is for instant waveform trace rendering only --
+        // real vitals arrive separately via `streamData` once the backend
+        // measures them from the forwarded samples above.
+        if (streamEvents) {
+          streamEvents.dispatchEvent(new CustomEvent('data', {
+            detail: { leads: leadFrame, is_hardware: true, single_lead, leads_off, verified_protocol },
+          }));
+        }
+
+        if (isRecording) {
+          appendRecordingFrame(recordingBuffer.current, leadFrame);
+        }
       }
+    }
+  };
+
+  const connectSerial = async () => {
+    if (!selectedPatient?.id) {
+      showToast('เลือกผู้ป่วยก่อนเชื่อมต่ออุปกรณ์', 'error');
+      return;
+    }
+    try {
+      const port = await navigator.serial.requestPort();
+      await runSerialSession(port);
     } catch (err) {
       console.error(err);
       if (err.name !== 'AbortError') {
@@ -258,11 +391,32 @@ const LiveMonitoring = () => {
     }
   };
 
+  // Auto-reconnect: the browser remembers ports the user already granted
+  // permission for (navigator.serial.getPorts()), so a returning user with
+  // a patient selected doesn't have to click "Connect" and re-pick the same
+  // device from the OS port dialog every time they open this page.
+  useEffect(() => {
+    if (!serialSupported || !selectedPatient?.id || isSerialConnected) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ports = await navigator.serial.getPorts();
+        if (cancelled || !ports.length || serialPortRef.current) return;
+        await runSerialSession(ports[0]);
+      } catch (err) {
+        console.error('Auto-reconnect failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serialSupported, selectedPatient?.id]);
+
   // Cleanup serial on unmount
   useEffect(() => {
     return () => {
       if (serialReaderRef.current) serialReaderRef.current.cancel().catch(() => {});
       if (serialPortRef.current) serialPortRef.current.close().catch(() => {});
+      if (hardwareSocketRef.current) hardwareSocketRef.current.close();
       if (demoIntervalRef.current) clearInterval(demoIntervalRef.current);
     };
   }, []);
@@ -301,6 +455,20 @@ const LiveMonitoring = () => {
       setIsDemoMode(true);
       showToast('▶ Demo Mode: AFIB (00017_hr) — สัญญาณ ECG จริง', 'success');
 
+      // This sample was already measured server-side by the same real
+      // pipeline used for uploaded ECGs (/ecg/analyze) -- replay those
+      // actual numbers instead of a hand-picked "typical AFIB" placeholder,
+      // which would show the same fixed reading regardless of which real
+      // sample is loaded.
+      const m = data.measurements || {};
+      const demoVitals = {
+        heart_rate: m.heart_rate_bpm?.value ?? null,
+        qtc: m.qtc_ms?.value ?? null,
+        pr_interval: m.pr_ms?.value ?? null,
+        qrs_duration: m.qrs_ms?.value ?? null,
+        ai_confidence: data.classification?.probabilities?.AFIB ?? data.classification?.top_probability ?? null,
+      };
+
       const BATCH = 50;
       demoIntervalRef.current = setInterval(() => {
         const d = demoDataRef.current;
@@ -308,18 +476,14 @@ const LiveMonitoring = () => {
         const leadFrame = buildFrameFromWaveform(wf, d.idx);
         if (leadFrame.I == null) leadFrame.I = wf[leadKeys[0]]?.[d.idx] ?? 0;
         if (leadFrame.II == null) leadFrame.II = wf[leadKeys[1] || leadKeys[0]]?.[d.idx] ?? 0;
-        
+
         d.idx = (d.idx + BATCH) % d.len;
 
         const payload = {
           leads: buildLive12LeadFrame(leadFrame),
           is_hardware: false,
           is_demo: true,
-          heart_rate: 85, // AFIB elevated HR
-          qtc: 440,
-          pr_interval: 0, // AFIB has absent P-waves
-          qrs_duration: 90,
-          ai_confidence: 0.94
+          ...demoVitals,
         };
 
         if (streamEvents) {
@@ -418,14 +582,20 @@ const LiveMonitoring = () => {
   const subText   = dk ? 'text-slate-400'                    : 'text-slate-500';
   const ecgBg     = dk ? 'bg-[#060d18]'                      : 'bg-slate-50';
 
-  // AI triage color
-  const diagColor = isCritical
+  // AI triage color — "unknown" (no measurement yet) must read as neutral,
+  // never amber/red, or a device that just connected but hasn't produced a
+  // real reading yet would look like an active clinical warning.
+  const diagColor = isUnknown
+    ? { ring: 'border-slate-400/25',  bg: dk ? 'bg-white/[0.03]'       : 'bg-slate-50',   text: dk ? 'text-slate-400'   : 'text-slate-500',   icon: <Minus size={18} /> }
+    : isCritical
     ? { ring: 'border-rose-500/30',   bg: dk ? 'bg-rose-500/[0.08]'    : 'bg-rose-50',    text: dk ? 'text-rose-400'    : 'text-rose-700',    icon: <AlertCircle size={18} /> }
     : isNormal
     ? { ring: 'border-emerald-500/25',bg: dk ? 'bg-emerald-500/[0.07]' : 'bg-emerald-50', text: dk ? 'text-emerald-400' : 'text-emerald-700', icon: <CheckCircle2 size={18} /> }
     : { ring: 'border-amber-500/30',  bg: dk ? 'bg-amber-500/[0.08]'   : 'bg-amber-50',   text: dk ? 'text-amber-400'   : 'text-amber-700',   icon: <AlertTriangle size={18} /> };
 
-  const hrColor = isNormal
+  const hrColor = isUnknown
+    ? (dk ? 'text-slate-500' : 'text-slate-400')
+    : isNormal
     ? (dk ? 'text-emerald-400' : 'text-emerald-600')
     : isCritical
     ? (dk ? 'text-rose-400'    : 'text-rose-600')
@@ -458,7 +628,7 @@ const LiveMonitoring = () => {
                   }`} title="สัญญาณนี้สร้างจากแบบจำลอง ไม่ใช่ผู้ป่วยจริง">SIMULATION</span>
                 )}
                 <StatusPill connected={isConnected} dk={dk} />
-                {!isNormal && (
+                {!isNormal && !isUnknown && (
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border animate-pulse ${
                     dk ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-200'
                   }`}>
@@ -492,10 +662,15 @@ const LiveMonitoring = () => {
             </AnimatePresence>
 
             {/* Native USB Serial (Web Serial API) */}
-            {serialSupported && (
+            {serialSupported ? (
               <button
                 type="button"
                 onClick={isSerialConnected ? disconnectSerial : connectSerial}
+                title={
+                  isSerialConnected
+                    ? `กำลังส่งข้อมูลจริงไปคำนวณ HR/QRS/PR/QTc ให้ผู้ป่วย: ${selectedPatient?.name || '-'}`
+                    : 'อุปกรณ์ต้องส่งข้อความทีละบรรทัด รูปแบบ "lead_i,lead_ii,v5" (ตัวเลขคั่นด้วยจุลภาค) ที่ baud rate 115200 — ระบบจะคำนวณ HR/QRS/PR/QTc จริงจากสัญญาณนี้ให้ผู้ป่วยที่เลือกอยู่โดยอัตโนมัติ'
+                }
                 className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all active:scale-95 ${
                   isSerialConnected
                     ? 'bg-emerald-600 border-emerald-500 text-white'
@@ -507,6 +682,16 @@ const LiveMonitoring = () => {
                 <Usb size={14} className={isSerialConnected ? 'animate-pulse' : ''} />
                 <span>{isSerialConnected ? 'Connected USB' : 'Connect USB Serial'}</span>
               </button>
+            ) : (
+              <span
+                title="การเชื่อมต่อ USB Serial โดยตรงใช้ได้เฉพาะ Chrome/Edge บนคอมพิวเตอร์ (Web Serial API) — ใช้ Demo Mode แทนได้บนเบราว์เซอร์นี้"
+                className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold opacity-60 ${
+                  dk ? 'border-white/[0.07] text-slate-500 bg-slate-900/40' : 'border-slate-200 text-slate-400 bg-white'
+                }`}
+              >
+                <Usb size={14} />
+                <span>USB Serial (ต้องใช้ Chrome/Edge)</span>
+              </span>
             )}
 
             {/* Demo Mode Button */}
@@ -558,6 +743,35 @@ const LiveMonitoring = () => {
           </div>
         </header>
 
+        {/* ── Hardware setup guide (only while nothing is connected yet) ── */}
+        {serialSupported && !isSerialConnected && !isDemoMode && (
+          <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 rounded-2xl border px-4 py-3 text-xs ${surface}`}>
+            {[
+              { done: !!selectedPatient, label: 'เลือกผู้ป่วยที่จะติดตาม' },
+              { done: !!selectedPatient, label: 'เสียบสาย USB ของเครื่องตรวจเข้าคอมพิวเตอร์' },
+              { done: false, label: 'กด "Connect USB Serial" แล้วเลือกอุปกรณ์จากรายการ' },
+            ].map((step, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                  step.done
+                    ? 'bg-emerald-500 text-white'
+                    : dk ? 'bg-white/10 text-slate-400' : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {step.done ? '✓' : i + 1}
+                </span>
+                <span className={step.done ? (dk ? 'text-slate-300' : 'text-slate-600') : (dk ? 'text-slate-500' : 'text-slate-400')}>
+                  {step.label}
+                </span>
+              </div>
+            ))}
+            {!selectedPatient && (
+              <span className={`text-[11px] font-semibold ${dk ? 'text-amber-400' : 'text-amber-600'}`}>
+                ← เลือกผู้ป่วยจากหน้าทะเบียนก่อน ปุ่มเชื่อมต่อจะยังใช้ไม่ได้
+              </span>
+            )}
+          </div>
+        )}
+
         {/* ── Body ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
@@ -578,33 +792,77 @@ const LiveMonitoring = () => {
                 )}
               </div>
               <div className={`${ecgBg} p-4`}>
-                <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] ${subText}`}>
-                  <span>แสดงครบ 12 leads ตามตำแหน่งมาตรฐาน; limb leads คำนวณจาก I/II เมื่อ stream ส่งมาเป็น 3-channel</span>
-                  <span className={`rounded-full border px-2 py-0.5 font-semibold ${dk ? 'border-sky-500/20 text-sky-300' : 'border-sky-200 text-sky-700'}`}>
-                    12/12 lead slots
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
-                  {LIVE_12_LEADS.map(({ key, label, color }) => (
-                    <div key={key} className="min-w-0">
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                {streamData?.is_hardware && streamData?.verified_protocol === false && (
+                  <div className={`mb-3 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${
+                    dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'
+                  }`}>
+                    ⚠ อุปกรณ์นี้ยังไม่ได้ยืนยัน protocol เต็มรูปแบบ (auto-detect จากสัญญาณตัวเลขทั่วไป) — Heart rate คำนวณจริงจากสัญญาณ เชื่อถือได้ แต่ QRS/PR/QTc/axis/3D localization จะซ่อนไว้จนกว่าจะใช้อุปกรณ์ที่มี protocol ยืนยันแล้ว (เช่น AD8232 ตามคู่มือ)
+                  </div>
+                )}
+                {streamData?.single_lead ? (
+                  <>
+                    <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] ${subText}`}>
+                      <span>อุปกรณ์ single-lead (เช่น AD8232) วัดได้แค่ Lead II — ไม่ใช่ 12-lead ECG</span>
+                      <span className={`rounded-full border px-2 py-0.5 font-semibold ${dk ? 'border-violet-500/25 text-violet-300' : 'border-violet-200 text-violet-700'}`}>
+                        1/12 lead slot · HR/rhythm only
+                      </span>
+                    </div>
+                    {streamData?.leads_off && (
+                      <div className={`mb-3 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
+                        dk ? 'border-rose-500/25 bg-rose-500/[0.08] text-rose-300' : 'border-rose-200 bg-rose-50 text-rose-700'
+                      }`}>
+                        ⚠ Leads off — ตรวจสอบว่า electrode ติดผิวหนังแน่นหรือไม่ (ไม่แสดง HR จนกว่าจะติดกลับ)
+                      </div>
+                    )}
+                    <div className="max-w-md">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">LEAD II</p>
                       <ECGCanvas
-                        leadKey={key}
-                        valueFrom={(leads) => buildLive12LeadFrame(leads)[key]}
+                        leadKey="II"
+                        valueFrom={(leads) => leads?.II ?? leads?.lead_ii}
                         paused={isFrozen}
                         label=""
-                        color={color}
-                        height={86}
+                        color="#2563eb"
+                        height={140}
                         emptyMessage="Lead unavailable"
                       />
                     </div>
-                  ))}
-                </div>
-                <div className={`mt-3 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${
-                  dk ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-200/85' : 'border-amber-200 bg-amber-50 text-amber-800'
-                }`}>
-                  Hardware/USB ที่ส่งมาแค่ I, II, V5 จะแสดง V lead อื่นเป็น unavailable จนกว่าจะมีข้อมูลจริงหรือใช้ Demo/clinical ECG ที่มีครบ 12 leads
-                </div>
+                    <div className={`mt-3 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${
+                      dk ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-200/85' : 'border-amber-200 bg-amber-50 text-amber-800'
+                    }`}>
+                      Single-lead ไม่พอสำหรับ axis หรือ 3D source localization — ใช้สำหรับติดตาม HR/rhythm เบื้องต้นเท่านั้น ต้องการผล 12-lead เต็มให้อัปโหลดภาพ/ไฟล์ ECG ที่หน้า "อ่านผล ECG (ไฟล์จริง)"
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 text-[10px] ${subText}`}>
+                      <span>แสดงครบ 12 leads ตามตำแหน่งมาตรฐาน; limb leads คำนวณจาก I/II เมื่อ stream ส่งมาเป็น 3-channel</span>
+                      <span className={`rounded-full border px-2 py-0.5 font-semibold ${dk ? 'border-sky-500/20 text-sky-300' : 'border-sky-200 text-sky-700'}`}>
+                        12/12 lead slots
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+                      {LIVE_12_LEADS.map(({ key, label, color }) => (
+                        <div key={key} className="min-w-0">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                          <ECGCanvas
+                            leadKey={key}
+                            valueFrom={(leads) => buildLive12LeadFrame(leads)[key]}
+                            paused={isFrozen}
+                            label=""
+                            color={color}
+                            height={86}
+                            emptyMessage="Lead unavailable"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className={`mt-3 rounded-xl border px-3 py-2 text-[10px] leading-relaxed ${
+                      dk ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-200/85' : 'border-amber-200 bg-amber-50 text-amber-800'
+                    }`}>
+                      Hardware/USB ที่ส่งมาแค่ I, II, V5 จะแสดง V lead อื่นเป็น unavailable จนกว่าจะมีข้อมูลจริงหรือใช้ Demo/clinical ECG ที่มีครบ 12 leads
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -658,19 +916,21 @@ const LiveMonitoring = () => {
                   </div>
                 </div>
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold border ${
-                  isNormal
+                  isUnknown
+                    ? dk ? 'bg-white/[0.05] text-slate-400 border-white/10' : 'bg-slate-100 text-slate-500 border-slate-200'
+                    : isNormal
                     ? dk ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : dk ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'         : 'bg-rose-50 text-rose-600 border-rose-200'
                 }`}>
-                  {isNormal ? 'Stable' : 'Alert'}
+                  {isUnknown ? 'No signal' : isNormal ? 'Stable' : 'Alert'}
                 </span>
               </div>
 
               {/* Secondary metrics */}
               <div className="grid grid-cols-2 gap-2.5">
                 <MetricCard dk={dk} label="QTc" value={fmt(metrics?.qtc)} unit="ms"
-                  color={metrics?.qtc > 450 ? (dk ? 'text-rose-400' : 'text-rose-600') : (dk ? 'text-sky-400' : 'text-sky-600')}
-                  sub={metrics?.qtc > 450 ? 'Prolonged' : 'Normal'} />
+                  color={metrics?.qtc == null ? (dk ? 'text-slate-500' : 'text-slate-400') : metrics.qtc > 450 ? (dk ? 'text-rose-400' : 'text-rose-600') : (dk ? 'text-sky-400' : 'text-sky-600')}
+                  sub={metrics?.qtc == null ? '--' : metrics.qtc > 450 ? 'Prolonged' : 'Normal'} />
                 <MetricCard dk={dk} label="QRS" value={fmt(metrics?.qrs)} unit="ms"
                   color={dk ? 'text-sky-400' : 'text-sky-600'} />
               </div>

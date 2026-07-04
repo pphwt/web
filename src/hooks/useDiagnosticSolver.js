@@ -6,33 +6,42 @@ import { CLINICAL_THRESHOLDS } from '../utils/constants';
  * Upgraded with Predictive Trend Analytics.
  * It now monitors history to detect rising/falling trends in vitals.
  */
+const toRoundedOrNull = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+};
+
 export const useDiagnosticSolver = (streamData) => {
   const [clinicalState, setClinicalState] = useState({
-    status: 'normal',
-    diagnosis: 'Simulated vitals within configured ranges',
+    status: 'unknown',
+    diagnosis: 'Awaiting signal',
     severity: 0,
     trend: 'stable' // 'rising', 'falling', 'stable'
   });
 
   const hrHistory = useRef([]);
 
-  // Derived clinical metrics with safety checks
+  // Derived clinical metrics — a field the source data doesn't actually have
+  // stays null (rendered as "--" by callers), never a made-up placeholder
+  // number. Confidently showing e.g. "72 bpm" when nothing was measured
+  // would be indistinguishable from a real reading to whoever is watching.
   const metrics = useMemo(() => {
     if (!streamData) return null;
-    
-    const currentHR = Math.round(streamData.heart_rate || 72);
-    
-    // Update HR History for trend analysis (keep last 10 samples)
-    hrHistory.current.push(currentHR);
-    if (hrHistory.current.length > 10) hrHistory.current.shift();
 
+    const currentHR = toRoundedOrNull(streamData.heart_rate);
+    if (currentHR != null) {
+      // Update HR History for trend analysis (keep last 10 samples)
+      hrHistory.current.push(currentHR);
+      if (hrHistory.current.length > 10) hrHistory.current.shift();
+    }
+
+    const confidenceRaw = Number(streamData.ai_confidence);
     return {
       hr: currentHR,
-      qtc: Math.round(streamData.qtc || 420),
-      pr: Math.round(streamData.pr_interval || 155),
-      qrs: Math.round(streamData.qrs_duration || 92),
-      confidence: (streamData.ai_confidence * 100 || 99.8).toFixed(2),
-      adherence: "99.42%" 
+      qtc: toRoundedOrNull(streamData.qtc),
+      pr: toRoundedOrNull(streamData.pr_interval),
+      qrs: toRoundedOrNull(streamData.qrs_duration),
+      confidence: Number.isFinite(confidenceRaw) ? (confidenceRaw * 100).toFixed(2) : null,
     };
   }, [streamData]);
 
@@ -40,32 +49,40 @@ export const useDiagnosticSolver = (streamData) => {
   useEffect(() => {
     if (!metrics) return;
 
+    // No real HR yet (device just connected, or between measurement cycles)
+    // -- say so rather than defaulting to "normal", which would read as a
+    // clean bill of health nobody actually checked.
+    if (metrics.hr == null) {
+      setClinicalState({ status: 'unknown', diagnosis: 'Awaiting signal', severity: 0, trend: 'stable' });
+      return;
+    }
+
     let newStatus = 'normal';
-    let newDiag = 'Simulated vitals within configured ranges';
+    let newDiag = 'Vitals within configured ranges';
     let newSeverity = 0;
     let newTrend = 'stable';
 
     const { HEART_RATE, QTC_INTERVAL, QRS_DURATION } = CLINICAL_THRESHOLDS;
 
     // 1. Threshold Checks
-    if (metrics.qtc > QTC_INTERVAL.NORMAL_MAX || 
-        metrics.hr > HEART_RATE.TACHYCARDIA || 
+    if ((metrics.qtc != null && metrics.qtc > QTC_INTERVAL.NORMAL_MAX) ||
+        metrics.hr > HEART_RATE.TACHYCARDIA ||
         metrics.hr < HEART_RATE.BRADYCARDIA) {
       newStatus = 'abnormal';
       newDiag = [
         metrics.hr > HEART_RATE.TACHYCARDIA || metrics.hr < HEART_RATE.BRADYCARDIA
           ? `HR outside ${HEART_RATE.BRADYCARDIA}-${HEART_RATE.TACHYCARDIA} bpm range`
           : null,
-        metrics.qtc > QTC_INTERVAL.NORMAL_MAX
+        metrics.qtc != null && metrics.qtc > QTC_INTERVAL.NORMAL_MAX
           ? `QTc above ${QTC_INTERVAL.NORMAL_MAX} ms threshold`
           : null,
       ].filter(Boolean).join(' + ');
       newSeverity = 1;
     }
 
-    if (metrics.qrs > QRS_DURATION.NORMAL_MAX) {
+    if (metrics.qrs != null && metrics.qrs > QRS_DURATION.NORMAL_MAX) {
       newStatus = 'critical';
-      newDiag = `QRS above ${QRS_DURATION.NORMAL_MAX} ms threshold (simulated)`;
+      newDiag = `QRS above ${QRS_DURATION.NORMAL_MAX} ms threshold`;
       newSeverity = 2;
     }
 

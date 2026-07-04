@@ -35,6 +35,8 @@ const REASON_TEXT = {
   bad_rr: 'RR ผิดปกติ',
 };
 
+REASON_TEXT.image_heuristic_approx = 'approx image morphology';
+
 const CLINICAL_STATUS_TEXT = {
   eligible_for_review: 'พร้อมให้แพทย์ทบทวน',
   repeat_required: 'ควรถ่าย/วัดซ้ำก่อนใช้ผล',
@@ -132,7 +134,54 @@ const makePolyline = (values, x, y, width, height, maxPoints = 260) => {
     .join(' ');
 };
 
-function EcgPaperChart({ waveform, dk, compact = false }) {
+const percentile = (values, ratio) => {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(sorted.length * ratio)))];
+};
+
+const pickOverlayPanel = (overlay, label, rhythm = false) => {
+  const panels = Array.isArray(overlay?.panels) ? overlay.panels : [];
+  const matches = panels.filter((panel) => panel?.name?.toUpperCase() === label.toUpperCase());
+  if (!matches.length) return null;
+  const preferredRole = rhythm ? 'rhythm_strip' : 'panel';
+  return matches.find((panel) => panel.role === preferredRole && (panel.trace_points || []).length > 1)
+    || matches.find((panel) => (panel.trace_points || []).length > 1)
+    || null;
+};
+
+const makeOverlayPolyline = (panel, x, y, width, height, pxPerMm, maxPoints = 260) => {
+  const tracePoints = Array.isArray(panel?.trace_points) ? panel.trace_points : [];
+  const sourceBox = panel?.trace_bbox || panel?.bbox;
+  if (tracePoints.length < 2 || !sourceBox) return '';
+
+  const [sx0, , sx1] = sourceBox;
+  const sourceWidth = Math.max(1, sx1 - sx0);
+  const step = Math.max(1, Math.floor(tracePoints.length / maxPoints));
+  const sampled = [];
+  for (let i = 0; i < tracePoints.length; i += step) sampled.push(tracePoints[i]);
+  if (sampled[sampled.length - 1] !== tracePoints[tracePoints.length - 1]) sampled.push(tracePoints[tracePoints.length - 1]);
+
+  const ys = sampled.map((pt) => Number(pt?.[1])).filter((value) => Number.isFinite(value));
+  if (ys.length < 2) return '';
+  const baseline = percentile(ys, 0.5);
+  const p05 = percentile(ys, 0.05);
+  const p95 = percentile(ys, 0.95);
+  const sourceSpan = Math.max(1, Math.abs(p95 - p05));
+  const physicalScale = pxPerMm > 0 ? 10 / pxPerMm : height * 0.66 / sourceSpan;
+  const maxScale = height * 0.82 / sourceSpan;
+  const yScale = Math.max(0.25, Math.min(physicalScale, maxScale));
+
+  return sampled
+    .map((pt) => {
+      const px = x + ((Number(pt?.[0]) - sx0) / sourceWidth) * width;
+      const py = y + height / 2 + (Number(pt?.[1]) - baseline) * yScale;
+      return `${px.toFixed(1)},${Math.min(y + height - 4, Math.max(y + 4, py)).toFixed(1)}`;
+    })
+    .join(' ');
+};
+
+function EcgPaperChart({ waveform, dk, compact = false, overlay = null, calibration = null }) {
   const rowHeight = compact ? 118 : 126;
   const chartWidth = 1120;
   const left = 34;
@@ -141,6 +190,7 @@ function EcgPaperChart({ waveform, dk, compact = false }) {
   const totalHeight = compact ? 236 : 560;
   const traceColor = dk ? '#334155' : '#3f3f46';
   const rows = compact ? [['II']] : ECG_DISPLAY_ROWS;
+  const pxPerMm = Number(calibration?.px_per_mm || 0);
 
   const renderCalibration = (x, y) => (
     <path
@@ -157,7 +207,10 @@ function EcgPaperChart({ waveform, dk, compact = false }) {
     const x = left + (fullWidth ? 58 : colIndex * segmentWidth + 58);
     const y = top + rowIndex * rowHeight;
     const width = fullWidth ? chartWidth - 74 : segmentWidth - 78;
-    const points = makePolyline(values, x, y + 4, width, rowHeight - 18, fullWidth ? 520 : 220);
+    const overlayPanel = pickOverlayPanel(overlay, label, fullWidth || compact);
+    const points = overlayPanel
+      ? makeOverlayPolyline(overlayPanel, x, y + 4, width, rowHeight - 18, pxPerMm, fullWidth ? 520 : 220)
+      : makePolyline(values, x, y + 4, width, rowHeight - 18, fullWidth ? 520 : 220);
     return (
       <g key={`${label}-${rowIndex}-${colIndex}`}>
         {colIndex === 0 && renderCalibration(left + 8, y)}
@@ -216,12 +269,14 @@ function ChartModeButton({ active, Icon, label, onClick, dk }) {
   );
 }
 
-function EcgChartViewer({ waveform, dk }) {
+function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = null }) {
   const [mode, setMode] = useState('readable');
   const compact = mode === 'leadII';
   const aspectRatio = compact ? '1200 / 236' : '1200 / 560';
   const width = mode === 'fit' ? '100%' : compact ? '980px' : '1120px';
   const minWidth = mode === 'fit' ? '640px' : width;
+  const usesImageTrace = Array.isArray(overlay?.panels)
+    && overlay.panels.some((panel) => (panel?.trace_points || []).length > 1);
 
   return (
     <div className={`rounded-xl border p-2.5 ${dk ? 'border-white/[0.07] bg-slate-950/25' : 'border-slate-200 bg-slate-50'}`}>
@@ -231,6 +286,12 @@ function EcgChartViewer({ waveform, dk }) {
           <span>25 mm/s</span>
           <span className={dk ? 'text-slate-600' : 'text-slate-300'}>|</span>
           <span>10 mm/mV</span>
+          {usesImageTrace && (
+            <>
+              <span className={dk ? 'text-slate-600' : 'text-slate-300'}>|</span>
+              <span>image trace</span>
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <ChartModeButton active={mode === 'readable'} Icon={ZoomIn} label="Readable" onClick={() => setMode('readable')} dk={dk} />
@@ -241,7 +302,13 @@ function EcgChartViewer({ waveform, dk }) {
 
       <div className={`overflow-x-auto rounded-lg ${dk ? 'bg-slate-950/30' : 'bg-rose-50/40'}`}>
         <div className="max-w-none" style={{ width, minWidth, aspectRatio }}>
-          <EcgPaperChart waveform={waveform} dk={dk} compact={compact} />
+          <EcgPaperChart
+            waveform={waveform}
+            dk={dk}
+            compact={compact}
+            overlay={overlay}
+            calibration={digitizationReport?.calibration}
+          />
         </div>
       </div>
     </div>
@@ -674,9 +741,16 @@ export default function ClinicalEcgAnalyzer() {
           {!compact && <StatusBadge status={status} dk={dk} />}
         </div>
         {hasValue ? (
-          <p className={`mt-1 text-xl font-bold ${token.text}`}>
-            {value}<span className={`ml-1 text-[10px] font-normal ${subText}`}>{unit}</span>
-          </p>
+          <>
+            <p className={`mt-1 text-xl font-bold ${token.text}`}>
+              {value}<span className={`ml-1 text-[10px] font-normal ${subText}`}>{unit}</span>
+            </p>
+            {metric.reason && (
+              <p className={`mt-0.5 text-[9px] font-semibold ${subText}`}>
+                {REASON_TEXT[metric.reason] || metric.reason}
+              </p>
+            )}
+          </>
         ) : (
           <p className={`mt-2 text-[11px] font-semibold ${subText}`}>
             - <span className="text-[9px]">{REASON_TEXT[metric.reason] || metric.reason || 'unavailable'}</span>
@@ -912,7 +986,13 @@ export default function ClinicalEcgAnalyzer() {
                 </div>
                 <div className={`overflow-x-auto rounded-xl border p-2 ${dk ? 'border-white/[0.07] bg-slate-950/25' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="max-w-none" style={{ width: '980px', minWidth: '680px', aspectRatio: '1200 / 236' }}>
-                    <EcgPaperChart waveform={result.waveform} dk={dk} compact />
+                    <EcgPaperChart
+                      waveform={result.waveform}
+                      dk={dk}
+                      compact
+                      overlay={digitizationOverlay}
+                      calibration={digitizationReport?.calibration}
+                    />
                   </div>
                 </div>
               </div>
@@ -975,7 +1055,12 @@ export default function ClinicalEcgAnalyzer() {
                       </button>
                     </div>
                   </div>
-                  <EcgChartViewer waveform={result.waveform} dk={dk} />
+                  <EcgChartViewer
+                    waveform={result.waveform}
+                    dk={dk}
+                    overlay={digitizationOverlay}
+                    digitizationReport={digitizationReport}
+                  />
                 </section>
 
                 <aside>

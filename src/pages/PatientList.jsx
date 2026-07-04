@@ -220,6 +220,24 @@ const PatientList = () => {
     }
   }, [token, patients, reports]);
 
+  // Latest unresolved (PENDING_REVIEW) risk per patient, from the same
+  // `derived_risk` the backend worklist sort uses. A patient registered as
+  // "General" whose ECG later comes back HIGH risk must still surface here
+  // -- the intake case_type alone was silently missing that case entirely.
+  const patientRiskMap = React.useMemo(() => {
+    const rank = { HIGH: 0, MODERATE: 1, LOW: 2, UNKNOWN: 3 };
+    const map = {};
+    for (const r of reports) {
+      const pid = r.patient_id;
+      if (!pid) continue;
+      if ((r.status || 'PENDING_REVIEW') !== 'PENDING_REVIEW') continue;
+      const risk = r.derived_risk || 'UNKNOWN';
+      const current = map[pid];
+      if (!current || rank[risk] < rank[current]) map[pid] = risk;
+    }
+    return map;
+  }, [reports]);
+
   const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id_card?.includes(searchTerm)
@@ -535,9 +553,11 @@ const PatientList = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((p) => {
-              const isEmergency = p.case_type === 'Emergency';
-              const isUrgent = p.case_type === 'Urgent';
-              
+              const pendingRisk = patientRiskMap[p.id];
+              const isEmergency = p.case_type === 'Emergency' || pendingRisk === 'HIGH';
+              const isUrgent = !isEmergency && (p.case_type === 'Urgent' || pendingRisk === 'MODERATE');
+              const riskDrivenBadge = pendingRisk === 'HIGH' || pendingRisk === 'MODERATE';
+
               const priorityBorder = isEmergency 
                 ? `pulse-border-red ${dk ? 'bg-rose-500/[0.01]' : 'bg-rose-50/20'}`
                 : isUrgent 
@@ -592,11 +612,17 @@ const PatientList = () => {
                       </button>
                     )}
                     {isEmergency ? (
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 animate-pulse bg-rose-500/10 text-rose-500 border-rose-500/20`}>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 animate-pulse bg-rose-500/10 text-rose-500 border-rose-500/20`}
+                        title={riskDrivenBadge ? 'ผลคัดกรอง ECG ล่าสุดมีความเสี่ยงสูง รอทบทวน' : undefined}
+                      >
                         <AlertCircle size={10} /> Emergency
                       </span>
                     ) : isUrgent ? (
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 bg-amber-500/10 text-amber-500 border-amber-500/20`}>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 bg-amber-500/10 text-amber-500 border-amber-500/20`}
+                        title={riskDrivenBadge ? 'ผลคัดกรอง ECG ล่าสุดมีความเสี่ยงปานกลาง รอทบทวน' : undefined}
+                      >
                         <AlertTriangle size={10} /> Urgent
                       </span>
                     ) : (
