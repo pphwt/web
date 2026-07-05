@@ -322,8 +322,51 @@ const panelStroke = (panel, highlighted) => {
   return '#10b981';
 };
 
+const humanize = (value) => (typeof value === 'string' ? value.replace(/_/g, ' ') : value);
+
+function PanelTooltip({ panel, width, height, dk }) {
+  if (!panel?.bbox) return null;
+  const [x0, y0, x1, y1] = panel.bbox;
+  const leftPct = Math.min(Math.max(((x0 + x1) / 2 / width) * 100, 14), 86);
+  const nearTop = (y0 / height) * 100 < 15;
+  const anchorPct = nearTop ? (y1 / height) * 100 : (y0 / height) * 100;
+  const stroke = panelStroke(panel, false);
+  const rows = [
+    ['Role', humanize(panel.role)],
+    ['Confidence', humanize(panel.confidence)],
+    ['Coverage', panel.coverage != null ? `${(Number(panel.coverage) * 100).toFixed(1)}%` : '-'],
+    ['Samples', panel.samples ?? '-'],
+    ['Source', humanize(panel.bbox_source)],
+  ];
+  if (panel.reason) rows.push(['Reason', humanize(panel.reason)]);
+  return (
+    <div
+      className={`pointer-events-none absolute z-10 min-w-[150px] rounded-lg border px-2.5 py-2 text-[10px] shadow-lg ${
+        dk ? 'border-white/[0.1] bg-[#0b1220]/95 text-slate-200' : 'border-slate-200 bg-white/95 text-slate-700'
+      }`}
+      style={{
+        left: `${leftPct}%`,
+        top: `${Math.max(anchorPct, 0)}%`,
+        transform: nearTop ? 'translate(-50%, 10px)' : 'translate(-50%, calc(-100% - 10px))',
+      }}
+    >
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] font-black" style={{ color: stroke }}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: stroke }} />
+        Lead {panel.name}
+      </div>
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex items-center justify-between gap-3">
+          <span className={dk ? 'text-slate-400' : 'text-slate-500'}>{label}</span>
+          <span className="font-bold capitalize">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }) {
   const [viewMode, setViewMode] = useState('panels');
+  const [hoveredPanel, setHoveredPanel] = useState(null);
   const width = Number(overlay?.image_size?.width || 0);
   const height = Number(overlay?.image_size?.height || 0);
   const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
@@ -429,8 +472,8 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                 <g
                   key={`${panel.name}-${panel.role}-${index}`}
                   onClick={() => onHighlight?.(panel.name)}
-                  onMouseEnter={() => onHighlight?.(panel.name)}
-                  onMouseLeave={() => onHighlight?.(null)}
+                  onMouseEnter={() => { onHighlight?.(panel.name); setHoveredPanel(panel); }}
+                  onMouseLeave={() => { onHighlight?.(null); setHoveredPanel(null); }}
                   className="cursor-pointer"
                 >
                   <title>
@@ -500,6 +543,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
             })}
           </svg>
         )}
+        {hoveredPanel && <PanelTooltip panel={hoveredPanel} width={width} height={height} dk={dk} />}
       </div>
       {(missingLeads.length > 0 || readableWarnings.length > 0) && (
         <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
