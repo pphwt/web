@@ -1114,12 +1114,26 @@ export default function ClinicalEcgAnalyzer() {
                       </button>
                     </div>
                   </div>
-                  <EcgChartViewer
-                    waveform={result.waveform}
-                    dk={dk}
-                    overlay={digitizationOverlay}
-                    digitizationReport={digitizationReport}
-                  />
+                  {digitizationReport?.layout === 'ocr_only' || digitizationReport?.layout === 'unknown' ? (
+                    <div className={`flex flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center ${
+                      dk ? 'border-white/[0.08] bg-white/[0.01]' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                      <Info size={28} className="text-sky-500 mb-2 opacity-80" />
+                      <h4 className={`text-xs font-bold ${mainText}`}>ไม่ได้ดึงข้อมูลสัญญาณคลื่นไฟฟ้าหัวใจ (Waveform Bypassed)</h4>
+                      <p className={`mt-1 max-w-md text-[10px] leading-relaxed ${subText}`}>
+                        {digitizationReport?.layout === 'ocr_only' 
+                          ? 'ระบบเปิดใช้งานโหมด OCR Only เพื่ออ่านข้อมูลและตัวเลขจากหัวกระดาษเป็นหลัก'
+                          : 'ระบบไม่สามารถตรวจจับเส้นกราฟคลื่นไฟฟ้าหัวใจบนภาพถ่ายได้อย่างสมบูรณ์ จึงแสดงเฉพาะข้อมูลที่ถอดจาก OCR หัวกระดาษ'}
+                      </p>
+                    </div>
+                  ) : (
+                    <EcgChartViewer
+                      waveform={result.waveform}
+                      dk={dk}
+                      overlay={digitizationOverlay}
+                      digitizationReport={digitizationReport}
+                    />
+                  )}
                 </section>
 
                 <aside>
