@@ -376,6 +376,11 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   const lowConfidenceCount = panels.filter((panel) => panel?.reason || panel?.confidence === 'low_confidence').length;
   const partialCount = panels.filter((panel) => panel?.confidence === 'interpolated').length;
   const missingLeads = overlay?.missing_leads || [];
+  // processed_image is the deskewed/perspective-corrected image whose pixel
+  // coordinates exactly match all panel bbox values returned by the backend.
+  // We display it in overlay view modes so boxes align correctly, and fall
+  // back to the original upload if it is absent (e.g. very old responses).
+  const processedImageUrl = overlay?.processed_image || null;
   const viewModes = [
     { key: 'original', label: 'Original' },
     { key: 'panels', label: 'Panels' },
@@ -384,6 +389,8 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   ];
   const showPanels = viewMode === 'panels' || viewMode === 'both';
   const showTrace = viewMode === 'trace' || viewMode === 'both';
+  // Use processed image for overlay modes so bbox coords align; original for the plain view.
+  const displayUrl = (viewMode !== 'original' && processedImageUrl) ? processedImageUrl : imageUrl;
   const readableWarnings = warnings.map((warning) => ({
     perspective_contour_too_small: 'Page border was weak; perspective correction may be approximate.',
     deskew_unavailable: 'Deskew angle was not reliable.',
@@ -442,7 +449,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
         </div>
       </div>
       <div className="relative overflow-auto rounded-lg border border-rose-200/70 bg-rose-50/60 max-h-[500px] custom-scrollbar">
-        <img src={imageUrl} alt="Uploaded ECG" className="block w-full" />
+        <img src={displayUrl} alt="Uploaded ECG" className="block w-full" />
         {hasOverlay && viewMode !== 'original' && (
           <svg
             viewBox={`0 0 ${width} ${height}`}
