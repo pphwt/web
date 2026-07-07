@@ -625,6 +625,7 @@ export default function ClinicalEcgAnalyzer() {
   const [samples, setSamples] = useState(DEFAULT_SAMPLES);
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
+  const [ocrOnly, setOcrOnly] = useState(false);
   const [erQuickMode, setErQuickMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -669,7 +670,7 @@ export default function ClinicalEcgAnalyzer() {
     setLoading(true); setError(''); setResult(null);
     try {
       setResult(uploadedFiles
-        ? await modelApi.analyzeEcgFile(uploadedFiles)
+        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly)
         : await modelApi.analyzeEcgSample(sampleId));
     } catch (e) {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
@@ -902,6 +903,20 @@ export default function ClinicalEcgAnalyzer() {
           รูปถ่าย/สแกน ECG (.png/.jpg) = digitize เต็ม 12-lead ได้ (รองรับหลาย layout: 3x4, 2x6, 4x3, มี/ไม่มี rhythm strip)
           + อ่านค่าจากหัวกระดาษเครื่องด้วย OCR ถ้ามี — ความชัดเจนของรูปมีผลต่อผลลัพธ์
         </p>
+        {uploadedFiles && uploadedFiles.some(f => f?.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(f?.name || '')) && (
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              id="ocr-only-checkbox"
+              type="checkbox"
+              checked={ocrOnly}
+              onChange={(e) => setOcrOnly(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+            />
+            <label htmlFor="ocr-only-checkbox" className={`text-[10px] font-bold cursor-pointer select-none ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
+              อ่านเฉพาะผลวิเคราะห์และตัวเลขหัวกระดาษ (OCR Only — ข้ามการดึงคลื่นไฟฟ้าหัวใจเพื่อรันทันที)
+            </label>
+          </div>
+        )}
         {ocrUnavailable && (
           <div className={`mb-3 flex gap-2 rounded-lg border p-2.5 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50'}`}>
             <AlertTriangle size={13} className={`mt-0.5 shrink-0 ${dk ? 'text-amber-400' : 'text-amber-600'}`} />
