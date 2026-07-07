@@ -441,7 +441,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
           </div>
         </div>
       </div>
-      <div className="relative overflow-hidden rounded-lg border border-rose-200/70 bg-rose-50/60">
+      <div className="relative overflow-auto rounded-lg border border-rose-200/70 bg-rose-50/60 max-h-[500px] custom-scrollbar">
         <img src={imageUrl} alt="Uploaded ECG" className="block w-full" />
         {hasOverlay && viewMode !== 'original' && (
           <svg
@@ -633,6 +633,15 @@ export default function ClinicalEcgAnalyzer() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [highlightedLead, setHighlightedLead] = useState(null);
   const inputRef = useRef(null);
+  const resultRef = useRef(null);
+
+  useEffect(() => {
+    if (result && resultRef.current) {
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [result]);
 
   useEffect(() => {
     modelApi.ecgSamples()
@@ -947,7 +956,7 @@ export default function ClinicalEcgAnalyzer() {
       )}
 
       {result && (
-        <>
+        <div ref={resultRef} className="space-y-5 scroll-mt-6">
           {result.meta?.format === 'image' && (
             <div className={`flex gap-2 rounded-xl border p-2.5 ${dk ? 'border-fuchsia-500/25 bg-fuchsia-500/[0.06]' : 'border-fuchsia-300 bg-fuchsia-50'}`}>
               <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${dk ? 'text-fuchsia-400' : 'text-fuchsia-600'}`} />
@@ -1306,7 +1315,7 @@ export default function ClinicalEcgAnalyzer() {
               />
             </label>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
