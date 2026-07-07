@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePatient } from '../context/PatientContext';
+import { PatientSkeleton } from '../components/ui/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -124,7 +125,7 @@ const FormTextarea = ({ label, icon, dk, ...props }) => (
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 const PatientList = () => {
-  const { patients, refreshPatients, addPatient, setSelectedPatient } = usePatient();
+  const { patients, refreshPatients, addPatient, setSelectedPatient, isLoading } = usePatient();
   const { token } = useAuth();
   const { t } = useLanguage();
   const { isDarkMode: dk } = useTheme();
@@ -543,7 +544,13 @@ const PatientList = () => {
         </section>
 
         {/* ── Patient grid ──────────────────────────────────────── */}
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <PatientSkeleton key={i} dk={dk} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className={`flex flex-col items-center justify-center rounded-2xl border py-20 ${dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50'}`}>
             <Users size={36} className={`mb-3 ${dk ? 'text-slate-700' : 'text-slate-300'}`} />
             <p className={`text-sm font-semibold ${dk ? 'text-slate-500' : 'text-slate-400'}`}>

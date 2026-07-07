@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
 import { useLanguage } from '../context/LanguageContext';
 import { modelApi } from '../services/modelApi';
+import { VisualizerSkeleton, MetricsSkeleton, Skeleton } from '../components/ui/Skeleton';
 import { diagnosticService } from '../services/diagnosticService';
 import { API_BASE } from '../utils/constants';
 
@@ -557,7 +558,9 @@ const Analysis = () => {
                 )}
               </div>
               <div className="h-[460px]">
-                {activeVisualizerTab === 'image' && imagePreviewUrl ? (
+                {loading ? (
+                  <VisualizerSkeleton dk={dk} />
+                ) : activeVisualizerTab === 'image' && imagePreviewUrl ? (
                   <div className="flex h-full flex-col gap-2 p-3">
                     <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
                       <img
@@ -685,6 +688,26 @@ const Analysis = () => {
 
           </div>
         </div>
+
+        {loading && (
+          <div className={`rounded-2xl border p-5 transition-all duration-300 ${surface} space-y-4`}>
+            <div className="flex items-center gap-2">
+              <Activity size={14} className="animate-pulse text-sky-500" />
+              <span className={`text-xs font-semibold ${secLabel}`}>กำลังคัดกรองและประเมินสัญญาณคลื่นไฟฟ้า...</span>
+            </div>
+            <MetricsSkeleton dk={dk} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 rounded w-1/3" dk={dk} />
+                <Skeleton className="h-20 rounded" dk={dk} />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 rounded w-1/3" dk={dk} />
+                <Skeleton className="h-20 rounded" dk={dk} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {result?.waveform && (
           <div className={`rounded-2xl border p-4 ${surface}`}>

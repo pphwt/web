@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Archive, Download, Activity, Clock, Cpu } from 'lucide-react';
+import { ArchiveSkeleton } from '../components/ui/Skeleton';
 import { usePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -93,9 +94,7 @@ const PatientArchives = () => {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 max-h-[600px]">
               {loading && (
-                <div className="py-12 flex justify-center">
-                  <div className={`h-6 w-6 rounded-full border-2 border-t-sky-400 animate-spin ${dk ? 'border-white/10' : 'border-slate-200'}`} />
-                </div>
+                <ArchiveSkeleton dk={dk} />
               )}
               {!loading && archives.length === 0 && (
                 <div className={`py-12 text-center text-xs ${subText}`}>
