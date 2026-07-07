@@ -216,6 +216,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
   });
 
   if (!info) return null;
+  if (result?.localization_normal_gated === true) return null;
 
   const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
   const TERR_COLOR = { LAD: '#ef4444', RCA: '#22c55e', LCx: '#f59e0b' };
@@ -555,6 +556,20 @@ const HeartModel3D = ({ result = null }) => {
         </Canvas>
       </WebGLErrorBoundary>
       <ColorLegend />
+      {result?.localization_normal_gated === true && (
+        <div style={{
+          position: 'absolute', bottom: 12, right: 12, left: 12,
+          background: 'rgba(16,185,129,0.92)', backdropFilter: 'blur(8px)',
+          border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 12,
+          padding: '10px 14px', fontFamily: 'sans-serif',
+          color: '#fff', zIndex: 20, fontSize: 11,
+          textAlign: 'center', boxShadow: '0 4px 20px rgba(16,185,129,0.3)',
+          fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+        }}>
+          <span>🟢</span>
+          <span>Normal ECG: No active localized source abnormality expected (คลื่นไฟฟ้าหัวใจปกติ: ไม่พบจุดกำเนิดกระแสไฟฟ้าผิดปกติ)</span>
+        </div>
+      )}
     </div>
   );
 };
