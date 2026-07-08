@@ -36,6 +36,8 @@ const REASON_TEXT = {
 };
 
 REASON_TEXT.image_heuristic_approx = 'approx image morphology';
+REASON_TEXT.p_wave_evidence_unavailable = 'อ่านหลักฐาน P wave ไม่ได้';
+REASON_TEXT.axis_unavailable = 'คำนวณแกนไฟฟ้าหัวใจไม่ได้';
 
 const CLINICAL_STATUS_TEXT = {
   eligible_for_review: 'พร้อมให้แพทย์ทบทวน',
@@ -1080,7 +1082,7 @@ export default function ClinicalEcgAnalyzer() {
                       <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>Rhythm</p>
                       <StatusBadge status={rhythmStatus} dk={dk} />
                     </div>
-                    <p className={`mt-1 text-base font-bold ${rhythm.label ? statusToken(rhythmStatus, dk).text : subText}`}>
+                    <p className={`mt-1 break-words text-base font-bold ${rhythm.label ? statusToken(rhythmStatus, dk).text : subText}`}>
                       {rhythm.label || REASON_TEXT[rhythm.reason] || rhythm.reason || 'Unavailable'}
                     </p>
                     {rhythmWhy && <p className={`mt-1 text-[9px] ${subText}`}>{rhythmWhy}</p>}
@@ -1090,7 +1092,7 @@ export default function ClinicalEcgAnalyzer() {
                       <p className={`text-[9px] font-semibold uppercase tracking-wider ${secLabel}`}>Axis</p>
                       <StatusBadge status={axisCategory.category ? (axisCategory.category === 'Normal' ? 'normal' : 'abnormal') : 'unavailable'} dk={dk} />
                     </div>
-                    <p className={`mt-1 text-base font-bold ${axisCategory.category ? statusToken(axisCategory.category === 'Normal' ? 'normal' : 'abnormal', dk).text : subText}`}>
+                    <p className={`mt-1 break-words text-base font-bold ${axisCategory.category ? statusToken(axisCategory.category === 'Normal' ? 'normal' : 'abnormal', dk).text : subText}`}>
                       {axisCategory.category || REASON_TEXT[axisCategory.reason] || axisCategory.reason || 'Unavailable'}
                     </p>
                     {axisCategory.degrees !== null && axisCategory.degrees !== undefined && (
