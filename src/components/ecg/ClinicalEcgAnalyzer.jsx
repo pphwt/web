@@ -339,7 +339,11 @@ function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = nul
   const layoutConfidence = digitizationReport?.layout_confidence || overlay?.layout_confidence || {};
   const layoutLevel = layoutConfidence.level || digitizationReport?.quality?.layout_confidence || 'medium';
   const layoutReason = layoutConfidence.reason || digitizationReport?.quality?.reason;
-  const layoutRequiresSource = Boolean(digitizationReport && layoutLevel === 'low');
+  const qualityStatus = digitizationReport?.quality?.status;
+  const layoutRequiresSource = Boolean(
+    digitizationReport
+      && (layoutLevel === 'low' || qualityStatus === 'low_confidence' || qualityStatus === 'not_supported')
+  );
   const [mode, setMode] = useState(layoutRequiresSource ? 'source' : 'readable');
   useEffect(() => {
     if (layoutRequiresSource) setMode('source');
@@ -379,7 +383,7 @@ function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = nul
 
       {layoutRequiresSource && (
         <div className={`mb-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
-          Layout confidence is low ({humanize(layoutReason || 'review_required')}). Readable synthetic chart is disabled until bbox/layout is corrected or ECG is repeated.
+          Layout or trace confidence is not ready ({humanize(layoutReason || qualityStatus || 'review_required')}). Readable synthetic chart is disabled until bbox/layout is corrected or ECG is repeated.
         </div>
       )}
 
