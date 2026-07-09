@@ -7,7 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { usePatient } from '../../context/PatientContext';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { modelApi } from '../../services/modelApi';
+import { modelApi, isImageEcgFile } from '../../services/modelApi';
 
 // Measurement metrics → display config. `approx` marks values that come from
 // open-source (neurokit2) delineation and can be less accurate than a certified
@@ -38,6 +38,7 @@ const REASON_TEXT = {
 REASON_TEXT.image_heuristic_approx = 'approx image morphology';
 REASON_TEXT.p_wave_evidence_unavailable = 'อ่านหลักฐาน P wave ไม่ได้';
 REASON_TEXT.axis_unavailable = 'คำนวณแกนไฟฟ้าหัวใจไม่ได้';
+REASON_TEXT.calibration_uncertain = 'หา grid มาตราส่วนไม่ได้ ค่าเป็นการประมาณ';
 
 const CLINICAL_STATUS_TEXT = {
   eligible_for_review: 'พร้อมให้แพทย์ทบทวน',
@@ -667,7 +668,7 @@ export default function ClinicalEcgAnalyzer() {
 
   useEffect(() => {
     const imageFile = Array.isArray(uploadedFiles)
-      ? uploadedFiles.find((file) => file?.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file?.name || ''))
+      ? uploadedFiles.find((file) => isImageEcgFile(file))
       : null;
     if (!imageFile) {
       setImagePreviewUrl('');
@@ -907,7 +908,7 @@ export default function ClinicalEcgAnalyzer() {
               ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : `${uploadedFiles.length} files selected`) 
               : 'เลือกไฟล์ (.npy / .csv / .hea+.dat / .dcm)'}
           </span>
-          <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg" className="hidden"
+          <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*" className="hidden"
             onChange={(e) => { 
               const list = Array.from(e.target.files || []); 
               setUploadedFiles(list.length > 0 ? list : null); 
@@ -918,10 +919,10 @@ export default function ClinicalEcgAnalyzer() {
         </label>
         <p className={`text-[10px] mb-3 ${subText}`}>
           รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
-          รูปถ่าย/สแกน ECG (.png/.jpg) = digitize เต็ม 12-lead ได้ (รองรับหลาย layout: 3x4, 2x6, 4x3, มี/ไม่มี rhythm strip)
+          รูปถ่าย/สแกน ECG (.png/.jpg/.webp/.bmp/.tiff) = digitize เต็ม 12-lead ได้ (รองรับหลาย layout: 3x4, 2x6, 4x3, มี/ไม่มี rhythm strip)
           + อ่านค่าจากหัวกระดาษเครื่องด้วย OCR ถ้ามี — ความชัดเจนของรูปมีผลต่อผลลัพธ์
         </p>
-        {uploadedFiles && uploadedFiles.some(f => f?.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(f?.name || '')) && (
+        {uploadedFiles && uploadedFiles.some((f) => isImageEcgFile(f)) && (
           <div className="mb-3 flex items-center gap-2">
             <input
               id="ocr-only-checkbox"
@@ -1315,7 +1316,7 @@ export default function ClinicalEcgAnalyzer() {
               <input
                 type="file"
                 multiple
-                accept=".pdf,.png,.jpg,.jpeg"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff"
                 className="hidden"
                 onChange={(e) => {
                   const list = Array.from(e.target.files || []);

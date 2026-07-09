@@ -25,9 +25,13 @@ const parseJson = async (response) => {
 const ECG_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_UPLOAD_MAX_BYTES || 2_000_000);
 const ECG_IMAGE_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_IMAGE_UPLOAD_MAX_BYTES || 20_000_000);
 
-const isImageEcgFile = (file) => {
+// Exported so every upload surface (Analysis.jsx, ClinicalEcgAnalyzer.jsx)
+// shares one definition instead of re-declaring this regex -- previously
+// duplicated in 4 places, which is how new formats (e.g. webp) silently
+// missed some of them.
+export const isImageEcgFile = (file) => {
   if (!file) return false;
-  return file.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name || '');
+  return file.type?.startsWith('image/') || /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(file.name || '');
 };
 
 const assertEcgUploadSize = (file) => {

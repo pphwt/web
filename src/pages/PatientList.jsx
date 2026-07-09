@@ -863,7 +863,7 @@ const PatientList = () => {
                                 </span>
                                 <input
                                   type="file"
-                                  accept=".pdf,.png,.jpg,.jpeg"
+                                  accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff"
                                   className="hidden"
                                   onChange={(e) => setConsentFile(e.target.files?.[0] || null)}
                                 />

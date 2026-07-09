@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
 import { useLanguage } from '../context/LanguageContext';
-import { modelApi } from '../services/modelApi';
+import { modelApi, isImageEcgFile } from '../services/modelApi';
 import { VisualizerSkeleton, MetricsSkeleton, Skeleton } from '../components/ui/Skeleton';
 import { diagnosticService } from '../services/diagnosticService';
 import { API_BASE } from '../utils/constants';
@@ -19,11 +19,6 @@ const ECG_12_LAYOUT = [
   ['II', 'aVL', 'V2', 'V5'],
   ['III', 'aVF', 'V3', 'V6'],
 ];
-
-const isImageEcgFile = (file) => {
-  if (!file) return false;
-  return file.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name || '');
-};
 
 const canonicalLeadName = (name) => {
   const upper = String(name || '').trim().toUpperCase();
@@ -648,13 +643,13 @@ const Analysis = () => {
                 })}
               </select>
 
-              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>หรืออัปโหลดไฟล์ ECG (.npy / .csv / .png / .jpg)</label>
+              <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>หรืออัปโหลดไฟล์ ECG (.npy / .csv / .png / .jpg / .webp / .bmp / .tiff)</label>
               <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs cursor-pointer mb-4 transition-all ${dk ? 'border-white/[0.12] text-slate-400 hover:border-sky-500/40 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:border-sky-500 hover:bg-slate-50'}`}>
                 <Upload size={14} />
                 <span className="truncate">{file ? file.name : 'เลือกไฟล์ ECG หรือรูปภาพ'}</span>
                 <input
                   type="file"
-                  accept=".npy,.csv,.png,.jpg,.jpeg,image/png,image/jpeg"
+                  accept=".npy,.csv,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*"
                   className="hidden"
                   onChange={(e) => {
                     const nextFile = e.target.files?.[0] || null;
