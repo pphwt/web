@@ -39,6 +39,7 @@ REASON_TEXT.image_heuristic_approx = 'approx image morphology';
 REASON_TEXT.p_wave_evidence_unavailable = 'อ่านหลักฐาน P wave ไม่ได้';
 REASON_TEXT.axis_unavailable = 'คำนวณแกนไฟฟ้าหัวใจไม่ได้';
 REASON_TEXT.calibration_uncertain = 'หา grid มาตราส่วนไม่ได้ ค่าเป็นการประมาณ';
+REASON_TEXT.layout_low_confidence = 'layout/bbox confidence low - review original image or repeat ECG';
 
 const CLINICAL_STATUS_TEXT = {
   eligible_for_review: 'พร้อมให้แพทย์ทบทวน',
@@ -252,14 +253,19 @@ function EcgPaperChart({ waveform, dk, compact = false, overlay = null, calibrat
   );
 }
 
-function ChartModeButton({ active, Icon, label, onClick, dk }) {
+function ChartModeButton({ active, Icon, label, onClick, dk, disabled = false }) {
   return (
     <button
       type="button"
       title={label}
       onClick={onClick}
+      disabled={disabled}
       className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[10px] font-black transition ${
-        active
+        disabled
+          ? dk
+            ? 'cursor-not-allowed border-white/[0.05] bg-white/[0.02] text-slate-600'
+            : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+          : active
           ? 'border-sky-500 bg-sky-600 text-white shadow-sm'
           : dk
             ? 'border-white/[0.08] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]'
@@ -272,12 +278,77 @@ function ChartModeButton({ active, Icon, label, onClick, dk }) {
   );
 }
 
-function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = null }) {
-  const [mode, setMode] = useState('readable');
+function SourceImageTraceChart({ imageUrl, overlay, dk }) {
+  const width = Number(overlay?.image_size?.width || 0);
+  const height = Number(overlay?.image_size?.height || 0);
+  const displayUrl = overlay?.processed_image || imageUrl;
+  const panels = Array.isArray(overlay?.panels) ? overlay.panels : [];
+  if (!displayUrl) {
+    return (
+      <div className={`flex min-h-[260px] items-center justify-center rounded-lg border border-dashed text-xs font-bold ${dk ? 'border-white/[0.08] text-slate-500' : 'border-slate-200 text-slate-400'}`}>
+        Source image unavailable
+      </div>
+    );
+  }
+  return (
+    <div className={`relative overflow-auto rounded-lg border ${dk ? 'border-white/[0.07] bg-slate-950/30' : 'border-slate-200 bg-white'}`}>
+      <img src={displayUrl} alt="Processed ECG source" className="block w-full" />
+      {width > 0 && height > 0 && panels.length > 0 && (
+        <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
+          {panels.map((panel, index) => {
+            const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
+            const stroke = panelStroke(panel, false);
+            const [x0, y0, x1, y1] = panel.bbox || [0, 0, 0, 0];
+            return (
+              <g key={`${panel.name}-${panel.role}-${index}`}>
+                {panel.bbox && (
+                  <rect
+                    x={x0}
+                    y={y0}
+                    width={Math.max(0, x1 - x0)}
+                    height={Math.max(0, y1 - y0)}
+                    fill="none"
+                    stroke={stroke}
+                    strokeOpacity="0.75"
+                    strokeWidth="1.8"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                {points && (
+                  <polyline
+                    points={points}
+                    fill="none"
+                    stroke={stroke}
+                    strokeOpacity="0.9"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = null, imageUrl = null }) {
+  const layoutConfidence = digitizationReport?.layout_confidence || overlay?.layout_confidence || {};
+  const layoutLevel = layoutConfidence.level || digitizationReport?.quality?.layout_confidence || 'medium';
+  const layoutReason = layoutConfidence.reason || digitizationReport?.quality?.reason;
+  const layoutRequiresSource = Boolean(digitizationReport && layoutLevel === 'low');
+  const [mode, setMode] = useState(layoutRequiresSource ? 'source' : 'readable');
+  useEffect(() => {
+    if (layoutRequiresSource) setMode('source');
+  }, [layoutRequiresSource]);
   const compact = mode === 'leadII';
   const aspectRatio = compact ? '1200 / 236' : '1200 / 560';
   const width = mode === 'fit' ? '100%' : compact ? '980px' : '1120px';
   const minWidth = mode === 'fit' ? '640px' : width;
+  const hasSourceImage = Boolean(imageUrl || overlay?.processed_image);
   const usesImageTrace = Array.isArray(overlay?.panels)
     && overlay.panels.some((panel) => (panel?.trace_points || []).length > 1);
 
@@ -297,12 +368,24 @@ function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = nul
           )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <ChartModeButton active={mode === 'readable'} Icon={ZoomIn} label="Readable" onClick={() => setMode('readable')} dk={dk} />
-          <ChartModeButton active={mode === 'fit'} Icon={Maximize2} label="Fit" onClick={() => setMode('fit')} dk={dk} />
-          <ChartModeButton active={mode === 'leadII'} Icon={Activity} label="Lead II" onClick={() => setMode('leadII')} dk={dk} />
+          {hasSourceImage && (
+            <ChartModeButton active={mode === 'source'} Icon={Info} label="Source" onClick={() => setMode('source')} dk={dk} />
+          )}
+          <ChartModeButton active={mode === 'readable'} Icon={ZoomIn} label="Readable" onClick={() => setMode('readable')} dk={dk} disabled={layoutRequiresSource} />
+          <ChartModeButton active={mode === 'fit'} Icon={Maximize2} label="Fit" onClick={() => setMode('fit')} dk={dk} disabled={layoutRequiresSource} />
+          <ChartModeButton active={mode === 'leadII'} Icon={Activity} label="Lead II" onClick={() => setMode('leadII')} dk={dk} disabled={layoutRequiresSource} />
         </div>
       </div>
 
+      {layoutRequiresSource && (
+        <div className={`mb-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+          Layout confidence is low ({humanize(layoutReason || 'review_required')}). Readable synthetic chart is disabled until bbox/layout is corrected or ECG is repeated.
+        </div>
+      )}
+
+      {mode === 'source' ? (
+        <SourceImageTraceChart imageUrl={imageUrl} overlay={overlay} dk={dk} />
+      ) : (
       <div className={`overflow-x-auto rounded-lg ${dk ? 'bg-slate-950/30' : 'bg-rose-50/40'}`}>
         <div className="max-w-none" style={{ width, minWidth, aspectRatio }}>
           <EcgPaperChart
@@ -314,6 +397,7 @@ function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = nul
           />
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -375,6 +459,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
   const panels = overlay?.panels || [];
   const warnings = overlay?.warnings || [];
+  const layoutConfidence = overlay?.layout_confidence || {};
   const recoveredCount = panels.filter((panel) => !panel?.reason && panel?.confidence !== 'low_confidence').length;
   const lowConfidenceCount = panels.filter((panel) => panel?.reason || panel?.confidence === 'low_confidence').length;
   const partialCount = panels.filter((panel) => panel?.confidence === 'interpolated').length;
@@ -401,6 +486,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
     layout_adaptive_trace_bands: 'Panel geometry was adapted from detected trace bands.',
     rhythm_strip_from_trace_band: 'Rhythm strip bbox follows the detected trace band.',
     bbox_low_trace_coverage: 'One or more panels have low trace coverage and need review.',
+    layout_low_confidence: 'Layout evidence is weak or label anchors conflict; review source image or repeat ECG.',
   }[warning] || warning));
 
   return (
@@ -415,6 +501,12 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
               {recoveredCount}/{panels.length} panels recovered
               {lowConfidenceCount > 0 ? ` · ${lowConfidenceCount} need review` : ''}
               {partialCount > 0 ? ` · ${partialCount} partial` : ''}
+            </p>
+          )}
+          {layoutConfidence.level && (
+            <p className={`mt-1 text-[10px] font-bold ${layoutConfidence.level === 'low' ? 'text-amber-500' : dk ? 'text-slate-400' : 'text-slate-500'}`}>
+              Layout confidence: {layoutConfidence.level}
+              {layoutConfidence.reason ? ` · ${humanize(layoutConfidence.reason)}` : ''}
             </p>
           )}
         </div>
@@ -1151,6 +1243,7 @@ export default function ClinicalEcgAnalyzer() {
                       dk={dk}
                       overlay={digitizationOverlay}
                       digitizationReport={digitizationReport}
+                      imageUrl={imagePreviewUrl}
                     />
                   )}
                 </section>

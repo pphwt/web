@@ -81,7 +81,7 @@ export const modelApi = {
 
   // Real clinical-file path: standard formats + neurokit2 measurements + honest
   // localizer gating (see backend /ecg/analyze).
-  analyzeEcgFile: async (fileOrFiles, ocrOnly = false) => {
+  analyzeEcgFile: async (fileOrFiles, ocrOnly = false, layoutOverride = null) => {
     const form = new FormData();
     if (Array.isArray(fileOrFiles)) {
       fileOrFiles.forEach(f => {
@@ -94,6 +94,9 @@ export const modelApi = {
     }
     if (ocrOnly) {
       form.append('ocr_only', 'true');
+    }
+    if (layoutOverride) {
+      form.append('layout_override', layoutOverride);
     }
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
