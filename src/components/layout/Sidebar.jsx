@@ -4,6 +4,7 @@ import {
   Activity, FileText, LogOut, Users, Archive,
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
   X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw, Stethoscope,
+  BookOpen,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -165,6 +166,21 @@ export const Sidebar = ({ onClose }) => {
           </div>
         ))}
       </nav>
+
+      {/* ── Footer: system documentation link ───────────────── */}
+      <div className={`px-3 pb-1 border-t ${divider} pt-2`}>
+        <a
+          href="/docs/system-explainer.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] transition-colors ${
+            dk ? 'text-slate-500 hover:text-sky-400 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-sky-600 hover:bg-slate-50'
+          }`}
+        >
+          <BookOpen size={13} className="opacity-70 shrink-0" />
+          <span className="truncate">เอกสารระบบ (System Docs)</span>
+        </a>
+      </div>
 
       {/* ── User card + dropdown ─────────────────────────────── */}
       <div className={`px-3 pt-3 pb-4 border-t ${divider}`} ref={menuRef}>
