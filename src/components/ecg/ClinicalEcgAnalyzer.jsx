@@ -41,12 +41,6 @@ REASON_TEXT.axis_unavailable = 'คำนวณแกนไฟฟ้าหัว
 REASON_TEXT.calibration_uncertain = 'หา grid มาตราส่วนไม่ได้ ค่าเป็นการประมาณ';
 REASON_TEXT.layout_low_confidence = 'layout/bbox confidence low - review original image or repeat ECG';
 
-const CLINICAL_STATUS_TEXT = {
-  eligible_for_review: 'พร้อมให้แพทย์ทบทวน',
-  repeat_required: 'ควรถ่าย/วัดซ้ำก่อนใช้ผล',
-  not_supported: 'ข้อมูลไม่พอสำหรับวิเคราะห์',
-  pending: 'รอผล',
-};
 
 const metricStatus = (metric, normal) => {
   if (!metric || metric.value === null || metric.value === undefined) return 'unavailable';
@@ -146,7 +140,13 @@ const percentile = (values, ratio) => {
 
 const pickOverlayPanel = (overlay, label, rhythm = false) => {
   const panels = Array.isArray(overlay?.panels) ? overlay.panels : [];
-  const matches = panels.filter((panel) => panel?.name?.toUpperCase() === label.toUpperCase());
+  // A low-confidence panel's trace_points are mostly straight-line
+  // interpolation across sparse ink (see the same exclusion in the raw-image
+  // overlay) -- plotting it here in the "Readable" synthetic chart produces
+  // the same misleading flat-then-jump artifact, just redrawn as if it were
+  // a clean signal. Exclude it so the caller falls back to `waveform` (or
+  // "Lead unavailable") instead of a fabricated-looking trace.
+  const matches = panels.filter((panel) => panel?.name?.toUpperCase() === label.toUpperCase() && panel.confidence !== 'low_confidence');
   if (!matches.length) return null;
   const preferredRole = rhythm ? 'rhythm_strip' : 'panel';
   return matches.find((panel) => panel.role === preferredRole && (panel.trace_points || []).length > 1)
@@ -298,7 +298,14 @@ function SourceImageTraceChart({ imageUrl, overlay, dk }) {
           {panels.map((panel, index) => {
             const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
             const stroke = panelStroke(panel, false);
-            const [x0, y0, x1, y1] = panel.bbox || [0, 0, 0, 0];
+            const [rawX0, rawY0, rawX1, rawY1] = panel.bbox || [0, 0, 0, 0];
+            // See EcgImageOverlay's matching inset: adjacent panels are often
+            // flush, which reads as one merged box -- draw with a small gap.
+            const boxInset = Math.min(rawX1 - rawX0, rawY1 - rawY0) * 0.04;
+            const x0 = rawX0 + boxInset;
+            const y0 = rawY0 + boxInset;
+            const x1 = rawX1 - boxInset;
+            const y1 = rawY1 - boxInset;
             return (
               <g key={`${panel.name}-${panel.role}-${index}`}>
                 {panel.bbox && (
@@ -314,7 +321,10 @@ function SourceImageTraceChart({ imageUrl, overlay, dk }) {
                     vectorEffect="non-scaling-stroke"
                   />
                 )}
-                {points && (
+                {/* See EcgImageOverlay's matching skip: a low-confidence trace is
+                    mostly straight-line interpolation across sparse points and
+                    reads as real (wrong) data if drawn. */}
+                {points && panel.confidence !== 'low_confidence' && (
                   <polyline
                     points={points}
                     fill="none"
@@ -547,109 +557,130 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
           </div>
         </div>
       </div>
-      <div className="relative overflow-auto rounded-lg border border-rose-200/70 bg-rose-50/60 max-h-[500px] custom-scrollbar">
-        <img src={displayUrl} alt="Uploaded ECG" className="block w-full" />
-        {hasOverlay && viewMode !== 'original' && (
-          <svg
-            viewBox={`0 0 ${width} ${height}`}
-            className="absolute inset-0 h-full w-full"
-            preserveAspectRatio="none"
-          >
-            {overlay.page_bbox && (
-              <rect
-                x={overlay.page_bbox[0]}
-                y={overlay.page_bbox[1]}
-                width={Math.max(0, overlay.page_bbox[2] - overlay.page_bbox[0])}
-                height={Math.max(0, overlay.page_bbox[3] - overlay.page_bbox[1])}
-                fill="none"
-                stroke="#0ea5e9"
-                strokeWidth="2"
-                vectorEffect="non-scaling-stroke"
-                strokeDasharray="6 4"
-              />
-            )}
-            {panels.map((panel, index) => {
-              const [x0, y0, x1, y1] = panel.bbox || [0, 0, 0, 0];
-              const highlighted = highlightedLead && panel.name?.toUpperCase() === highlightedLead.toUpperCase();
-              const stroke = panelStroke(panel, highlighted);
-              const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
-              const [tx0, ty0, tx1, ty1] = panel.trace_bbox || [];
-              return (
-                <g
-                  key={`${panel.name}-${panel.role}-${index}`}
-                  onClick={() => onHighlight?.(panel.name)}
-                  onMouseEnter={() => { onHighlight?.(panel.name); setHoveredPanel(panel); }}
-                  onMouseLeave={() => { onHighlight?.(null); setHoveredPanel(null); }}
-                  className="cursor-pointer"
-                >
-                  <title>
-                    {[
-                      panel.name,
-                      panel.role,
-                      panel.bbox_source,
-                      panel.coverage != null ? `coverage ${Number(panel.coverage).toFixed(3)}` : null,
-                      panel.reason,
-                    ].filter(Boolean).join(' · ')}
-                  </title>
-                  {showPanels && (
-                    <rect
-                      x={x0}
-                      y={y0}
-                      width={Math.max(0, x1 - x0)}
-                      height={Math.max(0, y1 - y0)}
-                      fill={highlighted ? 'rgba(14,165,233,0.13)' : 'rgba(255,255,255,0.01)'}
-                      stroke={stroke}
-                      strokeOpacity={highlighted ? 1 : 0.86}
-                      strokeWidth={highlighted ? 4 : 2.2}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  )}
-                  {showTrace && panel.trace_bbox && (
-                    <rect
-                      x={tx0}
-                      y={ty0}
-                      width={Math.max(0, tx1 - tx0)}
-                      height={Math.max(0, ty1 - ty0)}
-                      fill="none"
-                      stroke={highlighted ? '#38bdf8' : stroke}
-                      strokeDasharray="4 4"
-                      strokeOpacity={highlighted ? 0.9 : 0.42}
-                      strokeWidth={highlighted ? 2.1 : 1.2}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  )}
-                  {showTrace && points && (
-                    <polyline
-                      points={points}
-                      fill="none"
-                      stroke={stroke}
-                      strokeOpacity={highlighted ? 0.95 : 0.72}
-                      strokeWidth={highlighted ? 2.4 : 1.15}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  )}
-                  {showPanels && (
-                    <text
-                      x={x0 + 8}
-                      y={y0 + 18}
-                      fill={stroke}
-                      fontSize="14"
-                      fontWeight="800"
-                      stroke={dk ? '#0f172a' : '#ffffff'}
-                      strokeWidth="3"
-                      paintOrder="stroke"
-                    >
-                      {panel.name}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-        )}
-        {hoveredPanel && <PanelTooltip panel={hoveredPanel} width={width} height={height} dk={dk} />}
+      <div className="relative overflow-hidden rounded-lg border border-rose-200/70 bg-rose-50/60">
+        {/* No max-height/scroll here -- the whole image renders at its
+            natural size so the overlay is never taller than its container
+            (see the old max-h-[500px] version's comment history: that clamp
+            made the absolutely-positioned SVG's h-full resolve against the
+            clamped box instead of the image's true rendered size). */}
+        <div className="relative">
+          <img src={displayUrl} alt="Uploaded ECG" className="block w-full" />
+          {hasOverlay && viewMode !== 'original' && (
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              className="absolute inset-0 h-full w-full"
+              preserveAspectRatio="none"
+            >
+              {overlay.page_bbox && (
+                <rect
+                  x={overlay.page_bbox[0]}
+                  y={overlay.page_bbox[1]}
+                  width={Math.max(0, overlay.page_bbox[2] - overlay.page_bbox[0])}
+                  height={Math.max(0, overlay.page_bbox[3] - overlay.page_bbox[1])}
+                  fill="none"
+                  stroke="#0ea5e9"
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                  strokeDasharray="6 4"
+                />
+              )}
+              {panels.map((panel, index) => {
+                const [rawX0, rawY0, rawX1, rawY1] = panel.bbox || [0, 0, 0, 0];
+                // Adjacent panels are often flush (no real gap in the source
+                // geometry), which reads as one merged box once low-confidence
+                // panels share a border color -- inset the drawn rect a touch
+                // so neighboring boxes are always visually distinct.
+                const insetAmount = Math.min(rawX1 - rawX0, rawY1 - rawY0) * 0.04;
+                const x0 = rawX0 + insetAmount;
+                const y0 = rawY0 + insetAmount;
+                const x1 = rawX1 - insetAmount;
+                const y1 = rawY1 - insetAmount;
+                const highlighted = highlightedLead && panel.name?.toUpperCase() === highlightedLead.toUpperCase();
+                const stroke = panelStroke(panel, highlighted);
+                const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
+                const [tx0, ty0, tx1, ty1] = panel.trace_bbox || [];
+                return (
+                  <g
+                    key={`${panel.name}-${panel.role}-${index}`}
+                    onClick={() => onHighlight?.(panel.name)}
+                    onMouseEnter={() => { onHighlight?.(panel.name); setHoveredPanel(panel); }}
+                    onMouseLeave={() => { onHighlight?.(null); setHoveredPanel(null); }}
+                    className="cursor-pointer"
+                  >
+                    <title>
+                      {[
+                        panel.name,
+                        panel.role,
+                        panel.bbox_source,
+                        panel.coverage != null ? `coverage ${Number(panel.coverage).toFixed(3)}` : null,
+                        panel.reason,
+                      ].filter(Boolean).join(' · ')}
+                    </title>
+                    {showPanels && (
+                      <rect
+                        x={x0}
+                        y={y0}
+                        width={Math.max(0, x1 - x0)}
+                        height={Math.max(0, y1 - y0)}
+                        fill={highlighted ? 'rgba(14,165,233,0.13)' : 'rgba(255,255,255,0.01)'}
+                        stroke={stroke}
+                        strokeOpacity={highlighted ? 1 : 0.86}
+                        strokeWidth={highlighted ? 4 : 2.2}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {showTrace && panel.trace_bbox && (
+                      <rect
+                        x={tx0}
+                        y={ty0}
+                        width={Math.max(0, tx1 - tx0)}
+                        height={Math.max(0, ty1 - ty0)}
+                        fill="none"
+                        stroke={highlighted ? '#38bdf8' : stroke}
+                        strokeDasharray="4 4"
+                        strokeOpacity={highlighted ? 0.9 : 0.42}
+                        strokeWidth={highlighted ? 2.1 : 1.2}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {/* A low-confidence panel found very few ink columns, so this
+                        polyline is mostly straight-line interpolation across
+                        large gaps -- it reads as a real (wrong-looking) waveform
+                        rather than the "not enough data" it actually is. Skip
+                        it and let the red box + tooltip carry that signal. */}
+                    {showTrace && points && panel.confidence !== 'low_confidence' && (
+                      <polyline
+                        points={points}
+                        fill="none"
+                        stroke={stroke}
+                        strokeOpacity={highlighted ? 0.95 : 0.72}
+                        strokeWidth={highlighted ? 2.4 : 1.15}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {showPanels && (
+                      <text
+                        x={x0 + 8}
+                        y={y0 + 18}
+                        fill={stroke}
+                        fontSize="14"
+                        fontWeight="800"
+                        stroke={dk ? '#0f172a' : '#ffffff'}
+                        strokeWidth="3"
+                        paintOrder="stroke"
+                      >
+                        {panel.name}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+          {hoveredPanel && <PanelTooltip panel={hoveredPanel} width={width} height={height} dk={dk} />}
+        </div>
       </div>
       {(missingLeads.length > 0 || readableWarnings.length > 0) && (
         <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
@@ -738,8 +769,26 @@ export default function ClinicalEcgAnalyzer() {
   const [formatInfo, setFormatInfo] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [highlightedLead, setHighlightedLead] = useState(null);
+  const [sampleDropdownOpen, setSampleDropdownOpen] = useState(false);
   const inputRef = useRef(null);
   const resultRef = useRef(null);
+  const sampleDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!sampleDropdownOpen) return;
+    const onClickOutside = (e) => {
+      if (sampleDropdownRef.current && !sampleDropdownRef.current.contains(e.target)) {
+        setSampleDropdownOpen(false);
+      }
+    };
+    const onKeyDown = (e) => { if (e.key === 'Escape') setSampleDropdownOpen(false); };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [sampleDropdownOpen]);
 
   useEffect(() => {
     if (result && resultRef.current) {
@@ -868,8 +917,6 @@ export default function ClinicalEcgAnalyzer() {
   const ocrUnavailable = formatInfo?.ocr && formatInfo.ocr.available === false;
   const claimContext = result?.claim_context || formatInfo?.claim_context || {};
   const claimText = claimContext.intended_use || DEFAULT_CLAIM_WORDING;
-  const clinicalUse = result?.clinical_use_status || {};
-  const clinicalUseStatus = clinicalUse.status || 'pending';
   const machineFields = result?.machine_reported?.fields || {};
   const hasMachineReported = Object.values(machineFields).some((field) => field?.value !== null && field?.value !== undefined);
   const rhythm = result?.rhythm || {};
@@ -970,11 +1017,14 @@ export default function ClinicalEcgAnalyzer() {
     <div className="flex flex-col gap-5">
       {/* Input */}
       <div className={`rounded-2xl border p-4 ${surface}`}>
-        <div className={`text-xs font-semibold mb-3 ${secLabel}`}>1 · เลือก ECG จริง</div>
+        <div className={`text-[20px] mb-3 ${secLabel}`}>1 · เลือก ECG จริง</div>
 
-        <div className={`mb-3 rounded-lg border p-2.5 ${dk ? 'border-sky-500/20 bg-sky-500/[0.06]' : 'border-sky-200 bg-sky-50'}`}>
-          <p className={`text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>Clinician CDS claim</p>
-          <p className={`mt-1 text-[10px] leading-relaxed ${dk ? 'text-slate-300' : 'text-slate-700'}`}>{claimText}</p>
+        <div className={`group relative mb-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold ${dk ? 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
+          <Info size={11} />
+          Clinician CDS claim
+          <div className={`invisible absolute left-0 top-full z-30 mt-1.5 w-80 rounded-lg border p-2.5 text-[10px] font-normal leading-relaxed opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${dk ? 'border-white/[0.08] bg-[#0d1525] text-slate-300' : 'border-slate-200 bg-white text-slate-700'}`}>
+            {claimText}
+          </div>
         </div>
 
         {samples.length > 0 && (
@@ -982,17 +1032,52 @@ export default function ClinicalEcgAnalyzer() {
             <label className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
               <Database size={11} /> ตัวอย่างจริง PTB-XL (มี label ยืนยัน)
             </label>
-            <select
-              value={sampleId}
-              onChange={(e) => { setSampleId(e.target.value); setUploadedFiles(null); setHighlightedLead(null); setError(''); }}
-              disabled={!!uploadedFiles}
-              className={`w-full rounded-lg border px-3 py-2 text-xs mb-3 ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${uploadedFiles ? 'opacity-50' : ''}`}
-            >
-              <option value="">— เลือกตัวอย่างจริง —</option>
-              {samples.map((s) => (
-                <option key={s.id} value={s.id}>{s.primary_label} · {s.id} ({s.sex}, {s.age ?? '?'}y)</option>
-              ))}
-            </select>
+            <div ref={sampleDropdownRef} className="relative mb-3">
+              <button
+                type="button"
+                disabled={!!uploadedFiles}
+                onClick={() => setSampleDropdownOpen((v) => !v)}
+                className={`flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs ${dk ? 'bg-white/[0.03] border-white/[0.08] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} ${uploadedFiles ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <span className="truncate">
+                  {sampleId
+                    ? (() => {
+                        const s = samples.find((x) => x.id === sampleId);
+                        return s ? `${s.primary_label} · ${s.id} (${s.sex}, ${s.age ?? '?'}y)` : '— เลือกตัวอย่างจริง —';
+                      })()
+                    : '— เลือกตัวอย่างจริง —'}
+                </span>
+                <ChevronDown size={14} className={`shrink-0 transition-transform ${sampleDropdownOpen ? 'rotate-180' : ''} ${secLabel}`} />
+              </button>
+              {sampleDropdownOpen && (
+                <div
+                  role="listbox"
+                  className={`absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border text-xs shadow-lg ${dk ? 'bg-[#0d1525] border-white/[0.08]' : 'bg-white border-slate-200'}`}
+                >
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={sampleId === ''}
+                    onClick={() => { setSampleId(''); setUploadedFiles(null); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
+                    className={`block w-full px-3 py-2 text-left ${sampleId === '' ? 'bg-sky-600 text-white' : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
+                  >
+                    — เลือกตัวอย่างจริง —
+                  </button>
+                  {samples.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="option"
+                      aria-selected={sampleId === s.id}
+                      onClick={() => { setSampleId(s.id); setUploadedFiles(null); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
+                      className={`block w-full px-3 py-2 text-left ${sampleId === s.id ? 'bg-sky-600 text-white' : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      {s.primary_label} · {s.id} ({s.sex}, {s.age ?? '?'}y)
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className={`text-[10px] mb-3 ${secLabel}`}>หรืออัปโหลดไฟล์เอง</div>
           </>
         )}
@@ -1002,7 +1087,7 @@ export default function ClinicalEcgAnalyzer() {
           <span className="truncate">
             {uploadedFiles 
               ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : `${uploadedFiles.length} files selected`) 
-              : 'เลือกไฟล์ (.npy / .csv / .hea+.dat / .dcm)'}
+              : 'เลือกไฟล์ (รูปถ่าย/สแกน .jpg .png .webp หรือ .npy / .csv / .hea+.dat / .dcm)'}
           </span>
           <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*" className="hidden"
             onChange={(e) => { 
@@ -1013,11 +1098,15 @@ export default function ClinicalEcgAnalyzer() {
               setError(''); 
             }} />
         </label>
-        <p className={`text-[10px] mb-3 ${subText}`}>
-          รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
-          รูปถ่าย/สแกน ECG (.png/.jpg/.webp/.bmp/.tiff) = digitize เต็ม 12-lead ได้ (รองรับหลาย layout: 3x4, 2x6, 4x3, มี/ไม่มี rhythm strip)
-          + อ่านค่าจากหัวกระดาษเครื่องด้วย OCR ถ้ามี — ความชัดเจนของรูปมีผลต่อผลลัพธ์
-        </p>
+        <div className={`group relative mb-3 inline-flex items-center gap-1 text-[10px] ${subText}`}>
+          <Info size={11} />
+          รองรับไฟล์มาตรฐานและรูปถ่าย/สแกน ECG
+          <div className={`invisible absolute left-0 top-full z-30 mt-1.5 w-80 rounded-lg border p-2.5 text-[10px] font-normal leading-relaxed opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${dk ? 'border-white/[0.08] bg-[#0d1525] text-slate-300' : 'border-slate-200 bg-white text-slate-700'}`}>
+            รองรับ WFDB (PTB-XL), DICOM-ECG, XML (GE MUSE), Excel (.xlsx), CSV, NumPy — 12/10-lead ·
+            รูปถ่าย/สแกน ECG (.png/.jpg/.webp/.bmp/.tiff) = digitize เต็ม 12-lead ได้ (รองรับหลาย layout: 3x4, 2x6, 4x3, มี/ไม่มี rhythm strip)
+            + อ่านค่าจากหัวกระดาษเครื่องด้วย OCR ถ้ามี — ความชัดเจนของรูปมีผลต่อผลลัพธ์
+          </div>
+        </div>
         {uploadedFiles && uploadedFiles.some((f) => isImageEcgFile(f)) && (
           <div className="mb-3 flex items-center gap-2">
             <input
@@ -1073,44 +1162,15 @@ export default function ClinicalEcgAnalyzer() {
             </div>
           )}
 
-          <div className={`flex gap-2 rounded-xl border p-2.5 ${
-            clinicalUseStatus === 'eligible_for_review'
-              ? (dk ? 'border-emerald-500/25 bg-emerald-500/[0.06]' : 'border-emerald-300 bg-emerald-50')
-              : clinicalUseStatus === 'not_supported'
-                ? (dk ? 'border-rose-500/25 bg-rose-500/[0.07]' : 'border-rose-300 bg-rose-50')
-                : (dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-300 bg-amber-50')
-          }`}>
-            <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${
-              clinicalUseStatus === 'eligible_for_review'
-                ? 'text-emerald-500'
-                : clinicalUseStatus === 'not_supported' ? 'text-rose-500' : 'text-amber-500'
-            }`} />
-            <div>
-              <p className={`text-[11px] font-black tracking-wide ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
-                {CLINICAL_STATUS_TEXT[clinicalUseStatus] || clinicalUseStatus}
-              </p>
-              <p className={`mt-0.5 text-[10px] leading-relaxed ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
-                {(clinicalUse.reasons || []).length ? `Gate reasons: ${clinicalUse.reasons.join(', ')}` : 'Eligible for clinician review with sign-off.'}
-                {(clinicalUse.flags || []).length ? ` Flags: ${clinicalUse.flags.join(', ')}` : ''}
-              </p>
-            </div>
-          </div>
-
           <div className={`overflow-hidden rounded-[22px] border p-4 shadow-sm ${dk ? 'border-white/[0.07] bg-[#0b1220]' : 'border-slate-200 bg-white'}`}>
             {result.ground_truth_label && (
-              <div className={`mb-3 flex items-center gap-2 rounded-xl border p-2.5 ${dk ? 'bg-emerald-500/[0.08] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
-                <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />
-                <span className={`text-[11px] ${dk ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                  Label ยืนยันจาก PTB-XL: <b>{result.ground_truth_label}</b>
-                </span>
-              </div>
+              <p className={`mb-3 text-[24px] ${subText}`}>
+                ผลการประมวลผล: <b className={mainText}>{result.ground_truth_label}</b>
+              </p>
             )}
-            <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <div className={`rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">1</span>
-                  <h3 className={`text-sm font-bold ${mainText}`}>Patient Information</h3>
-                </div>
+            <div className={`mb-4 rounded-lg border ${dk ? 'border-white/[0.07] divide-white/[0.07]' : 'border-slate-200 divide-slate-200'} divide-y sm:divide-y-0 sm:divide-x sm:grid sm:grid-cols-2`}>
+              <div className="p-3">
+                <h3 className={`mb-2 text-[11px] font-bold uppercase tracking-wider ${secLabel}`}>Patient Information</h3>
                 <div className="grid grid-cols-1 gap-x-5 gap-y-1 sm:grid-cols-2">
                   <InfoPair dk={dk} label="MRN:" value={patientInfo.mrn} />
                   <InfoPair dk={dk} label="Gender:" value={patientInfo.gender} />
@@ -1121,12 +1181,9 @@ export default function ClinicalEcgAnalyzer() {
                 </div>
               </div>
 
-              <div className={`rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
+              <div className="p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">2</span>
-                    <h3 className={`text-sm font-bold ${mainText}`}>ECG Measurements</h3>
-                  </div>
+                  <h3 className={`text-[11px] font-bold uppercase tracking-wider ${secLabel}`}>ECG Measurements</h3>
                   <button
                     type="button"
                     onClick={() => setErQuickMode((v) => !v)}
@@ -1135,9 +1192,7 @@ export default function ClinicalEcgAnalyzer() {
                     {erQuickMode ? 'Full View' : 'ER Quick'}
                   </button>
                 </div>
-                <div className="grid grid-cols-1 gap-x-5 gap-y-1 sm:grid-cols-2">
-                  <InfoPair dk={dk} label="Heart Rate:" value={`${getMetricValue('heart_rate_bpm')} bpm`} />
-                </div>
+                <InfoPair dk={dk} label="Heart Rate:" value={`${getMetricValue('heart_rate_bpm')} bpm`} />
                 {/* Rhythm/Axis/Intervals shown once, in the detail cards below — repeating them
                     here as plain text just doubled the page without adding information. */}
                 <p className={`mt-2 text-[10px] font-semibold ${hasMachineReported ? (dk ? 'text-cyan-300' : 'text-cyan-700') : subText}`}>

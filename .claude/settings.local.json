@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npx sixzens *)",
       "Bash(cat vite.config.js)",
-      "Bash(cat vite.config.ts)"
+      "Bash(cat vite.config.ts)",
+      "Bash(python make_synthetic.py)",
+      "Bash(python run_test.py)",
+      "Bash(python -c ' *)",
+      "Bash(python 'C:\\\\Users\\\\ASUS\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ASUS-Downloads-BioElectric-web\\\\69439a6f-7f83-497f-b975-4c9fd0a54427\\\\scratchpad\\\\ssh_run.py' 'python3 -c \"import base64; open\\('\\\\''/var/www/bioelectic/bioelectric-backend/app/ecg/loaders/__init__.py'\\\\'','\\\\''wb'\\\\''\\).write\\(base64.b64decode\\('\\\\''__CMDSUB_OUTPUT__'\\\\''\\)\\)\"; wc -l /var/www/bioelectic/bioelectric-backend/app/ecg/loaders/__init__.py')"
     ]
   }
 }

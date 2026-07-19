@@ -13,9 +13,25 @@ const clampScale = (value) => {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, parsed));
 };
 
+const readSavedScale = () => {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const writeSavedScale = (value) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(value));
+  } catch {
+    // Keep rendering when saved preferences cannot be written.
+  }
+};
+
 export const AccessibilityProvider = ({ children }) => {
   const [fontScale, setFontScaleState] = useState(() => {
-    return clampScale(localStorage.getItem(STORAGE_KEY) || 1);
+    return clampScale(readSavedScale() || 1);
   });
 
   useEffect(() => {
@@ -23,7 +39,7 @@ export const AccessibilityProvider = ({ children }) => {
     const nextScale = clampScale(fontScale);
     root.style.setProperty('--app-font-scale', String(nextScale));
     root.style.setProperty('--app-font-percent', `${Math.round(nextScale * 100)}%`);
-    localStorage.setItem(STORAGE_KEY, String(nextScale));
+    writeSavedScale(nextScale);
   }, [fontScale]);
 
   const controls = useMemo(() => {

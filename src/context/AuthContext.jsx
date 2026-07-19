@@ -2,18 +2,42 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const AuthContext = createContext();
 
+const getStoredItem = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const setStoredItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Auth state still updates in memory for the current tab.
+  }
+};
+
+const removeStoredItem = (key) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures so render can continue.
+  }
+};
+
 const readStoredToken = () => {
-  const stored = localStorage.getItem('bio_token');
+  const stored = getStoredItem('bio_token');
   if (!stored) return null;
   try {
     const payload = JSON.parse(atob(stored.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem('bio_token');
+      removeStoredItem('bio_token');
       return null;
     }
     return stored;
   } catch {
-    localStorage.removeItem('bio_token');
+    removeStoredItem('bio_token');
     return null;
   }
 };
@@ -37,6 +61,7 @@ export const AuthProvider = ({ children }) => {
       try {
         setUser(userFromToken(token));
       } catch {
+        removeStoredItem('bio_token');
         setToken(null);
       }
     }
@@ -44,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = (newToken, userData) => {
-    localStorage.setItem('bio_token', newToken);
+    setStoredItem('bio_token', newToken);
     setToken(newToken);
     try {
       setUser({ ...userFromToken(newToken), ...userData });
@@ -54,7 +79,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('bio_token');
+    removeStoredItem('bio_token');
     setToken(null);
     setUser(null);
   };
