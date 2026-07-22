@@ -138,6 +138,41 @@ const percentile = (values, ratio) => {
   return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(sorted.length * ratio)))];
 };
 
+const resolveOverlayCoordinateSize = (overlay, loadedSize = null) => {
+  const declaredWidth = Number(overlay?.image_size?.width || 0);
+  const declaredHeight = Number(overlay?.image_size?.height || 0);
+  if (declaredWidth > 0 && declaredHeight > 0) {
+    return { width: declaredWidth, height: declaredHeight, source: 'metadata' };
+  }
+
+  // Older responses may contain panel coordinates without image_size. Derive
+  // a coordinate canvas from every auditable geometry field so scanning can
+  // continue instead of withholding the complete overlay.
+  let maxX = 0;
+  let maxY = 0;
+  const includeBox = (box) => {
+    if (!Array.isArray(box) || box.length < 4) return;
+    maxX = Math.max(maxX, Number(box[2]) || 0);
+    maxY = Math.max(maxY, Number(box[3]) || 0);
+  };
+  includeBox(overlay?.page_bbox);
+  (overlay?.panels || []).forEach((panel) => {
+    includeBox(panel?.bbox);
+    includeBox(panel?.cell_bbox);
+    includeBox(panel?.trace_bbox);
+    (panel?.trace_points || []).forEach((point) => {
+      maxX = Math.max(maxX, Number(point?.[0]) || 0);
+      maxY = Math.max(maxY, Number(point?.[1]) || 0);
+    });
+  });
+  if (maxX > 0 && maxY > 0) return { width: maxX, height: maxY, source: 'geometry' };
+  return {
+    width: Number(loadedSize?.width || 0),
+    height: Number(loadedSize?.height || 0),
+    source: 'displayed_image',
+  };
+};
+
 const pickOverlayPanel = (overlay, label, rhythm = false) => {
   const panels = Array.isArray(overlay?.panels) ? overlay.panels : [];
   // A low-confidence panel's trace_points are mostly straight-line
@@ -280,11 +315,11 @@ function ChartModeButton({ active, Icon, label, onClick, dk, disabled = false })
 
 function SourceImageTraceChart({ imageUrl, overlay, dk }) {
   const [loadedSize, setLoadedSize] = useState(null);
-  const width = Number(overlay?.image_size?.width || 0);
-  const height = Number(overlay?.image_size?.height || 0);
   const displayUrl = overlay?.processed_image || imageUrl;
+  const coordinateSize = resolveOverlayCoordinateSize(overlay, loadedSize);
+  const { width, height } = coordinateSize;
   const panels = Array.isArray(overlay?.panels) ? overlay.panels : [];
-  const dimensionsMatch = !loadedSize || (loadedSize.width === width && loadedSize.height === height);
+  useEffect(() => setLoadedSize(null), [displayUrl]);
   if (!displayUrl) {
     return (
       <div className={`flex min-h-[260px] items-center justify-center rounded-lg border border-dashed text-xs font-bold ${dk ? 'border-white/[0.08] text-slate-500' : 'border-slate-200 text-slate-400'}`}>
@@ -295,7 +330,7 @@ function SourceImageTraceChart({ imageUrl, overlay, dk }) {
   return (
     <div className={`relative overflow-auto rounded-lg border ${dk ? 'border-white/[0.07] bg-slate-950/30' : 'border-slate-200 bg-white'}`}>
       <img src={displayUrl} alt="Processed ECG source" className="block w-full" onLoad={(event) => setLoadedSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} />
-      {width > 0 && height > 0 && panels.length > 0 && dimensionsMatch && (
+      {width > 0 && height > 0 && panels.length > 0 && (
         <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
           {panels.map((panel, index) => {
             const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
@@ -471,9 +506,6 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   const [viewMode, setViewMode] = useState('panels');
   const [hoveredPanel, setHoveredPanel] = useState(null);
   const [loadedSize, setLoadedSize] = useState(null);
-  const width = Number(overlay?.image_size?.width || 0);
-  const height = Number(overlay?.image_size?.height || 0);
-  const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
   const panels = overlay?.panels || [];
   const warnings = overlay?.warnings || [];
   const layoutConfidence = overlay?.layout_confidence || {};
@@ -497,8 +529,18 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   const showTrace = viewMode === 'trace' || viewMode === 'both';
   // Use processed image for overlay modes so bbox coords align; original for the plain view.
   const displayUrl = (viewMode !== 'original' && processedImageUrl) ? processedImageUrl : imageUrl;
-  const dimensionsMatch = !loadedSize || (loadedSize.width === width && loadedSize.height === height);
-  const overlayReady = hasOverlay && dimensionsMatch;
+  const coordinateSize = resolveOverlayCoordinateSize(overlay, loadedSize);
+  const { width, height } = coordinateSize;
+  const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
+  // SVG viewBox performs independent X/Y scaling into the exact rendered
+  // image box. This supports browser resize, EXIF-oriented uploads, cropped
+  // processed images and legacy responses whose natural dimensions differ.
+  const overlayReady = hasOverlay && Boolean(displayUrl);
+  const usesBestEffortSource = viewMode !== 'original'
+    && !processedImageUrl
+    && loadedSize
+    && coordinateSize.source !== 'displayed_image';
+  useEffect(() => setLoadedSize(null), [displayUrl]);
   const readableWarnings = warnings.map((warning) => ({
     perspective_contour_too_small: 'Page border was weak; perspective correction may be approximate.',
     deskew_unavailable: 'Deskew angle was not reliable.',
@@ -688,12 +730,11 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
           {hoveredPanel && <PanelTooltip panel={hoveredPanel} width={width} height={height} dk={dk} />}
         </div>
       </div>
-      {hasOverlay && !dimensionsMatch && (
+      {usesBestEffortSource && (
         <p className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
-          Overlay withheld: source image dimensions do not match the returned coordinate space.
+          Overlay scaled to the displayed source image. Verify alignment because a processed coordinate image was not returned by this response.
         </p>
       )}
-      {!dimensionsMatch && <p className={`p-2 text-[10px] font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>Overlay withheld: source image dimensions do not match coordinates.</p>}
       {(missingLeads.length > 0 || readableWarnings.length > 0) && (
         <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           {missingLeads.length > 0 && <div>Missing leads: {missingLeads.join(', ')}</div>}
