@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, User, CheckCircle2, FileText, FileDown } from 'lucide-react';
+import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, FileText, FileDown } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
@@ -442,6 +442,7 @@ const Analysis = () => {
       aha: result.region,
       activation_map: result.activation_map,
       top5_nodes: result.top5_nodes,
+      localization_normal_gated: result.localization_normal_gated,
     };
   }, [result]);
 
@@ -461,7 +462,12 @@ const Analysis = () => {
     };
   }, [imagePreviewUrl]);
 
-  const visualizerHeartResult = heartResult || imageHeartContext;
+  const visualizerHeartResult = useMemo(() => heartResult || imageHeartContext || ({
+    localization_coords: null,
+    ai_confidence: 0,
+    activation_map: Array(75).fill(0.5),
+    top5_nodes: [],
+  }), [heartResult, imageHeartContext]);
 
   // ── tokens ──────────────────────────────────────────────────────
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
@@ -513,11 +519,11 @@ const Analysis = () => {
           </span>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="relative grid grid-cols-1 gap-5">
 
           {/* Left: 3D + waveform */}
-          <div className="lg:col-span-8 flex flex-col gap-5">
-            <div className={`rounded-2xl border overflow-hidden ${surface}`}>
+          <div className="flex flex-col gap-5">
+            <div className={`rounded-2xl border overflow-hidden shadow-xl ${surface}`}>
               <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
                 <div className="flex items-center gap-4">
                   <span className={`text-xs font-semibold ${secLabel}`}>การแสดงผล</span>
@@ -552,7 +558,7 @@ const Analysis = () => {
                   </span>
                 )}
               </div>
-              <div className="h-[460px]">
+              <div className="h-[calc(100vh-190px)] min-h-[560px] xl:min-h-[680px] max-h-[960px]">
                 {loading ? (
                   <VisualizerSkeleton dk={dk} />
                 ) : activeVisualizerTab === 'image' && imagePreviewUrl ? (
@@ -578,41 +584,8 @@ const Analysis = () => {
 
           </div>
 
-          {/* Right: controls + honest result */}
-          <div className="lg:col-span-4 flex flex-col gap-5">
-
-            {/* Selected Patient Context Card */}
-            {selectedPatient && (
-              <div className={`rounded-2xl border-l-4 p-4 transition-all duration-300 min-w-0 hover:scale-[1.01] ${
-                dk 
-                  ? 'bg-sky-500/[0.02] border-sky-500/80 border-y-white/[0.06] border-r-white/[0.06] shadow-[0_0_20px_rgba(56,189,248,0.04)]' 
-                  : 'bg-sky-50/50 border-sky-500 border-y-sky-200 border-r-sky-200 shadow-sm'
-              }`}>
-                <div className="flex items-center gap-2.5 mb-2.5 min-w-0">
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                    dk ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'
-                  }`}>
-                    <User size={14} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-xs font-bold leading-none truncate ${dk ? 'text-white' : 'text-slate-900'}`} title={selectedPatient.name}>{selectedPatient.name}</p>
-                    <p className={`text-[9px] mt-0.5 ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
-                      HN: {selectedPatient.id_card?.substring(0, 8) || 'GEN-001'} · Age: {selectedPatient.age || 'n/a'}
-                    </p>
-                  </div>
-                </div>
-                {activeSample && (
-                  <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-[10px] min-w-0 w-full ${
-                    dk ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                  }`}>
-                    <CheckCircle2 size={12} className="shrink-0 text-emerald-500 mt-0.5 animate-pulse" />
-                    <span className="font-medium break-all break-words min-w-0">
-                      เชื่อมต่อคลื่นไฟฟ้าคนไข้สำเร็จ (Auto-linked: {activeSample.name})
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+          {/* ECG input above the visualization */}
+          <div className="order-first mr-auto flex w-full flex-col gap-4 sm:w-[400px]">
 
             {/* Input */}
             <div className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>

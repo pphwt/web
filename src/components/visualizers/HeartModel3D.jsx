@@ -1,12 +1,24 @@
 import React, { Suspense, useRef, useEffect, useState, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Html } from '@react-three/drei';
+import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { useStream } from '../../context/StreamContext';
 import { MODEL_API_BASE } from '../../services/modelApi';
 
 const API_BASE = MODEL_API_BASE;
-const HEART_SCALE = 1.5;
+const HEART_MODEL_SIZE = 3.1;
+const HEART_MODELS = {
+  open: {
+    obj: '/models/heart/open/openheartLD1.obj',
+    mtl: '/models/heart/open/openheartLD1.mtl',
+  },
+  normal: {
+    obj: '/models/heart/normal/heart1.obj',
+    mtl: '/models/heart/normal/heart1.mtl',
+  },
+};
 
 function normToScene(n, bbRef, cal) {
   if (!bbRef.current) return new THREE.Vector3(0, 0, 0);
@@ -51,48 +63,86 @@ function regionFromAHA(seg) {
 }
 
 // ── Heart ─────────────────────────────────────────────────────────────────────
-function Heart({ bbRef }) {
-  const { scene }  = useGLTF('/models/heart.glb');
-  const { events } = useStream();
-  const meshRef    = useRef();
-  const qrsRef     = useRef(0);
+function Heart({ bbRef, variant = 'normal', onToggle }) {
+  const model = HEART_MODELS[variant] ?? HEART_MODELS.open;
+  const materials = useLoader(MTLLoader, model.mtl);
+  const object = useLoader(OBJLoader, model.obj, (loader) => {
+    materials.preload();
+    loader.setMaterials(materials);
+  });
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!hovered) return undefined;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = 'pointer';
+    return () => {
+      document.body.style.cursor = previousCursor;
+    };
+  }, [hovered]);
+
+  const scene = useMemo(() => {
+    const content = object.clone(true);
+    content.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const sourceMaterials = Array.isArray(child.material) ? child.material : [child.material];
+      const clonedMaterials = sourceMaterials.map((material) => {
+        const cloned = material.clone();
+        // Preserve the anatomical texture's real colour instead of tinting it
+        // with the dark scene or the former purple fill light.
+        cloned.color?.set(0xffffff);
+        if (cloned.map) cloned.map.colorSpace = THREE.SRGBColorSpace;
+        if (!cloned.emissive) cloned.emissive = new THREE.Color(0x000000);
+        cloned.emissive.set(0x000000);
+        cloned.emissiveIntensity = 0;
+        if ('shininess' in cloned) cloned.shininess = 18;
+        if ('specular' in cloned) cloned.specular.set(0x4a3530);
+        if ('roughness' in cloned) cloned.roughness = Math.max(cloned.roughness ?? 0.5, 0.45);
+        if ('metalness' in cloned) cloned.metalness = Math.min(cloned.metalness ?? 0, 0.10);
+        return cloned;
+      });
+      child.material = Array.isArray(child.material) ? clonedMaterials : clonedMaterials[0];
+    });
+
+    // Both OBJ assets use Z as their vertical axis and have very different
+    // source dimensions. Rotate, centre, and fit them into the same scene box.
+    content.rotation.x = -Math.PI / 2;
+    const root = new THREE.Group();
+    root.add(content);
+    root.updateMatrixWorld(true);
+
+    const sourceBox = new THREE.Box3().setFromObject(root);
+    const size = sourceBox.getSize(new THREE.Vector3());
+    const center = sourceBox.getCenter(new THREE.Vector3());
+    const fitScale = HEART_MODEL_SIZE / Math.max(size.x, size.y, size.z, 1);
+    root.scale.setScalar(fitScale);
+    root.position.copy(center).multiplyScalar(-fitScale);
+    root.updateMatrixWorld(true);
+
+    return root;
+  }, [object]);
 
   useEffect(() => {
     if (!scene) return;
-    scene.traverse((child) => {
-      if (!child.isMesh || !child.material) return;
-      if (!child.material.__cloned) {
-        child.material = child.material.clone();
-        child.material.__cloned = true;
-      }
-      if (!child.material.emissive) child.material.emissive = new THREE.Color(0x000000);
-      child.material.emissiveIntensity = 0.18;
-      child.material.roughness = Math.max(child.material.roughness ?? 0.5, 0.45);
-      child.material.metalness = Math.min(child.material.metalness ?? 0, 0.10);
-    });
     const bb = new THREE.Box3().setFromObject(scene);
-    bbRef.current = { bb, scale: HEART_SCALE };
+    bbRef.current = { bb, scale: 1 };
   }, [scene, bbRef]);
 
-  useEffect(() => {
-    const handler = (e) => { if (e.detail?.qrs_detected) qrsRef.current = 1.0; };
-    events?.addEventListener('data', handler);
-    return () => events?.removeEventListener('data', handler);
-  }, [events]);
-
-  useFrame(({ clock }, dt) => {
-    if (!meshRef.current) return;
-    const t    = clock.getElapsedTime();
-    const beat = 1 + Math.sin(t * Math.PI * 1.2) * 0.022;
-    meshRef.current.scale.setScalar(HEART_SCALE * beat);
-    qrsRef.current = Math.max(0, qrsRef.current - dt * 3.5);
-    scene?.traverse((child) => {
-      if (!child.isMesh) return;
-      child.material.emissiveIntensity = 0.18 + qrsRef.current * 0.55;
-    });
-  });
-
-  return <primitive ref={meshRef} object={scene} scale={HEART_SCALE} />;
+  return (
+    <group
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle?.();
+      }}
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={() => setHovered(false)}
+    >
+      <primitive object={scene} />
+    </group>
+  );
 }
 
 // ── Activation sphere cluster ─────────────────────────────────────────────────
@@ -279,33 +329,6 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
   );
 }
 
-function ColorLegend() {
-  return (
-    <div style={{
-      position: 'absolute', bottom: 12, left: 12,
-      background: 'rgba(4,10,24,0.82)', backdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8,
-      padding: '7px 12px', fontFamily: 'ui-monospace,monospace',
-      color: '#94a3b8', zIndex: 10, pointerEvents: 'none',
-    }}>
-      <div style={{ marginBottom: 4, color: '#475569', fontSize: 9, fontWeight: 700, letterSpacing: 1.2 }}>
-        ACTIVATION MAP
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-        <div style={{ width: 40, height: 6, borderRadius: 3,
-          background: 'linear-gradient(to right, #ef4444, #3b82f6)' }} />
-        <span style={{ fontSize: 8, color: '#64748b' }}>Early &rarr; Late</span>
-      </div>
-      {[['#ef4444','HIGH — Ant/Septal (LAD)'],['#f59e0b','MODERATE'],['#22c55e','LOW']].map(([c,l]) => (
-        <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: c }} />
-          <span style={{ fontSize: 8, color: '#64748b' }}>{l}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 class WebGLErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -360,15 +383,9 @@ const HeartModel3D = ({ result = null }) => {
   const [nodePositions, setNodePositions] = useState([]);
   const [activationMap, setActivationMap] = useState(Array(75).fill(0.5));
   const [top5Nodes,     setTop5Nodes]     = useState([]);
+  const [heartVariant, setHeartVariant] = useState('normal');
   
-  // Interactive Layer Toggles
-  const [showPin, setShowPin] = useState(true);
-  const [showActivation, setShowActivation] = useState(true);
-  const [showTop5, setShowTop5] = useState(true);
-
-  // Calibration State
-  const [showCal, setShowCal] = useState(false);
-  const [calibration, setCalibration] = useState(() => {
+  const [calibration] = useState(() => {
     const saved = localStorage.getItem('heart_3d_calibration');
     if (saved) {
       try {
@@ -385,29 +402,12 @@ const HeartModel3D = ({ result = null }) => {
     };
   });
 
-  const updateCalibration = (key, val) => {
-    setCalibration(prev => {
-      const next = { ...prev, [key]: parseFloat(val) };
-      localStorage.setItem('heart_3d_calibration', JSON.stringify(next));
-      return next;
-    });
-  };
-
-  const resetCalibration = () => {
-    const defaults = {
-      xOffset: 0.25,
-      xScale: 0.50,
-      yOffset: 0.15,
-      yScale: 0.40,
-      zOffset: 0.25,
-      zScale: 0.50
-    };
-    setCalibration(defaults);
-    localStorage.setItem('heart_3d_calibration', JSON.stringify(defaults));
-  };
-
   const bbRef      = useRef(null);
   const { events } = useStream();
+
+  useEffect(() => {
+    setHeartVariant('normal');
+  }, [result]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/v1/localization/nodes`)
@@ -436,126 +436,41 @@ const HeartModel3D = ({ result = null }) => {
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative">
-      {/* Interactive Layer controls */}
-      <div style={{
-        position: 'absolute', top: 12, right: 12,
-        background: 'rgba(4,10,24,0.85)', backdropFilter: 'blur(8px)',
-        border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8,
-        padding: '8px 12px', fontFamily: 'ui-monospace,monospace',
-        color: '#94a3b8', zIndex: 10, fontSize: 10,
-        display: 'flex', flexDirection: 'column', gap: 6,
-        userSelect: 'none', maxWidth: 220
-      }}>
-        <div style={{ color: '#475569', fontSize: 9, fontWeight: 700, letterSpacing: 1.2, marginBottom: 2 }}>
-          LAYERS OVERLAY
-        </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <input type="checkbox" checked={showPin} onChange={(e) => setShowPin(e.target.checked)} />
-          <span>📍 Source Pinpoint</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <input type="checkbox" checked={showActivation} onChange={(e) => setShowActivation(e.target.checked)} />
-          <span>⚡ PINN Activation Grid</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-          <input type="checkbox" checked={showTop5} onChange={(e) => setShowTop5(e.target.checked)} />
-          <span>🔵 Top-5 Candidates</span>
-        </label>
-
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 6, marginTop: 4 }}>
-          <div 
-            style={{ color: '#475569', fontSize: 9, fontWeight: 700, letterSpacing: 1.2, marginBottom: 4, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} 
-            onClick={() => setShowCal(!showCal)}
-          >
-            <span>{showCal ? '▼ CALIBRATION' : '► CALIBRATION'}</span>
-            <span style={{ fontSize: 8 }}>⚙️</span>
-          </div>
-          {showCal && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>X Off: {calibration.xOffset.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0.0" max="1.0" step="0.01" value={calibration.xOffset} onChange={(e) => updateCalibration('xOffset', e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>X Scale: {calibration.xScale.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0.1" max="1.5" step="0.01" value={calibration.xScale} onChange={(e) => updateCalibration('xScale', e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Y Off: {calibration.yOffset.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0.0" max="1.0" step="0.01" value={calibration.yOffset} onChange={(e) => updateCalibration('yOffset', e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Y Scale: {calibration.yScale.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0.1" max="1.5" step="0.01" value={calibration.yScale} onChange={(e) => updateCalibration('yScale', e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Z Off: {calibration.zOffset.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0.0" max="1.0" step="0.01" value={calibration.zOffset} onChange={(e) => updateCalibration('zOffset', e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Z Scale: {calibration.zScale.toFixed(2)}</span>
-                </div>
-                <input type="range" min="0.1" max="1.5" step="0.01" value={calibration.zScale} onChange={(e) => updateCalibration('zScale', e.target.value)} style={{ width: '100%' }} />
-              </div>
-              <button 
-                onClick={resetCalibration}
-                style={{
-                  marginTop: 4,
-                  padding: '4px 6px',
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '1px solid rgba(239, 68, 68, 0.4)',
-                  borderRadius: 4,
-                  color: '#fca5a5',
-                  cursor: 'pointer',
-                  fontSize: 9,
-                  textAlign: 'center'
-                }}
-              >
-                Reset Defaults
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
       <WebGLErrorBoundary>
         <Canvas
           shadows
-          camera={{ position: [0, 0.5, 4], fov: 42 }}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
-          scene={{ background: new THREE.Color(0x040a18) }}
+          camera={{ position: [0, 0.35, 4.2], fov: 40 }}
+          gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: 1.25 }}
+          scene={{ background: new THREE.Color(0xf7f3eb) }}
         >
           <Suspense fallback={null}>
-            <ambientLight intensity={0.5} />
-            <directionalLight position={[3, 5, 4]}    intensity={1.3} castShadow />
-            <directionalLight position={[-4, -2, -3]}  intensity={0.3} color="#8b5cf6" />
-            <pointLight       position={[0, 4, 1]}     intensity={0.5} color="#e2e8f0" />
-            <Heart bbRef={bbRef} />
-            {showActivation && (
-              <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
-            )}
-            {showTop5 && (
-              <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
-            )}
-            {showPin && (
-              <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
-            )}
+            <hemisphereLight args={['#fff8f2', '#5c3030', 1.15]} />
+            <ambientLight intensity={1.0} color="#fffaf5" />
+            <directionalLight position={[3, 5, 4]} intensity={2.0} color="#fff4eb" castShadow />
+            <directionalLight position={[-4, 1, 3]} intensity={0.9} color="#f8fbff" />
+            <pointLight position={[0, -2, 3]} intensity={0.55} color="#ffd8ca" />
+            <Heart
+              bbRef={bbRef}
+              variant={heartVariant}
+              onToggle={() => setHeartVariant((current) => current === 'normal' ? 'open' : 'normal')}
+            />
+            <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
+            <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
+            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
             <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
           </Suspense>
         </Canvas>
       </WebGLErrorBoundary>
-      <ColorLegend />
+      <div style={{
+        position: 'absolute', top: 12, left: 12,
+        background: 'rgba(4,10,24,0.72)', backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8,
+        padding: '6px 10px', color: '#cbd5e1', zIndex: 10,
+        fontFamily: 'ui-monospace,monospace', fontSize: 9,
+        pointerEvents: 'none', letterSpacing: 0.4,
+      }}>
+        {heartVariant === 'normal' ? 'Click the heart to open' : 'Click the heart to close'}
+      </div>
       {result?.localization_normal_gated === true && (
         <div style={{
           position: 'absolute', bottom: 12, right: 12, left: 12,
