@@ -279,10 +279,12 @@ function ChartModeButton({ active, Icon, label, onClick, dk, disabled = false })
 }
 
 function SourceImageTraceChart({ imageUrl, overlay, dk }) {
+  const [loadedSize, setLoadedSize] = useState(null);
   const width = Number(overlay?.image_size?.width || 0);
   const height = Number(overlay?.image_size?.height || 0);
   const displayUrl = overlay?.processed_image || imageUrl;
   const panels = Array.isArray(overlay?.panels) ? overlay.panels : [];
+  const dimensionsMatch = !loadedSize || (loadedSize.width === width && loadedSize.height === height);
   if (!displayUrl) {
     return (
       <div className={`flex min-h-[260px] items-center justify-center rounded-lg border border-dashed text-xs font-bold ${dk ? 'border-white/[0.08] text-slate-500' : 'border-slate-200 text-slate-400'}`}>
@@ -292,13 +294,13 @@ function SourceImageTraceChart({ imageUrl, overlay, dk }) {
   }
   return (
     <div className={`relative overflow-auto rounded-lg border ${dk ? 'border-white/[0.07] bg-slate-950/30' : 'border-slate-200 bg-white'}`}>
-      <img src={displayUrl} alt="Processed ECG source" className="block w-full" />
-      {width > 0 && height > 0 && panels.length > 0 && (
+      <img src={displayUrl} alt="Processed ECG source" className="block w-full" onLoad={(event) => setLoadedSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} />
+      {width > 0 && height > 0 && panels.length > 0 && dimensionsMatch && (
         <svg viewBox={`0 0 ${width} ${height}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none">
           {panels.map((panel, index) => {
             const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
             const stroke = panelStroke(panel, false);
-            const [rawX0, rawY0, rawX1, rawY1] = panel.bbox || [0, 0, 0, 0];
+            const [rawX0, rawY0, rawX1, rawY1] = panel.cell_bbox || panel.bbox || [0, 0, 0, 0];
             // See EcgImageOverlay's matching inset: adjacent panels are often
             // flush, which reads as one merged box -- draw with a small gap.
             const boxInset = Math.min(rawX1 - rawX0, rawY1 - rawY0) * 0.04;
@@ -468,13 +470,15 @@ function PanelTooltip({ panel, width, height, dk }) {
 function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }) {
   const [viewMode, setViewMode] = useState('panels');
   const [hoveredPanel, setHoveredPanel] = useState(null);
+  const [loadedSize, setLoadedSize] = useState(null);
   const width = Number(overlay?.image_size?.width || 0);
   const height = Number(overlay?.image_size?.height || 0);
   const hasOverlay = width > 0 && height > 0 && Array.isArray(overlay?.panels);
   const panels = overlay?.panels || [];
   const warnings = overlay?.warnings || [];
   const layoutConfidence = overlay?.layout_confidence || {};
-  const recoveredCount = panels.filter((panel) => !panel?.reason && panel?.confidence !== 'low_confidence').length;
+  const standardPanels = panels.filter((panel) => panel?.role === 'panel');
+  const recoveredCount = standardPanels.filter((panel) => panel?.extraction_status === 'recovered' || (!panel?.extraction_status && !panel?.reason && panel?.confidence !== 'low_confidence')).length;
   const lowConfidenceCount = panels.filter((panel) => panel?.reason || panel?.confidence === 'low_confidence').length;
   const partialCount = panels.filter((panel) => panel?.confidence === 'interpolated').length;
   const missingLeads = overlay?.missing_leads || [];
@@ -493,6 +497,8 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   const showTrace = viewMode === 'trace' || viewMode === 'both';
   // Use processed image for overlay modes so bbox coords align; original for the plain view.
   const displayUrl = (viewMode !== 'original' && processedImageUrl) ? processedImageUrl : imageUrl;
+  const dimensionsMatch = !loadedSize || (loadedSize.width === width && loadedSize.height === height);
+  const overlayReady = hasOverlay && dimensionsMatch;
   const readableWarnings = warnings.map((warning) => ({
     perspective_contour_too_small: 'Page border was weak; perspective correction may be approximate.',
     deskew_unavailable: 'Deskew angle was not reliable.',
@@ -512,7 +518,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
           </div>
           {hasOverlay && (
             <p className={`mt-1 text-[11px] font-semibold ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
-              {recoveredCount}/{panels.length} panels recovered
+              {recoveredCount}/{standardPanels.length || panels.length} standard panels recovered
               {lowConfidenceCount > 0 ? ` · ${lowConfidenceCount} need review` : ''}
               {partialCount > 0 ? ` · ${partialCount} partial` : ''}
             </p>
@@ -564,8 +570,8 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
             made the absolutely-positioned SVG's h-full resolve against the
             clamped box instead of the image's true rendered size). */}
         <div className="relative">
-          <img src={displayUrl} alt="Uploaded ECG" className="block w-full" />
-          {hasOverlay && viewMode !== 'original' && (
+          <img src={displayUrl} alt="Uploaded ECG" className="block w-full" onLoad={(event) => setLoadedSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} />
+          {overlayReady && viewMode !== 'original' && (
             <svg
               viewBox={`0 0 ${width} ${height}`}
               className="absolute inset-0 h-full w-full"
@@ -585,7 +591,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                 />
               )}
               {panels.map((panel, index) => {
-                const [rawX0, rawY0, rawX1, rawY1] = panel.bbox || [0, 0, 0, 0];
+                const [rawX0, rawY0, rawX1, rawY1] = panel.cell_bbox || panel.bbox || [0, 0, 0, 0];
                 // Adjacent panels are often flush (no real gap in the source
                 // geometry), which reads as one merged box once low-confidence
                 // panels share a border color -- inset the drawn rect a touch
@@ -598,7 +604,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                 const highlighted = highlightedLead && panel.name?.toUpperCase() === highlightedLead.toUpperCase();
                 const stroke = panelStroke(panel, highlighted);
                 const points = (panel.trace_points || []).map((pt) => `${pt[0]},${pt[1]}`).join(' ');
-                const [tx0, ty0, tx1, ty1] = panel.trace_bbox || [];
+                const [tx0, ty0, tx1, ty1] = panel.trace_bbox || panel.bbox || [0, 0, 0, 0];
                 return (
                   <g
                     key={`${panel.name}-${panel.role}-${index}`}
@@ -629,7 +635,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
                         vectorEffect="non-scaling-stroke"
                       />
                     )}
-                    {showTrace && panel.trace_bbox && (
+                    {showTrace && (panel.trace_bbox || panel.bbox) && (
                       <rect
                         x={tx0}
                         y={ty0}
@@ -682,6 +688,12 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
           {hoveredPanel && <PanelTooltip panel={hoveredPanel} width={width} height={height} dk={dk} />}
         </div>
       </div>
+      {hasOverlay && !dimensionsMatch && (
+        <p className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+          Overlay withheld: source image dimensions do not match the returned coordinate space.
+        </p>
+      )}
+      {!dimensionsMatch && <p className={`p-2 text-[10px] font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>Overlay withheld: source image dimensions do not match coordinates.</p>}
       {(missingLeads.length > 0 || readableWarnings.length > 0) && (
         <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           {missingLeads.length > 0 && <div>Missing leads: {missingLeads.join(', ')}</div>}
@@ -763,6 +775,7 @@ export default function ClinicalEcgAnalyzer() {
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
   const [ocrOnly, setOcrOnly] = useState(false);
+  const [layoutOverride, setLayoutOverride] = useState('');
   const [erQuickMode, setErQuickMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -817,10 +830,12 @@ export default function ClinicalEcgAnalyzer() {
       : null;
     if (!imageFile) {
       setImagePreviewUrl('');
+      setLayoutOverride('');
       return undefined;
     }
     const url = URL.createObjectURL(imageFile);
     setImagePreviewUrl(url);
+    setLayoutOverride('');
     return () => URL.revokeObjectURL(url);
   }, [uploadedFiles]);
 
@@ -834,7 +849,7 @@ export default function ClinicalEcgAnalyzer() {
     setLoading(true); setError(''); setResult(null);
     try {
       setResult(uploadedFiles
-        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly)
+        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null)
         : await modelApi.analyzeEcgSample(sampleId));
     } catch (e) {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
@@ -912,7 +927,7 @@ export default function ClinicalEcgAnalyzer() {
   const digitizationReport = result?.digitization_report || result?.meta?.digitization_report;
   const digitizationOverlay = result?.digitization_overlay || result?.meta?.digitization_overlay;
   const digitizedLeadRows = digitizationReport?.leads || [];
-  const recoveredDigitizedLeads = digitizedLeadRows.filter((lead) => lead?.reason === null || lead?.reason === undefined);
+  const recoveredDigitizedLeads = digitizedLeadRows.filter((lead) => lead?.extraction_status === 'recovered' || (!lead?.extraction_status && (lead?.reason === null || lead?.reason === undefined)));
   const digitizationQuality = digitizationReport?.quality || {};
   const ocrUnavailable = formatInfo?.ocr && formatInfo.ocr.available === false;
   const claimContext = result?.claim_context || formatInfo?.claim_context || {};
@@ -1058,7 +1073,7 @@ export default function ClinicalEcgAnalyzer() {
                     type="button"
                     role="option"
                     aria-selected={sampleId === ''}
-                    onClick={() => { setSampleId(''); setUploadedFiles(null); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
+                    onClick={() => { setSampleId(''); setUploadedFiles(null); setLayoutOverride(''); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
                     className={`block w-full px-3 py-2 text-left ${sampleId === '' ? 'bg-sky-600 text-white' : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                   >
                     — เลือกตัวอย่างจริง —
@@ -1069,7 +1084,7 @@ export default function ClinicalEcgAnalyzer() {
                       type="button"
                       role="option"
                       aria-selected={sampleId === s.id}
-                      onClick={() => { setSampleId(s.id); setUploadedFiles(null); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
+                      onClick={() => { setSampleId(s.id); setUploadedFiles(null); setLayoutOverride(''); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
                       className={`block w-full px-3 py-2 text-left ${sampleId === s.id ? 'bg-sky-600 text-white' : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                     >
                       {s.primary_label} · {s.id} ({s.sex}, {s.age ?? '?'}y)
@@ -1094,6 +1109,7 @@ export default function ClinicalEcgAnalyzer() {
               const list = Array.from(e.target.files || []); 
               setUploadedFiles(list.length > 0 ? list : null); 
               setSampleId(''); 
+              setLayoutOverride('');
               setHighlightedLead(null);
               setError(''); 
             }} />
@@ -1108,7 +1124,21 @@ export default function ClinicalEcgAnalyzer() {
           </div>
         </div>
         {uploadedFiles && uploadedFiles.some((f) => isImageEcgFile(f)) && (
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3 space-y-2">
+            {Array.isArray(formatInfo?.image_layouts) && formatInfo.image_layouts.length > 0 && (
+              <label className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-[10px] font-bold ${dk ? 'border-white/[0.08] bg-white/[0.03] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                <span>Image layout</span>
+                <select
+                  value={layoutOverride}
+                  onChange={(e) => setLayoutOverride(e.target.value)}
+                  className={`rounded-md border px-2 py-1 text-[10px] ${dk ? 'border-white/[0.1] bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                >
+                  <option value="">Auto detect</option>
+                  {formatInfo.image_layouts.map((layout) => <option key={layout.name} value={layout.name}>{layout.name}</option>)}
+                </select>
+              </label>
+            )}
+            <div className="flex items-center gap-2">
             <input
               id="ocr-only-checkbox"
               type="checkbox"
@@ -1119,6 +1149,7 @@ export default function ClinicalEcgAnalyzer() {
             <label htmlFor="ocr-only-checkbox" className={`text-[10px] font-bold cursor-pointer select-none ${dk ? 'text-slate-300' : 'text-slate-700'}`}>
               อ่านเฉพาะผลวิเคราะห์และตัวเลขหัวกระดาษ (OCR Only — ข้ามการดึงคลื่นไฟฟ้าหัวใจเพื่อรันทันที)
             </label>
+            </div>
           </div>
         )}
         {ocrUnavailable && (
