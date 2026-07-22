@@ -31,7 +31,14 @@ const ECG_IMAGE_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_IMAGE_UPLOAD_
 // missed some of them.
 export const isImageEcgFile = (file) => {
   if (!file) return false;
-  return file.type?.startsWith('image/') || /\.(png|jpe?g|webp|bmp|tiff?)$/i.test(file.name || '');
+  return file.type?.startsWith('image/') || file.type === 'application/pdf' || /\.(png|jpe?g|webp|bmp|tiff?|hei[cf]|pdf)$/i.test(file.name || '');
+};
+
+export const canPreviewImageFile = (file) => {
+  if (!file || !isImageEcgFile(file)) return false;
+  // PDF and HEIF-family inputs are decoded by the backend; cross-browser img
+  // support is inconsistent, so the UI switches to processed_image afterward.
+  return !/\.(pdf|hei[cf])$/i.test(file.name || '') && file.type !== 'application/pdf';
 };
 
 const assertEcgUploadSize = (file) => {

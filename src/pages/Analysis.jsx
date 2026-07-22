@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
 import { useLanguage } from '../context/LanguageContext';
-import { modelApi, isImageEcgFile } from '../services/modelApi';
+import { canPreviewImageFile, modelApi, isImageEcgFile } from '../services/modelApi';
 import { VisualizerSkeleton, MetricsSkeleton, Skeleton } from '../components/ui/Skeleton';
 import { diagnosticService } from '../services/diagnosticService';
 import { API_BASE } from '../utils/constants';
@@ -295,7 +295,7 @@ const Analysis = () => {
   }, [activeSample, file]);
 
   useEffect(() => {
-    if (!isImageEcgFile(file)) {
+    if (!isImageEcgFile(file) || !canPreviewImageFile(file)) {
       setImagePreviewUrl('');
       return undefined;
     }
@@ -450,8 +450,10 @@ const Analysis = () => {
     };
   }, [result]);
 
+  const displayedImageUrl = result?.digitization_overlay?.processed_image || imagePreviewUrl;
+
   const imageHeartContext = useMemo(() => {
-    if (!imagePreviewUrl) return null;
+    if (!displayedImageUrl) return null;
     return {
       localization_coords: null,
       ai_confidence: 0,
@@ -466,7 +468,7 @@ const Analysis = () => {
       activation_map: Array(75).fill(0.5),
       top5_nodes: [],
     };
-  }, [imagePreviewUrl, result?.localization_note]);
+  }, [displayedImageUrl, result?.localization_note]);
 
   const visualizerHeartResult = useMemo(() => heartResult || imageHeartContext || ({
     localization_coords: null,
@@ -535,7 +537,7 @@ const Analysis = () => {
               <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
                 <div className="flex items-center gap-4">
                   <span className={`text-xs font-semibold ${secLabel}`}>การแสดงผล</span>
-                  {imagePreviewUrl && (
+                  {displayedImageUrl && (
                     <div className="flex rounded-lg bg-slate-100 p-0.5 dark:bg-white/5">
                       <button
                         onClick={() => setActiveVisualizerTab('3d')}
@@ -569,11 +571,11 @@ const Analysis = () => {
               <div className="h-[calc(100vh-190px)] min-h-[560px] xl:min-h-[680px] max-h-[960px]">
                 {loading ? (
                   <VisualizerSkeleton dk={dk} />
-                ) : activeVisualizerTab === 'image' && imagePreviewUrl ? (
+                ) : activeVisualizerTab === 'image' && displayedImageUrl ? (
                   <div className="flex h-full flex-col gap-2 p-3">
                     <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
                       <img
-                        src={imagePreviewUrl}
+                        src={displayedImageUrl}
                         alt="Uploaded ECG preview"
                         className="h-full w-full object-contain"
                       />

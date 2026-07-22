@@ -7,7 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { usePatient } from '../../context/PatientContext';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { modelApi, isImageEcgFile } from '../../services/modelApi';
+import { canPreviewImageFile, modelApi, isImageEcgFile } from '../../services/modelApi';
 
 // Measurement metrics → display config. `approx` marks values that come from
 // open-source (neurokit2) delineation and can be less accurate than a certified
@@ -313,6 +313,70 @@ function ChartModeButton({ active, Icon, label, onClick, dk, disabled = false })
   );
 }
 
+const SCAN_STAGE_LABELS = {
+  ingest: 'รับไฟล์',
+  normalize: 'ปรับภาพ',
+  layout: 'หา Layout',
+  lead_detection: 'หา Leads',
+  trace_extraction: 'อ่านเส้น ECG',
+  calibration: 'สอบเทียบ Grid',
+  signal_validation: 'ตรวจสัญญาณ',
+  measurements: 'วัดค่า',
+  classification: 'ประเมินโมเดลโรค',
+  localization: 'ตรวจสิทธิ์ 3D',
+};
+
+function ScanPipelineStatus({ loading, scanStatus, dk }) {
+  if (!loading && !scanStatus) return null;
+  const stages = scanStatus?.stages || [
+    { key: 'ingest', status: 'complete' },
+    { key: 'normalize', status: 'pending' },
+    { key: 'layout', status: 'pending' },
+    { key: 'lead_detection', status: 'pending' },
+    { key: 'trace_extraction', status: 'pending' },
+    { key: 'calibration', status: 'pending' },
+    { key: 'signal_validation', status: 'pending' },
+  ];
+  const colorFor = (status) => ({
+    complete: dk ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    review: dk ? 'border-amber-500/25 bg-amber-500/[0.08] text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-700',
+    failed: dk ? 'border-rose-500/25 bg-rose-500/[0.08] text-rose-300' : 'border-rose-200 bg-rose-50 text-rose-700',
+    blocked: dk ? 'border-white/[0.08] bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500',
+    pending: dk ? 'border-sky-500/20 bg-sky-500/[0.05] text-sky-300' : 'border-sky-200 bg-sky-50 text-sky-600',
+  }[status] || (dk ? 'border-white/[0.08] text-slate-400' : 'border-slate-200 text-slate-500'));
+
+  return (
+    <div className={`mt-3 rounded-xl border p-3 ${dk ? 'border-white/[0.08] bg-slate-950/25' : 'border-slate-200 bg-white'}`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className={`flex items-center gap-2 text-[11px] font-black ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
+          {loading ? <Loader2 size={13} className="animate-spin text-sky-500" /> : <CheckCircle2 size={13} className="text-emerald-500" />}
+          {loading ? 'กำลัง Scan และอ่าน ECG…' : `Scan ${scanStatus?.status || 'complete'}`}
+        </div>
+        <span className={`text-[9px] font-semibold ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
+          Scan ก่อน · AI เฉพาะข้อมูลที่ผ่านเกณฑ์
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+        {stages.map((stage) => (
+          <div
+            key={stage.key}
+            title={stage.reason || ''}
+            className={`rounded-lg border px-2 py-1.5 ${colorFor(stage.status)}`}
+          >
+            <div className="truncate text-[9px] font-black">{SCAN_STAGE_LABELS[stage.key] || stage.key}</div>
+            <div className="truncate text-[8px] font-semibold uppercase opacity-75">{stage.status}</div>
+          </div>
+        ))}
+      </div>
+      {scanStatus?.capabilities && (
+        <div className={`mt-2 text-[9px] font-semibold ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
+          ใช้งานได้: {Object.entries(scanStatus.capabilities).filter(([, enabled]) => enabled).map(([name]) => name.replaceAll('_', ' ')).join(' · ') || 'source preview only'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SourceImageTraceChart({ imageUrl, overlay, dk }) {
   const [loadedSize, setLoadedSize] = useState(null);
   const displayUrl = overlay?.processed_image || imageUrl;
@@ -520,7 +584,7 @@ function EcgImageOverlay({ imageUrl, overlay, dk, highlightedLead, onHighlight }
   // back to the original upload if it is absent (e.g. very old responses).
   const processedImageUrl = overlay?.processed_image || null;
   const viewModes = [
-    { key: 'original', label: 'Original' },
+    ...(imageUrl ? [{ key: 'original', label: 'Original' }] : []),
     { key: 'panels', label: 'Panels' },
     { key: 'trace', label: 'Trace' },
     { key: 'both', label: 'Both' },
@@ -827,6 +891,7 @@ export default function ClinicalEcgAnalyzer() {
   const inputRef = useRef(null);
   const resultRef = useRef(null);
   const sampleDropdownRef = useRef(null);
+  const hasImageUpload = Array.isArray(uploadedFiles) && uploadedFiles.some((file) => isImageEcgFile(file));
 
   useEffect(() => {
     if (!sampleDropdownOpen) return;
@@ -869,7 +934,7 @@ export default function ClinicalEcgAnalyzer() {
     const imageFile = Array.isArray(uploadedFiles)
       ? uploadedFiles.find((file) => isImageEcgFile(file))
       : null;
-    if (!imageFile) {
+    if (!imageFile || !canPreviewImageFile(imageFile)) {
       setImagePreviewUrl('');
       setLayoutOverride('');
       return undefined;
@@ -967,6 +1032,7 @@ export default function ClinicalEcgAnalyzer() {
   const measurements = result?.measurements || {};
   const digitizationReport = result?.digitization_report || result?.meta?.digitization_report;
   const digitizationOverlay = result?.digitization_overlay || result?.meta?.digitization_overlay;
+  const scanStatus = result?.scan_status || null;
   const digitizedLeadRows = digitizationReport?.leads || [];
   const recoveredDigitizedLeads = digitizedLeadRows.filter((lead) => lead?.extraction_status === 'recovered' || (!lead?.extraction_status && (lead?.reason === null || lead?.reason === undefined)));
   const digitizationQuality = digitizationReport?.quality || {};
@@ -1149,7 +1215,7 @@ export default function ClinicalEcgAnalyzer() {
               ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : `${uploadedFiles.length} files selected`) 
               : 'เลือกไฟล์ (รูปถ่าย/สแกน .jpg .png .webp หรือ .npy / .csv / .hea+.dat / .dcm)'}
           </span>
-          <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,image/*" className="hidden"
+          <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,.heif,.pdf,image/*,application/pdf" className="hidden"
             onChange={(e) => { 
               const list = Array.from(e.target.files || []); 
               setUploadedFiles(list.length > 0 ? list : null); 
@@ -1213,10 +1279,11 @@ export default function ClinicalEcgAnalyzer() {
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
           {loading ? 'กำลังวิเคราะห์...' : '2 · วัดผล ECG'}
         </button>
+        {hasImageUpload && <ScanPipelineStatus loading={loading} scanStatus={scanStatus} dk={dk} />}
         {error && <p className="mt-2 text-[11px] text-rose-500">{error}</p>}
       </div>
 
-      {imagePreviewUrl && (
+      {(imagePreviewUrl || digitizationOverlay?.processed_image) && (
         <EcgImageOverlay
           imageUrl={imagePreviewUrl}
           overlay={digitizationOverlay}
