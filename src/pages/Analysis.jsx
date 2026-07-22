@@ -439,6 +439,10 @@ const Analysis = () => {
     return {
       localization_coords: result.source.norm,
       ai_confidence: result.confidence,
+      confidence_type: result.confidence_type,
+      localization_supported: result.localization_supported !== false,
+      localization_note: result.localization_note,
+      validation: result.validation,
       aha: result.region,
       activation_map: result.activation_map,
       top5_nodes: result.top5_nodes,
@@ -451,6 +455,8 @@ const Analysis = () => {
     return {
       localization_coords: null,
       ai_confidence: 0,
+      localization_supported: false,
+      localization_note: result?.localization_note || '3D localization is not validated for digitized clinical 12-lead ECGs.',
       aha: {
         segment: 0,
         label: 'ECG Image Review',
@@ -460,11 +466,13 @@ const Analysis = () => {
       activation_map: Array(75).fill(0.5),
       top5_nodes: [],
     };
-  }, [imagePreviewUrl]);
+  }, [imagePreviewUrl, result?.localization_note]);
 
   const visualizerHeartResult = useMemo(() => heartResult || imageHeartContext || ({
     localization_coords: null,
     ai_confidence: 0,
+    localization_supported: false,
+    localization_note: 'No eligible localization result is available.',
     activation_map: Array(75).fill(0.5),
     top5_nodes: [],
   }), [heartResult, imageHeartContext]);
@@ -758,7 +766,12 @@ const Analysis = () => {
 
               {result?.source ? (
                 <div className="grid grid-cols-2 gap-2">
-                  <Stat label="Support confidence" value={`${Math.round(result.confidence * 100)}%`} dk={dk} />
+                  <Stat
+                    label="Activation compactness"
+                    value={`${Math.round(result.confidence * 100)}%`}
+                    hint="Model spread indicator; not localization accuracy. Held-out simulated mean error: 50.5 mm."
+                    dk={dk}
+                  />
                   <Stat label="Heart rate"
                     value={result.heart_rate_bpm ? `${Math.round(result.heart_rate_bpm)} bpm` : 'n/a'}
                     hint={result.hr_note} dk={dk} />

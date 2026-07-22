@@ -207,6 +207,11 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
 
   // Build pin info from a stream-shaped payload (live frame OR static analyze result)
   const applyDetail = (detail) => {
+    if (detail?.localization_supported === false) {
+      posRef.current = null;
+      setInfo(null);
+      return;
+    }
     const coords = detail?.localization_coords;
     const conf   = detail?.ai_confidence ?? 0;
     const aha    = detail?.aha;
@@ -228,7 +233,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
       region:     label,
       territory,
       risk,
-      confidence: Math.round(conf * 100),
+      compactness: Math.round(conf * 100),
       aha,
       chamber:    getChamberName(coords),
     };
@@ -266,6 +271,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
   });
 
   if (!info) return null;
+  if (result?.localization_supported === false) return null;
   if (result?.localization_normal_gated === true) return null;
 
   const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
@@ -320,7 +326,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
             {info.mm.x} / {info.mm.y} / {info.mm.z} mm
           </div>
           <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 700, marginTop: 3 }}>
-            AI {info.confidence}%
+            Activation compactness {info.compactness}%
           </div>
         </div>
       </Html>
@@ -419,8 +425,9 @@ const HeartModel3D = ({ result = null }) => {
   // Static mode: drive activation/top5 from the analyze result
   useEffect(() => {
     if (!result) return;
-    if (result.activation_map) setActivationMap(result.activation_map);
-    if (result.top5_nodes)     setTop5Nodes(result.top5_nodes);
+    const supported = result.localization_supported !== false;
+    setActivationMap(supported && result.activation_map ? result.activation_map : Array(75).fill(0.5));
+    setTop5Nodes(supported && result.top5_nodes ? result.top5_nodes : []);
   }, [result]);
 
   // Live mode: subscribe to the stream (only when no static result)
@@ -454,8 +461,12 @@ const HeartModel3D = ({ result = null }) => {
               variant={heartVariant}
               onToggle={() => setHeartVariant((current) => current === 'normal' ? 'open' : 'normal')}
             />
-            <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
-            <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
+            {result?.localization_supported !== false && (
+              <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
+            )}
+            {result?.localization_supported !== false && (
+              <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
+            )}
             <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
             <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
           </Suspense>
@@ -483,6 +494,19 @@ const HeartModel3D = ({ result = null }) => {
         }}>
           <span>🟢</span>
           <span>Normal ECG: No active localized source abnormality expected (คลื่นไฟฟ้าหัวใจปกติ: ไม่พบจุดกำเนิดกระแสไฟฟ้าผิดปกติ)</span>
+        </div>
+      )}
+      {result?.localization_supported === false && (
+        <div style={{
+          position: 'absolute', bottom: 12, right: 12, left: 12,
+          background: 'rgba(180,83,9,0.94)', backdropFilter: 'blur(8px)',
+          border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 12,
+          padding: '10px 14px', fontFamily: 'sans-serif',
+          color: '#fff', zIndex: 20, fontSize: 11,
+          textAlign: 'center', boxShadow: '0 4px 20px rgba(180,83,9,0.25)',
+          fontWeight: 'bold'
+        }}>
+          3D localization unavailable: {result.localization_note || 'this input is outside the validated localizer domain.'}
         </div>
       )}
     </div>

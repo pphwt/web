@@ -1010,11 +1010,15 @@ export default function ClinicalEcgAnalyzer() {
     return metric?.value !== null && metric?.value !== undefined ? metric.value : fallback;
   };
   const primaryFinding = result?.findings?.primary;
+  const classifierReview = result?.classification?.clinical_review;
   const topLabel = primaryFinding?.label || result?.classification?.top_label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
   const topProbability = result?.classification?.top_probability;
   const isPathological = primaryFinding
     ? !['normal', 'unavailable'].includes(primaryFinding.severity)
     : result?.classification?.top_label && result.classification.top_label !== 'NORM';
+  const outputUnverified = primaryFinding?.severity === 'unavailable'
+    || classifierReview?.status === 'unconfirmed'
+    || (!result?.classification && Boolean(result?.classification_note));
   // Only the classifier's own probability breakdown belongs here — findings,
   // rhythm, and axis are already shown once each in their own detail cards
   // above; repeating them in this list just restated the same conclusions
@@ -1357,8 +1361,8 @@ export default function ClinicalEcgAnalyzer() {
                               : ''}
                         </p>
                       </div>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${isPathological ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                        {isPathological ? 'REVIEW' : 'SCREEN OK'}
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${outputUnverified ? 'bg-amber-500' : isPathological ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                        {outputUnverified ? 'UNVERIFIED' : isPathological ? 'REVIEW' : 'SCREEN OK'}
                       </span>
                       <div className="flex items-center gap-1 opacity-80">
                         <ThumbsUp size={13} />
@@ -1371,7 +1375,7 @@ export default function ClinicalEcgAnalyzer() {
                         <p className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Primary output</p>
                         <p className={`mt-1 text-lg font-black ${mainText}`}>{topLabel}</p>
                         <p className={`text-[11px] ${subText}`}>
-                          {topProbability !== null && topProbability !== undefined ? `${Math.round(topProbability * 100)}% confidence · ` : ''}
+                          {topProbability !== null && topProbability !== undefined ? `${Math.round(topProbability * 100)}% model score · ` : ''}
                           Axis {axisCategory.category || '-'} · Lead {measurements.lead_used || '-'}
                         </p>
                         {primaryFinding?.criteria?.length > 0 && (
@@ -1382,6 +1386,16 @@ export default function ClinicalEcgAnalyzer() {
                           </ul>
                         )}
                       </div>
+                      {result.classification_note && (
+                        <div className={`mb-3 rounded-lg border p-2.5 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+                          Disease classifier withheld: {humanize(result.classification_note)}. Measurements and traceable morphology remain available for clinician review.
+                        </div>
+                      )}
+                      {classifierReview?.status === 'unconfirmed' && (
+                        <div className={`mb-3 rounded-lg border p-2.5 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+                          Model output is unconfirmed by independent ECG measurements: {(classifierReview.reasons || []).join(' ')}
+                        </div>
+                      )}
                       <p className={`mb-2 text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Classifier probabilities (all 6 classes)</p>
                       <div className="grid grid-cols-1 gap-2">
                         {predictionItems.length ? predictionItems.map((item) => (
