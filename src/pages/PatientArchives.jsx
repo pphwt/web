@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Archive, Download, Activity, Clock, Cpu } from 'lucide-react';
+import { Archive, Download, Activity, Clock, Cpu, FileText, CheckCircle2 } from 'lucide-react';
 import { ArchiveSkeleton } from '../components/ui/Skeleton';
 import { usePatient } from '../context/PatientContext';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import ECGCanvas from '../components/visualizers/ECGCanvas';
 import { API_BASE } from '../utils/constants';
+import { modelApi } from '../services/modelApi';
 
 const PatientArchives = () => {
   const { selectedPatient } = usePatient();
@@ -15,7 +16,9 @@ const PatientArchives = () => {
   const { t } = useLanguage();
 
   const [archives, setArchives]             = useState([]);
+  const [reports, setReports]               = useState([]);
   const [selectedArchive, setSelectedArchive] = useState(null);
+  const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading]               = useState(false);
 
   useEffect(() => {
@@ -24,11 +27,17 @@ const PatientArchives = () => {
 
   const fetchArchives = async () => {
     setLoading(true);
+    setSelectedArchive(null);
+    setSelectedReport(null);
     try {
-      const res = await fetch(`${API_BASE}/archives/${selectedPatient.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setArchives(await res.json());
+      const [archiveResult, reportResult] = await Promise.allSettled([
+        fetch(`${API_BASE}/archives/${selectedPatient.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then((res) => res.ok ? res.json() : Promise.reject(new Error(`Archives HTTP ${res.status}`))),
+        modelApi.getPatientReports(selectedPatient.id),
+      ]);
+      setArchives(archiveResult.status === 'fulfilled' && Array.isArray(archiveResult.value) ? archiveResult.value : []);
+      setReports(reportResult.status === 'fulfilled' && Array.isArray(reportResult.value) ? reportResult.value : []);
     } catch { console.error('Failed to fetch archives'); }
     finally  { setLoading(false); }
   };
@@ -156,11 +165,92 @@ const PatientArchives = () => {
                 </div>
               )}
             </div>
+
+            <div className={`border-t ${divider}`}>
+              <div className={`flex items-center gap-2 px-4 py-3`}>
+                <FileText size={14} className={dk ? 'text-emerald-400' : 'text-emerald-600'} />
+                <span className={`text-xs font-semibold ${secLabel}`}>Saved ECG Reports</span>
+                <span className={`ml-auto text-[10px] ${subText}`}>{reports.length}</span>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto custom-scrollbar px-4 pb-4 space-y-2">
+                {!loading && reports.length === 0 && (
+                  <p className={`py-4 text-center text-[11px] ${subText}`}>ยังไม่มีรายงาน ECG ที่บันทึก</p>
+                )}
+                {reports.map((report) => {
+                  const active = selectedReport?.id === report.id;
+                  const ecgResult = report.physics_params?.ecg_result || {};
+                  const classification = ecgResult.classification || {};
+                  const label = classification.top_label || classification.label || 'ECG screening';
+                  const dateStr = report.created_at
+                    ? new Date(report.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '-';
+                  return (
+                    <button
+                      key={report.id}
+                      type="button"
+                      onClick={() => { setSelectedReport(report); setSelectedArchive(null); }}
+                      className={`w-full rounded-xl border px-3 py-2 text-left transition ${active
+                        ? dk ? 'border-emerald-500/30 bg-emerald-500/[0.12]' : 'border-emerald-200 bg-emerald-50'
+                        : dk ? 'border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.04]' : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`truncate text-[11px] font-bold ${active ? (dk ? 'text-emerald-300' : 'text-emerald-700') : mainText}`}>{label}</span>
+                        <span className={`shrink-0 text-[9px] ${subText}`}>{report.status || 'PENDING_REVIEW'}</span>
+                      </div>
+                      <div className={`mt-1 flex items-center gap-2 text-[10px] ${subText}`}>
+                        <span>{dateStr}</span>
+                        {ecgResult.measurements?.heart_rate_bpm != null && <span>· {ecgResult.measurements.heart_rate_bpm} BPM</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Viewer */}
           <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-5">
-            {selectedArchive ? (
+            {selectedReport ? (
+              <div className={`rounded-2xl border ${surface}`}>
+                <div className={`flex items-center justify-between gap-3 border-b px-4 py-3 ${divider}`}>
+                  <div className="flex items-center gap-2">
+                    <FileText size={14} className={dk ? 'text-emerald-400' : 'text-emerald-600'} />
+                    <span className={`text-xs font-semibold ${secLabel}`}>Saved ECG Report</span>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${dk ? 'bg-amber-400/10 text-amber-300' : 'bg-amber-50 text-amber-700'}`}>
+                    {selectedReport.status || 'PENDING_REVIEW'}
+                  </span>
+                </div>
+                <div className={`grid grid-cols-1 gap-4 p-5 md:grid-cols-2 ${ecgBg}`}>
+                  {(() => {
+                    const ecgResult = selectedReport.physics_params?.ecg_result || {};
+                    const classification = ecgResult.classification || {};
+                    const measurements = ecgResult.measurements || {};
+                    const findings = ecgResult.findings || [];
+                    return (
+                      <>
+                        <div className={`rounded-xl border p-4 ${surface}`}>
+                          <p className={`mb-3 text-[10px] font-semibold uppercase tracking-wider ${secLabel}`}>Analysis summary</p>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between gap-3"><span className={subText}>Classification</span><strong className={mainText}>{classification.top_label || classification.label || 'Unavailable'}</strong></div>
+                            <div className="flex justify-between gap-3"><span className={subText}>Confidence</span><strong className={mainText}>{classification.top_probability != null ? `${Math.round(classification.top_probability * 100)}%` : '—'}</strong></div>
+                            <div className="flex justify-between gap-3"><span className={subText}>Heart rate</span><strong className={mainText}>{measurements.heart_rate_bpm ?? '—'} BPM</strong></div>
+                            <div className="flex justify-between gap-3"><span className={subText}>Created</span><strong className={mainText}>{selectedReport.created_at ? new Date(selectedReport.created_at).toLocaleString('th-TH') : '—'}</strong></div>
+                          </div>
+                        </div>
+                        <div className={`rounded-xl border p-4 ${surface}`}>
+                          <p className={`mb-3 text-[10px] font-semibold uppercase tracking-wider ${secLabel}`}>Clinical findings</p>
+                          {Array.isArray(findings) && findings.length > 0 ? (
+                            <ul className={`list-disc space-y-1 pl-4 text-xs ${subText}`}>{findings.slice(0, 8).map((finding, index) => <li key={`${index}-${String(finding)}`}>{typeof finding === 'string' ? finding : finding.label || finding.message || JSON.stringify(finding)}</li>)}</ul>
+                          ) : <p className={`text-xs ${subText}`}>ไม่มี findings ที่บันทึกไว้</p>}
+                          <p className={`mt-4 text-[11px] leading-relaxed ${subText}`}>รายงานนี้เป็นผลคัดกรองเพื่อรอแพทย์ทบทวน ไม่ใช่การวินิจฉัยอัตโนมัติ</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : selectedArchive ? (
               <>
                 {/* ECG panel */}
                 <div className={`rounded-2xl border overflow-hidden ${surface}`}>

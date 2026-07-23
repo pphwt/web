@@ -959,7 +959,7 @@ export default function ClinicalEcgAnalyzer() {
     if (analyzeInFlightRef.current || loading) return;
     if (!uploadedFiles && !sampleId) { setError('เลือกตัวอย่างจริง หรืออัปโหลดไฟล์ก่อน'); return; }
     analyzeInFlightRef.current = true;
-    setLoading(true); setError(''); setResult(null);
+    setLoading(true); setError(''); setResult(null); setSavedReport(null);
     try {
       setResult(uploadedFiles
         ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null)
@@ -997,8 +997,13 @@ export default function ClinicalEcgAnalyzer() {
   };
 
   const [saving, setSaving] = useState(false);
+  const [savedReport, setSavedReport] = useState(null);
   const saveToRecord = async () => {
-    if (saveInFlightRef.current || saving) return;
+    if (saveInFlightRef.current || saving || savedReport?.report_id) return;
+    if (!result) {
+      showToast('วิเคราะห์ ECG ให้เสร็จก่อนบันทึก', 'warning');
+      return;
+    }
     if (!selectedPatient?.id) {
       showToast('เลือกผู้ป่วยก่อน (จากหน้า Patients) เพื่อบันทึกเข้าเวชระเบียน', 'warning');
       return;
@@ -1014,6 +1019,7 @@ export default function ClinicalEcgAnalyzer() {
           : sampleId,
       });
       const reportId = res.report_id;
+      setSavedReport({ report_id: reportId, status: res.status || 'success' });
       if (reportId && attachments.length > 0) {
         for (const file of attachments) {
           try {
@@ -1023,7 +1029,12 @@ export default function ClinicalEcgAnalyzer() {
           }
         }
       }
-      showToast(`บันทึกเข้าเวชระเบียน ${selectedPatient.name} สำเร็จ`, 'success');
+      showToast(
+        res.status === 'already_exists'
+          ? `ผล ECG นี้ถูกบันทึกไว้แล้วในเวชระเบียน ${selectedPatient.name}`
+          : `บันทึกเข้าเวชระเบียน ${selectedPatient.name} สำเร็จ`,
+        'success'
+      );
       setAttachments([]);
     } catch (e) {
       showToast(`บันทึกไม่สำเร็จ: ${e.message}`, 'error');
@@ -1203,7 +1214,7 @@ export default function ClinicalEcgAnalyzer() {
                     type="button"
                     role="option"
                     aria-selected={sampleId === ''}
-                    onClick={() => { setSampleId(''); setUploadedFiles(null); setLayoutOverride(''); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
+                    onClick={() => { setSampleId(''); setUploadedFiles(null); setLayoutOverride(''); setHighlightedLead(null); setError(''); setSavedReport(null); setSampleDropdownOpen(false); }}
                     className={`block w-full px-3 py-2 text-left ${sampleId === '' ? 'bg-sky-600 text-white' : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                   >
                     — เลือกตัวอย่างจริง —
@@ -1214,7 +1225,7 @@ export default function ClinicalEcgAnalyzer() {
                       type="button"
                       role="option"
                       aria-selected={sampleId === s.id}
-                      onClick={() => { setSampleId(s.id); setUploadedFiles(null); setLayoutOverride(''); setHighlightedLead(null); setError(''); setSampleDropdownOpen(false); }}
+                      onClick={() => { setSampleId(s.id); setUploadedFiles(null); setLayoutOverride(''); setHighlightedLead(null); setError(''); setSavedReport(null); setSampleDropdownOpen(false); }}
                       className={`block w-full px-3 py-2 text-left ${sampleId === s.id ? 'bg-sky-600 text-white' : dk ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                     >
                       {s.primary_label} · {s.id} ({s.sex}, {s.age ?? '?'}y)
@@ -1242,6 +1253,7 @@ export default function ClinicalEcgAnalyzer() {
               setLayoutOverride('');
               setHighlightedLead(null);
               setError(''); 
+              setSavedReport(null);
             }} />
         </label>
         <div className={`group relative mb-3 inline-flex items-center gap-1 text-[10px] ${subText}`}>
@@ -1432,11 +1444,11 @@ export default function ClinicalEcgAnalyzer() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={saveToRecord}
-                        disabled={saving}
-                        className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:opacity-60"
+                        disabled={saving || Boolean(savedReport?.report_id)}
+                        className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition disabled:opacity-60 ${savedReport?.report_id ? 'bg-emerald-600' : 'bg-sky-600 hover:bg-sky-700'}`}
                       >
                         {saving ? <Loader2 size={13} className="animate-spin" /> : <Bookmark size={13} />}
-                        Saved
+                        {saving ? 'กำลังบันทึก…' : savedReport?.report_id ? 'บันทึกแล้ว' : 'บันทึกเข้าเวชระเบียน'}
                       </button>
                       <button
                         onClick={downloadPdf}

@@ -179,6 +179,10 @@ export const modelApi = {
     }));
   },
 
+  getPatientReports: async (patientId) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/reports/history/${encodeURIComponent(patientId)}`, {
+    headers: authHeaders(),
+  })),
+
   getReportAttachments: async (reportId) => {
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/attachments/reports/${reportId}/attachments`, {
       headers: authHeaders(),
