@@ -1325,6 +1325,11 @@ export default function ClinicalEcgAnalyzer() {
             </p>
           </div>
         )}
+        {hasImageUpload && !result && (
+          <div className={`mb-2 rounded-lg border px-3 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+            ภาพ ECG จะถูกส่งให้โมเดลประเมินเบื้องต้นทันที แต่ผลอาจคลาดเคลื่อนจากภาพถ่าย/สแกน ควรให้แพทย์ตรวจยืนยันทุกครั้ง
+          </div>
+        )}
         <button
           onClick={analyze}
           disabled={loading}
