@@ -297,6 +297,7 @@ function Heart({ bbRef, variant = 'normal', onToggle, onReady }) {
 }
 
 function AnatomyHotspots({ bbRef, variant = 'normal', selectedId, onSelect }) {
+  const [hoveredId, setHoveredId] = useState(null);
   if (!bbRef.current) return null;
   const visibleParts = ANATOMY_PARTS.filter((part) => (
     variant === 'open' ? part.view === 'internal' : part.view === 'external'
@@ -313,9 +314,10 @@ function AnatomyHotspots({ bbRef, variant = 'normal', selectedId, onSelect }) {
           }}
           onPointerOver={(event) => {
             event.stopPropagation();
+            setHoveredId(part.id);
             document.body.style.cursor = 'pointer';
           }}
-          onPointerOut={() => { document.body.style.cursor = ''; }}
+          onPointerOut={() => { setHoveredId(null); document.body.style.cursor = ''; }}
           renderOrder={1200}
         >
           <sphereGeometry args={[selected ? 0.13 : 0.095, 16, 16]} />
@@ -330,6 +332,14 @@ function AnatomyHotspots({ bbRef, variant = 'normal', selectedId, onSelect }) {
           <ringGeometry args={[selected ? 0.15 : 0.115, selected ? 0.18 : 0.135, 24]} />
           <meshBasicMaterial color={selected ? '#38bdf8' : '#0ea5e9'} transparent opacity={0.8} depthTest={false} side={THREE.DoubleSide} />
         </mesh>
+        {hoveredId === part.id && !selected && (
+          <Html position={[0.13, 0.12, 0]} distanceFactor={5} style={{ pointerEvents: 'none' }}>
+            <div style={{ background: 'rgba(4,10,24,0.92)', border: '1px solid rgba(125,211,252,0.7)', borderRadius: 6, color: '#f8fafc', padding: '5px 8px', whiteSpace: 'nowrap', fontFamily: 'sans-serif', boxShadow: '0 4px 14px rgba(0,0,0,0.25)' }}>
+              <div style={{ color: '#7dd3fc', fontSize: 10, fontWeight: 800 }}>{part.name}</div>
+              <div style={{ color: '#cbd5e1', fontSize: 9, marginTop: 2 }}>คลิกเพื่อดู Detail</div>
+            </div>
+          </Html>
+        )}
       </group>
     );
   });
@@ -338,7 +348,7 @@ function AnatomyHotspots({ bbRef, variant = 'normal', selectedId, onSelect }) {
 // Smoothly moves the camera to the selected landmark instead of snapping the
 // view. The hotspot and camera use the same normalized coordinate transform, so
 // the selected pin remains attached to the anatomical location while orbiting.
-function CameraFocus({ bbRef, selectedPart, controlsRef }) {
+function CameraFocus({ bbRef, selectedPart, controlsRef, resetToken }) {
   const { camera } = useThree();
   const animationRef = useRef(null);
 
@@ -357,7 +367,7 @@ function CameraFocus({ bbRef, selectedPart, controlsRef }) {
       position: target.clone().add(direction.multiplyScalar(distance)),
       target,
     };
-  }, [bbRef, camera, controlsRef, selectedPart]);
+  }, [bbRef, camera, controlsRef, resetToken, selectedPart]);
 
   useFrame((_, delta) => {
     const animation = animationRef.current;
@@ -623,6 +633,8 @@ const HeartModel3D = ({ result = null }) => {
   const [top5Nodes,     setTop5Nodes]     = useState([]);
   const [heartVariant, setHeartVariant] = useState('normal');
   const [selectedAnatomy, setSelectedAnatomy] = useState(null);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [cameraResetToken, setCameraResetToken] = useState(0);
   const [, setModelReady] = useState(false);
   const markModelReady = useCallback(() => setModelReady(true), []);
   
@@ -646,6 +658,21 @@ const HeartModel3D = ({ result = null }) => {
   const bbRef      = useRef(null);
   const controlsRef = useRef(null);
   const { events } = useStream();
+
+  const resetView = useCallback(() => {
+    setSelectedAnatomy(null);
+    setCameraResetToken((value) => value + 1);
+  }, []);
+
+  const zoomBy = useCallback((factor) => {
+    const controls = controlsRef.current;
+    if (!controls?.object || !controls?.target) return;
+    const direction = controls.object.position.clone().sub(controls.target);
+    const distance = THREE.MathUtils.clamp(direction.length() * factor, 1.1, 8);
+    if (direction.lengthSq() < 0.001) direction.set(0, 0, 1);
+    controls.object.position.copy(controls.target).add(direction.normalize().multiplyScalar(distance));
+    controls.update();
+  }, []);
 
   useEffect(() => {
     setHeartVariant('normal');
@@ -708,7 +735,7 @@ const HeartModel3D = ({ result = null }) => {
               selectedId={selectedAnatomy?.id}
               onSelect={setSelectedAnatomy}
             />
-            <CameraFocus bbRef={bbRef} selectedPart={selectedAnatomy} controlsRef={controlsRef} />
+            <CameraFocus bbRef={bbRef} selectedPart={selectedAnatomy} controlsRef={controlsRef} resetToken={cameraResetToken} />
             {result?.localization_supported !== false && (
               <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
             )}
@@ -719,10 +746,13 @@ const HeartModel3D = ({ result = null }) => {
             <OrbitControls
               ref={controlsRef}
               enableZoom
+              enableDamping
+              dampingFactor={0.08}
+              enablePan={false}
               minDistance={1.1}
               maxDistance={8}
               target={[0, 0, 0]}
-              autoRotate={!selectedAnatomy}
+              autoRotate={autoRotate && !selectedAnatomy}
               autoRotateSpeed={0.5}
             />
           </Suspense>
@@ -737,6 +767,23 @@ const HeartModel3D = ({ result = null }) => {
         pointerEvents: 'none', letterSpacing: 0.4,
       }}>
         {heartVariant === 'normal' ? 'โหมดภายนอก: หลอดเลือดและหลอดเลือดเลี้ยงหัวใจ' : 'โหมดภายใน: ห้องและลิ้นหัวใจ'} • คลิกจุดสีขาวเพื่อดูรายละเอียด
+      </div>
+      <div
+        aria-label="ตัวควบคุมโมเดลหัวใจ"
+        style={{
+          position: 'absolute', top: 48, left: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5,
+          background: 'rgba(4,10,24,0.82)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 8, padding: 5, zIndex: 15, fontFamily: 'sans-serif',
+        }}
+      >
+        <button type="button" title="ดูโครงสร้างภายนอก" onClick={() => { setHeartVariant('normal'); resetView(); }} style={{ border: 0, borderRadius: 5, padding: '5px 8px', cursor: 'pointer', color: heartVariant === 'normal' ? '#082f49' : '#cbd5e1', background: heartVariant === 'normal' ? '#7dd3fc' : 'rgba(148,163,184,0.15)', fontSize: 10, fontWeight: 800 }}>ภายนอก</button>
+        <button type="button" title="เปิดดูห้องและลิ้นหัวใจ" onClick={() => { setHeartVariant('open'); resetView(); }} style={{ border: 0, borderRadius: 5, padding: '5px 8px', cursor: 'pointer', color: heartVariant === 'open' ? '#082f49' : '#cbd5e1', background: heartVariant === 'open' ? '#7dd3fc' : 'rgba(148,163,184,0.15)', fontSize: 10, fontWeight: 800 }}>ภายใน</button>
+        <span style={{ width: 1, height: 18, background: 'rgba(148,163,184,0.3)' }} />
+        <button type="button" title="ซูมเข้า" onClick={() => zoomBy(0.78)} style={{ border: 0, borderRadius: 5, width: 25, height: 25, cursor: 'pointer', color: '#e0f2fe', background: 'rgba(14,165,233,0.2)', fontSize: 16, lineHeight: 1 }}>+</button>
+        <button type="button" title="ซูมออก" onClick={() => zoomBy(1.28)} style={{ border: 0, borderRadius: 5, width: 25, height: 25, cursor: 'pointer', color: '#e0f2fe', background: 'rgba(14,165,233,0.2)', fontSize: 16, lineHeight: 1 }}>−</button>
+        <button type="button" title="กลับมุมมองเต็ม" onClick={resetView} style={{ border: 0, borderRadius: 5, padding: '5px 8px', cursor: 'pointer', color: '#cbd5e1', background: 'rgba(148,163,184,0.15)', fontSize: 10, fontWeight: 700 }}>Reset</button>
+        <button type="button" title="เปิด/ปิดการหมุนอัตโนมัติ" onClick={() => setAutoRotate((value) => !value)} style={{ border: 0, borderRadius: 5, padding: '5px 8px', cursor: 'pointer', color: autoRotate ? '#052e16' : '#cbd5e1', background: autoRotate ? '#86efac' : 'rgba(148,163,184,0.15)', fontSize: 10, fontWeight: 700 }}>{autoRotate ? 'หยุดหมุน' : 'หมุนอัตโนมัติ'}</button>
+        <span style={{ color: '#94a3b8', fontSize: 9, padding: '0 3px' }}>ลากเพื่อหมุน • ล้อเมาส์เพื่อซูม</span>
       </div>
       {selectedAnatomy && (
         <aside
