@@ -1,5 +1,5 @@
 import React, { Suspense, useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
@@ -335,6 +335,48 @@ function AnatomyHotspots({ bbRef, variant = 'normal', selectedId, onSelect }) {
   });
 }
 
+// Smoothly moves the camera to the selected landmark instead of snapping the
+// view. The hotspot and camera use the same normalized coordinate transform, so
+// the selected pin remains attached to the anatomical location while orbiting.
+function CameraFocus({ bbRef, selectedPart, controlsRef }) {
+  const { camera } = useThree();
+  const animationRef = useRef(null);
+
+  useEffect(() => {
+    if (!bbRef.current) return;
+    const controls = controlsRef.current;
+    const currentTarget = controls?.target?.clone?.() ?? new THREE.Vector3(0, 0, 0);
+    const target = selectedPart
+      ? normToScene(selectedPart.position, bbRef, null)
+      : new THREE.Vector3(0, 0, 0);
+    const direction = camera.position.clone().sub(currentTarget);
+    if (direction.lengthSq() < 0.001) direction.set(0, 0, 1);
+    direction.normalize();
+    const distance = selectedPart ? 1.65 : 4.2;
+    animationRef.current = {
+      position: target.clone().add(direction.multiplyScalar(distance)),
+      target,
+    };
+  }, [bbRef, camera, controlsRef, selectedPart]);
+
+  useFrame((_, delta) => {
+    const animation = animationRef.current;
+    const controls = controlsRef.current;
+    if (!animation || !controls) return;
+    const alpha = Math.min(1, delta * 5);
+    camera.position.lerp(animation.position, alpha);
+    controls.target.lerp(animation.target, alpha);
+    controls.update();
+    if (camera.position.distanceTo(animation.position) < 0.01 && controls.target.distanceTo(animation.target) < 0.01) {
+      camera.position.copy(animation.position);
+      controls.target.copy(animation.target);
+      animationRef.current = null;
+    }
+  });
+
+  return null;
+}
+
 // ── Activation sphere cluster ─────────────────────────────────────────────────
 function ActivationMap({ bbRef, nodePositions, activationMap, calibration }) {
   const meshRef = useRef();
@@ -602,6 +644,7 @@ const HeartModel3D = ({ result = null }) => {
   });
 
   const bbRef      = useRef(null);
+  const controlsRef = useRef(null);
   const { events } = useStream();
 
   useEffect(() => {
@@ -665,6 +708,7 @@ const HeartModel3D = ({ result = null }) => {
               selectedId={selectedAnatomy?.id}
               onSelect={setSelectedAnatomy}
             />
+            <CameraFocus bbRef={bbRef} selectedPart={selectedAnatomy} controlsRef={controlsRef} />
             {result?.localization_supported !== false && (
               <ActivationMap bbRef={bbRef} nodePositions={nodePositions} activationMap={activationMap} calibration={calibration} />
             )}
@@ -672,7 +716,15 @@ const HeartModel3D = ({ result = null }) => {
               <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
             )}
             <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
-            <OrbitControls enableZoom minDistance={2} maxDistance={8} autoRotate autoRotateSpeed={0.5} />
+            <OrbitControls
+              ref={controlsRef}
+              enableZoom
+              minDistance={1.1}
+              maxDistance={8}
+              target={[0, 0, 0]}
+              autoRotate={!selectedAnatomy}
+              autoRotateSpeed={0.5}
+            />
           </Suspense>
         </Canvas>
       </WebGLErrorBoundary>
@@ -718,6 +770,13 @@ const HeartModel3D = ({ result = null }) => {
           <div style={{ color: '#94a3b8', fontSize: 9, marginTop: 8 }}>
             ข้อมูลนี้เป็นคำอธิบายกายวิภาค ไม่ใช่การวินิจฉัยจาก ECG
           </div>
+          <button
+            type="button"
+            onClick={() => setSelectedAnatomy(null)}
+            style={{ marginTop: 10, width: '100%', border: '1px solid rgba(125,211,252,0.35)', borderRadius: 6, background: 'rgba(14,165,233,0.12)', color: '#bae6fd', cursor: 'pointer', padding: '6px 8px', fontSize: 10, fontWeight: 700 }}
+          >
+            กลับมุมมองเต็ม / Reset view
+          </button>
         </aside>
       )}
       {result?.localization_normal_gated === true && (
