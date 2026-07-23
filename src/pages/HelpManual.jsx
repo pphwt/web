@@ -54,7 +54,7 @@ const HelpManual = () => {
   const subText  = dk ? 'text-slate-400'                    : 'text-slate-500';
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
+    <div className="min-h-full bg-[var(--bg-main)] px-2 py-3 text-[var(--text-main)] transition-colors duration-300 sm:px-4 lg:px-6">
       <div className="max-w-[1000px] mx-auto flex flex-col gap-5">
 
         {/* Header */}

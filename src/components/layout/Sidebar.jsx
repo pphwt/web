@@ -93,7 +93,7 @@ export const Sidebar = ({ onClose }) => {
     ? 'bg-sky-500/15 border-sky-500/20 text-sky-400'
     : 'bg-sky-50 border-sky-200 text-sky-600';
 
-  const navBase     = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 text-sm';
+  const navBase     = 'clinical-focus w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150 text-sm';
   const navActive   = dk
     ? `${navBase} bg-sky-500/[0.12] text-sky-300 font-semibold`
     : `${navBase} bg-sky-50 text-sky-700 font-semibold`;
@@ -145,7 +145,7 @@ export const Sidebar = ({ onClose }) => {
       <nav className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-3 space-y-4">
         {sections.map(({ label, items }) => (
           <div key={label}>
-            <p className={`mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] ${secLabel}`}>
+            <p className={`mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] ${secLabel}`}>
               {label}
             </p>
             <div className="space-y-0.5">

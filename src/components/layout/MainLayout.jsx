@@ -65,7 +65,7 @@ const MainLayoutContent = ({ children }) => {
 
         <div className="flex-1 flex flex-col min-w-0">
           {!hideTopBar && <TopBar onMenuClick={() => setIsSidebarOpen(true)} />}
-          <main className="flex-1 overflow-auto p-4 md:p-8 custom-scrollbar">
+          <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-5 xl:p-6 custom-scrollbar">
             {children}
           </main>
         </div>

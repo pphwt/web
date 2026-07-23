@@ -16,7 +16,7 @@ export const TopBar = ({ onMenuClick }) => {
     : null;
 
   return (
-    <header className={`h-16 border-b px-4 md:px-6 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300 ${
+    <header className={`min-h-16 border-b px-3 py-2 sm:px-4 md:px-6 flex items-center justify-between sticky top-0 z-30 transition-colors duration-300 ${
       dk ? 'bg-[#080e1a]/90 border-white/[0.06] backdrop-blur-md' : 'bg-white/90 border-slate-200 backdrop-blur-md'
     }`}>
 
@@ -31,21 +31,23 @@ export const TopBar = ({ onMenuClick }) => {
         </button>
 
         {selectedPatient ? (
-          <div className="flex items-center gap-2.5">
-            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold ${
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold ${
               dk ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700'
             }`}>
               {initials}
             </div>
-            <div className="hidden sm:block">
-              <p className={`text-xs font-semibold leading-none ${dk ? 'text-white' : 'text-slate-800'}`}>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold uppercase tracking-[0.12em] ${dk ? 'text-sky-300' : 'text-sky-700'}`}>Patient context</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span className={`hidden text-[10px] sm:inline ${dk ? 'text-slate-500' : 'text-slate-400'}`}>{t('status_active')}</span>
+              </div>
+              <p className={`truncate text-sm font-bold leading-tight ${dk ? 'text-white' : 'text-slate-800'}`}>
                 {selectedPatient.name}
               </p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                <span className={`text-[10px] ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {t('status_active')}
-                </span>
+              <div className={`hidden truncate text-[11px] leading-tight sm:block ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
+                {[selectedPatient.id_card || selectedPatient.id, selectedPatient.age ? `${selectedPatient.age}y` : null, selectedPatient.gender].filter(Boolean).join(' · ')}
               </div>
             </div>
           </div>

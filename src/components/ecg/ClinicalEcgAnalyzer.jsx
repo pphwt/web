@@ -9,6 +9,12 @@ import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useNavigationLock } from '../../context/NavigationLockContext';
 import { canPreviewImageFile, modelApi, isImageEcgFile } from '../../services/modelApi';
+import {
+  ClinicalMetricCard,
+  ClinicalSectionHeader,
+  ClinicalStatusBadge,
+  ClinicalWarning,
+} from '../ui/ClinicalPrimitives';
 
 // Measurement metrics → display config. `approx` marks values that come from
 // open-source (neurokit2) delineation and can be less accurate than a certified
@@ -364,8 +370,8 @@ function ScanPipelineStatus({ loading, scanStatus, dk }) {
             title={stage.reason || ''}
             className={`rounded-lg border px-2 py-1.5 ${colorFor(stage.status)}`}
           >
-            <div className="truncate text-[9px] font-black">{SCAN_STAGE_LABELS[stage.key] || stage.key}</div>
-            <div className="truncate text-[8px] font-semibold uppercase opacity-75">{stage.status}</div>
+            <div className="truncate text-[11px] font-black">{SCAN_STAGE_LABELS[stage.key] || stage.key}</div>
+            <div className="truncate text-[10px] font-semibold uppercase opacity-75">{stage.status}</div>
           </div>
         ))}
       </div>
@@ -469,7 +475,7 @@ function EcgChartViewer({ waveform, dk, overlay = null, digitizationReport = nul
     && overlay.panels.some((panel) => (panel?.trace_points || []).length > 1);
 
   return (
-    <div className={`rounded-xl border p-2.5 ${dk ? 'border-white/[0.07] bg-slate-950/25' : 'border-slate-200 bg-slate-50'}`}>
+    <div className={`clinical-panel p-3 ${dk ? 'border-white/[0.07] bg-slate-950/25' : 'bg-slate-50'}`}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold ${dk ? 'border-white/[0.08] text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
           <Activity size={12} />
@@ -1103,6 +1109,18 @@ export default function ClinicalEcgAnalyzer() {
     const hasValue = value !== null && value !== undefined;
     const status = metricStatus({ value }, normal);
     const token = statusToken(status, dk);
+    if (!compact && key === 'heart_rate_bpm') {
+      return (
+        <ClinicalMetricCard
+          label={label}
+          value={hasValue ? value : null}
+          unit={unit}
+          status={status}
+          dark={dk}
+          detail={metric.reason ? (REASON_TEXT[metric.reason] || metric.reason) : `Source: ${usedMachine ? 'machine OCR header' : `computed waveform lead ${measurements.lead_used || '-'}`}`}
+        />
+      );
+    }
     return (
       <div key={key} className={`rounded-xl border p-3 ${token.card}`}>
         <div className="flex items-start justify-between gap-2">
@@ -1177,6 +1195,7 @@ export default function ClinicalEcgAnalyzer() {
     || classifierReview?.status === 'unconfirmed'
     || Boolean(result?.classification_warning)
     || (!result?.classification && Boolean(result?.classification_note));
+  const clinicalSummaryStatus = outputUnverified ? 'review' : isPathological ? 'urgent' : 'normal';
   // Only the classifier's own probability breakdown belongs here — findings,
   // rhythm, and axis are already shown once each in their own detail cards
   // above; repeating them in this list just restated the same conclusions
@@ -1193,8 +1212,18 @@ export default function ClinicalEcgAnalyzer() {
   return (
     <div className="flex flex-col gap-5">
       {/* Input */}
-      <div className={`rounded-2xl border p-4 ${surface}`}>
-        <div className={`text-[20px] mb-3 ${secLabel}`}>1 · เลือก ECG จริง</div>
+      <div className={`clinical-panel p-4 ${surface}`}>
+        <ClinicalSectionHeader
+          eyebrow="ECG REVIEW · STEP 1"
+          title="เลือกและตรวจ ECG"
+          description="เลือกข้อมูลผู้ป่วยหรืออัปโหลด ECG จากนั้นตรวจคุณภาพก่อนอ่านผลและบันทึกเวชระเบียน"
+          dark={dk}
+        />
+        {!selectedPatient && (
+          <ClinicalWarning dark={dk} className="mb-3">
+            ยังไม่ได้เลือกผู้ป่วย ระบบยังวิเคราะห์ ECG ได้ แต่ต้องเลือกผู้ป่วยก่อนบันทึกเข้าเวชระเบียน
+          </ClinicalWarning>
+        )}
 
         <div className={`group relative mb-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold ${dk ? 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
           <Info size={11} />
@@ -1326,9 +1355,9 @@ export default function ClinicalEcgAnalyzer() {
           </div>
         )}
         {hasImageUpload && !result && (
-          <div className={`mb-2 rounded-lg border px-3 py-2 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+          <ClinicalWarning dark={dk} className="mb-3">
             ภาพ ECG จะถูกส่งให้โมเดลประเมินเบื้องต้นทันที แต่ผลอาจคลาดเคลื่อนจากภาพถ่าย/สแกน ควรให้แพทย์ตรวจยืนยันทุกครั้ง
-          </div>
+          </ClinicalWarning>
         )}
         <button
           onClick={analyze}
@@ -1354,6 +1383,13 @@ export default function ClinicalEcgAnalyzer() {
 
       {result && (
         <div ref={resultRef} className="space-y-5 scroll-mt-6">
+          <ClinicalSectionHeader
+            eyebrow="ECG REVIEW · STEP 2"
+            title="ผลการอ่าน ECG และรายงานเต็ม"
+            description={`${patientInfo.name} · ${patientInfo.mrn} · ตรวจสอบ trace และคุณภาพก่อนลงนามผล`}
+            dark={dk}
+            actions={<ClinicalStatusBadge status={clinicalSummaryStatus} dark={dk} />}
+          />
           {result.meta?.format === 'image' && (
             <div className={`flex gap-2 rounded-xl border p-2.5 ${dk ? 'border-fuchsia-500/25 bg-fuchsia-500/[0.06]' : 'border-fuchsia-300 bg-fuchsia-50'}`}>
               <AlertTriangle size={13} className={`shrink-0 mt-0.5 ${dk ? 'text-fuchsia-400' : 'text-fuchsia-600'}`} />
@@ -1364,7 +1400,7 @@ export default function ClinicalEcgAnalyzer() {
             </div>
           )}
 
-          <div className={`overflow-hidden rounded-[22px] border p-4 shadow-sm ${dk ? 'border-white/[0.07] bg-[#0b1220]' : 'border-slate-200 bg-white'}`}>
+          <div className={`clinical-panel overflow-hidden p-4 ${dk ? 'border-white/[0.07] bg-[#0b1220]' : 'bg-white'}`}>
             {result.ground_truth_label && (
               <p className={`mb-3 text-[24px] ${subText}`}>
                 ผลการประมวลผล: <b className={mainText}>{result.ground_truth_label}</b>
@@ -1459,7 +1495,7 @@ export default function ClinicalEcgAnalyzer() {
                 <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {INTERVAL_METRICS.map((metric) => renderMetricTile(metric, true))}
                 </section>
-                <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
                 <section>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -1509,7 +1545,7 @@ export default function ClinicalEcgAnalyzer() {
                   )}
                 </section>
 
-                <aside>
+                <aside className="lg:sticky lg:top-24 lg:self-start">
                   <div className="mb-3 flex items-center gap-2">
                     <h3 className={`text-base font-black ${mainText}`}>AI Predictions</h3>
                     <Info size={13} className={subText} />
@@ -1561,7 +1597,7 @@ export default function ClinicalEcgAnalyzer() {
                       </div>
                       {result.classification_note && (
                         <div className={`mb-3 rounded-lg border p-2.5 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
-                          Disease classifier withheld: {humanize(result.classification_note)}. Measurements and traceable morphology remain available for clinician review.
+                          ยังไม่มีผลโมเดลโรค: {humanize(result.classification_note)} ข้อมูล measurements และ morphology ยังพร้อมให้แพทย์ตรวจสอบ
                         </div>
                       )}
                       {classifierReview?.status === 'unconfirmed' && (

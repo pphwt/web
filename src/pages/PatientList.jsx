@@ -325,8 +325,8 @@ const PatientList = () => {
   const modalSub   = dk ? 'text-slate-500'          : 'text-slate-500';
 
   return (
-    <div className={`p-4 md:p-8 min-h-screen ${pageBg} text-[var(--text-main)] transition-colors duration-300`}>
-      <div className="max-w-[1400px] mx-auto">
+    <div className={`min-h-full px-2 py-3 sm:px-4 lg:px-6 ${pageBg} text-[var(--text-main)] transition-colors duration-300`}>
+      <div className="clinical-page">
 
         {/* ── Header ───────────────────────────────────────────── */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">

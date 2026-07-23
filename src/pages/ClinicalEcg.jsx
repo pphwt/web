@@ -3,8 +3,8 @@ import ClinicalEcgAnalyzer from '../components/ecg/ClinicalEcgAnalyzer';
 
 export default function ClinicalEcg() {
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
-      <div className="max-w-[1800px] mx-auto flex flex-col gap-5">
+    <div className="min-h-full bg-[var(--bg-main)] px-2 py-3 text-[var(--text-main)] sm:px-4 lg:px-6">
+      <div className="clinical-page flex flex-col gap-4 lg:gap-5">
         <ClinicalEcgAnalyzer />
       </div>
     </div>
