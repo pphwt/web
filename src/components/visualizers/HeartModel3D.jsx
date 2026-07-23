@@ -480,6 +480,7 @@ function AnatomyNavigator({ parts, selectedId, onSelect }) {
       style={{ position: 'absolute', bottom: 58, left: 12, right: 12, zIndex: 25, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: 9, background: 'rgba(4,10,24,0.90)', border: '1px solid rgba(125,211,252,0.35)', boxShadow: '0 6px 24px rgba(0,0,0,0.22)', overflowX: 'auto', fontFamily: 'sans-serif' }}
     >
       <button type="button" title="จุดก่อนหน้า" aria-label="จุดก่อนหน้า" onClick={() => move(-1)} style={{ flex: '0 0 auto', width: 28, height: 28, border: 0, borderRadius: 6, background: 'rgba(148,163,184,0.18)', color: '#e0f2fe', cursor: 'pointer', fontSize: 16 }}>‹</button>
+      <span style={{ flex: '0 0 auto', color: '#7dd3fc', fontSize: 9, fontWeight: 800, padding: '0 4px', whiteSpace: 'nowrap' }}>{parts[0]?.viewLabelTh || parts[0]?.viewLabelEn || ''}</span>
       {parts.map((part) => {
         const selected = selectedId === part.id;
         return (
@@ -955,6 +956,8 @@ const HeartModel3D = ({ result = null }) => {
             <div>
               <div style={{ color: '#7dd3fc', fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Anatomy</div>
               <div style={{ color: '#7dd3fc', fontSize: 10, marginTop: 2 }}>จุด {selectedAnatomy.number} · {selectedAnatomy.category}</div>
+              <div style={{ color: '#38bdf8', fontSize: 10, fontWeight: 700, marginTop: 5 }}>{selectedAnatomy.viewLabelEn} · {selectedAnatomy.viewLabelTh}</div>
+              <div style={{ color: '#cbd5e1', fontSize: 10, lineHeight: 1.35, marginTop: 3 }}>{selectedAnatomy.viewDescription}</div>
               <h3 style={{ margin: '3px 0 0', color: '#f8fafc', fontSize: 15, lineHeight: 1.25 }}>{selectedAnatomy.nameEn}</h3>
               <div style={{ color: '#cbd5e1', fontSize: 11, marginTop: 2 }}>{selectedAnatomy.nameTh}</div>
             </div>
@@ -995,19 +998,6 @@ const HeartModel3D = ({ result = null }) => {
         }}>
           <span>🟢</span>
           <span>Normal ECG: No active localized source abnormality expected (คลื่นไฟฟ้าหัวใจปกติ: ไม่พบจุดกำเนิดกระแสไฟฟ้าผิดปกติ)</span>
-        </div>
-      )}
-      {result?.localization_supported === false && (
-        <div style={{
-          position: 'absolute', bottom: 12, right: 12, left: 12,
-          background: 'rgba(180,83,9,0.94)', backdropFilter: 'blur(8px)',
-          border: '1.5px solid rgba(255,255,255,0.2)', borderRadius: 12,
-          padding: '10px 14px', fontFamily: 'sans-serif',
-          color: '#fff', zIndex: 20, fontSize: 11,
-          textAlign: 'center', boxShadow: '0 4px 20px rgba(180,83,9,0.25)',
-          fontWeight: 'bold'
-        }}>
-          3D localization unavailable: {result.localization_note || 'this input is outside the validated localizer domain.'}
         </div>
       )}
     </div>

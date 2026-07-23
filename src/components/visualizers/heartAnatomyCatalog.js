@@ -176,8 +176,76 @@ const internal = [
   },
 ];
 
-export const HEART_ANATOMY_CATALOG = { external, internal };
+const VIEW_METADATA = {
+  external: {
+    key: 'external',
+    labelEn: 'External surface',
+    labelTh: 'กายวิภาคภายนอก',
+    description: 'จุดบนผิวหัวใจ หลอดเลือด และแนวร่องด้านนอก',
+  },
+  internal: {
+    key: 'internal',
+    labelEn: 'Internal anatomy',
+    labelTh: 'กายวิภาคภายใน',
+    description: 'ห้องหัวใจ ลิ้นหัวใจ ผนังกั้น และโครงสร้างภายใน',
+  },
+};
+
+// These four structures are visible on the outside asset but must not reuse
+// the chamber-level wording from the open-heart asset. The override keeps
+// each click target tied to one view and gives it a surface-specific detail.
+const EXTERNAL_DETAIL_OVERRIDES = {
+  'right-atrium-external': {
+    nameEn: 'Right Auricle (external surface)',
+    nameTh: 'หูหัวใจขวา (ผิวภายนอก)',
+    category: 'โครงสร้างภายนอก',
+    location: 'ติ่งกล้ามเนื้อรูปใบหูที่ยื่นจากขอบด้านหน้าของ right atrium',
+    function: 'ช่วยเพิ่มความจุของ right atrium และเป็นส่วนที่มองเห็นได้จากผิวด้านหน้า',
+    flow: 'SVC/IVC → right atrium (เป็นส่วนยื่นภายนอก ไม่ใช่ทางผ่านเลือดแยกต่างหาก)',
+  },
+  'right-ventricle-external': {
+    nameEn: 'Right Ventricular Surface',
+    nameTh: 'ผิวกล้ามเนื้อหัวใจห้องล่างขวา',
+    category: 'กล้ามเนื้อหัวใจภายนอก',
+    location: 'ผิวด้านหน้าของหัวใจใต้ pulmonary trunk และด้านขวาของ anterior interventricular sulcus',
+    function: 'เป็นผนังกล้ามเนื้อที่สร้างแรงบีบส่งเลือดไปปอด; จุดนี้หมายถึงผิวภายนอก ไม่ใช่โพรงภายใน',
+    flow: 'right ventricle → pulmonary valve → pulmonary trunk',
+  },
+  'left-ventricle-external': {
+    nameEn: 'Left Ventricular Surface',
+    nameTh: 'ผิวกล้ามเนื้อหัวใจห้องล่างซ้าย',
+    category: 'กล้ามเนื้อหัวใจภายนอก',
+    location: 'ผิวด้านซ้ายและด้านหลังของหัวใจ ต่อเนื่องลงไปถึงบริเวณ apex',
+    function: 'เป็นผนังกล้ามเนื้อหนาที่สร้างแรงดันสูง; จุดนี้หมายถึงผิวภายนอก ไม่ใช่โพรงภายใน',
+    flow: 'left ventricle → aortic valve → aorta',
+  },
+  'left-atrium-external': {
+    nameEn: 'Left Auricle (external surface)',
+    nameTh: 'หูหัวใจซ้าย (ผิวภายนอก)',
+    category: 'โครงสร้างภายนอก',
+    location: 'ติ่งกล้ามเนื้อเล็กด้านหน้าของ left atrium ใกล้ฐานของ pulmonary trunk',
+    function: 'ช่วยเพิ่มความจุของ left atrium และเป็นส่วนยื่นที่เห็นจากผิวด้านหน้า',
+    flow: 'pulmonary veins → left atrium (เป็นส่วนยื่นภายนอก ไม่ใช่ทางผ่านเลือดแยกต่างหาก)',
+  },
+};
+
+export const HEART_ANATOMY_CATALOG = { external, internal, viewMetadata: VIEW_METADATA };
 
 export function partsForVariant(variant) {
-  return variant === 'open' ? internal : external;
+  const view = variant === 'open' ? 'internal' : 'external';
+  const metadata = VIEW_METADATA[view];
+  const source = view === 'internal' ? internal : external;
+  const overrides = view === 'external' ? EXTERNAL_DETAIL_OVERRIDES : {};
+
+  return source.map((part) => ({
+    ...part,
+    ...(overrides[part.id] || {}),
+    view: metadata.key,
+    viewLabelEn: metadata.labelEn,
+    viewLabelTh: metadata.labelTh,
+    viewDescription: metadata.description,
+    // A scoped key prevents a selected external point from ever resolving to
+    // an internal point with a similar anatomical name.
+    detailId: `${metadata.key}:${part.id}`,
+  }));
 }
