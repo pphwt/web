@@ -891,6 +891,9 @@ export default function ClinicalEcgAnalyzer() {
   const inputRef = useRef(null);
   const resultRef = useRef(null);
   const sampleDropdownRef = useRef(null);
+  const analyzeInFlightRef = useRef(false);
+  const pdfInFlightRef = useRef(false);
+  const saveInFlightRef = useRef(false);
   const hasImageUpload = Array.isArray(uploadedFiles) && uploadedFiles.some((file) => isImageEcgFile(file));
 
   useEffect(() => {
@@ -951,7 +954,11 @@ export default function ClinicalEcgAnalyzer() {
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
 
   const analyze = async () => {
+    // React state updates are asynchronous; this ref closes the small window
+    // where two rapid clicks could otherwise start duplicate uploads.
+    if (analyzeInFlightRef.current || loading) return;
     if (!uploadedFiles && !sampleId) { setError('เลือกตัวอย่างจริง หรืออัปโหลดไฟล์ก่อน'); return; }
+    analyzeInFlightRef.current = true;
     setLoading(true); setError(''); setResult(null);
     try {
       setResult(uploadedFiles
@@ -961,11 +968,14 @@ export default function ClinicalEcgAnalyzer() {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
     } finally {
       setLoading(false);
+      analyzeInFlightRef.current = false;
     }
   };
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const downloadPdf = async () => {
+    if (pdfInFlightRef.current || pdfLoading) return;
+    pdfInFlightRef.current = true;
     setPdfLoading(true);
     try {
       const blob = await modelApi.ecgReportBlob(
@@ -982,15 +992,18 @@ export default function ClinicalEcgAnalyzer() {
       setError(e.message || 'สร้าง PDF ไม่สำเร็จ');
     } finally {
       setPdfLoading(false);
+      pdfInFlightRef.current = false;
     }
   };
 
   const [saving, setSaving] = useState(false);
   const saveToRecord = async () => {
+    if (saveInFlightRef.current || saving) return;
     if (!selectedPatient?.id) {
       showToast('เลือกผู้ป่วยก่อน (จากหน้า Patients) เพื่อบันทึกเข้าเวชระเบียน', 'warning');
       return;
     }
+    saveInFlightRef.current = true;
     setSaving(true);
     try {
       const res = await modelApi.saveEcgReport({
@@ -1016,6 +1029,7 @@ export default function ClinicalEcgAnalyzer() {
       showToast(`บันทึกไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
       setSaving(false);
+      saveInFlightRef.current = false;
     }
   };
 
@@ -1220,7 +1234,7 @@ export default function ClinicalEcgAnalyzer() {
               ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : `${uploadedFiles.length} files selected`) 
               : 'เลือกไฟล์ (รูปถ่าย/สแกน .jpg .png .webp หรือ .npy / .csv / .hea+.dat / .dcm)'}
           </span>
-          <input ref={inputRef} type="file" multiple accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,.heif,.pdf,image/*,application/pdf" className="hidden"
+          <input ref={inputRef} type="file" multiple disabled={loading} accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,.heif,.pdf,image/*,application/pdf" className="hidden"
             onChange={(e) => { 
               const list = Array.from(e.target.files || []); 
               setUploadedFiles(list.length > 0 ? list : null); 
@@ -1246,6 +1260,7 @@ export default function ClinicalEcgAnalyzer() {
                 <span>Image layout</span>
                 <select
                   value={layoutOverride}
+                  disabled={loading}
                   onChange={(e) => setLayoutOverride(e.target.value)}
                   className={`rounded-md border px-2 py-1 text-[10px] ${dk ? 'border-white/[0.1] bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
                 >
@@ -1259,6 +1274,7 @@ export default function ClinicalEcgAnalyzer() {
               id="ocr-only-checkbox"
               type="checkbox"
               checked={ocrOnly}
+              disabled={loading}
               onChange={(e) => setOcrOnly(e.target.checked)}
               className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
             />
