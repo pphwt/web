@@ -461,7 +461,7 @@ function CameraFocus({ bbRef, selectedPart, controlsRef, resetToken, cancelRef }
   return null;
 }
 
-function AnatomyNavigator({ parts, selectedId, onSelect }) {
+function AnatomyNavigator({ parts, selectedId, onSelect, bottomOffset = 12 }) {
   const selectedIndex = Math.max(0, parts.findIndex((part) => part.id === selectedId));
   const move = (delta) => {
     if (!parts.length) return;
@@ -477,7 +477,7 @@ function AnatomyNavigator({ parts, selectedId, onSelect }) {
         if (event.key === 'ArrowRight') { event.preventDefault(); move(1); }
         if (event.key === 'Escape') { event.preventDefault(); onSelect(null); }
       }}
-      style={{ position: 'absolute', bottom: 58, left: 12, right: 12, zIndex: 25, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: 9, background: 'rgba(4,10,24,0.90)', border: '1px solid rgba(125,211,252,0.35)', boxShadow: '0 6px 24px rgba(0,0,0,0.22)', overflowX: 'auto', fontFamily: 'sans-serif' }}
+      style={{ position: 'absolute', bottom: bottomOffset, left: 12, right: 12, zIndex: 25, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: 9, background: 'rgba(4,10,24,0.90)', border: '1px solid rgba(125,211,252,0.35)', boxShadow: '0 6px 24px rgba(0,0,0,0.22)', overflowX: 'auto', fontFamily: 'sans-serif' }}
     >
       <button type="button" title="จุดก่อนหน้า" aria-label="จุดก่อนหน้า" onClick={() => move(-1)} style={{ flex: '0 0 auto', width: 28, height: 28, border: 0, borderRadius: 6, background: 'rgba(148,163,184,0.18)', color: '#e0f2fe', cursor: 'pointer', fontSize: 16 }}>‹</button>
       <span style={{ flex: '0 0 auto', color: '#7dd3fc', fontSize: 9, fontWeight: 800, padding: '0 4px', whiteSpace: 'nowrap' }}>{parts[0]?.viewLabelTh || parts[0]?.viewLabelEn || ''}</span>
@@ -932,7 +932,12 @@ const HeartModel3D = ({ result = null }) => {
         <button type="button" title="เปิด/ปิดการหมุนอัตโนมัติ" onClick={() => setAutoRotate((value) => !value)} style={{ border: 0, borderRadius: 5, padding: '5px 8px', cursor: 'pointer', color: autoRotate ? '#052e16' : '#cbd5e1', background: autoRotate ? '#86efac' : 'rgba(148,163,184,0.15)', fontSize: 10, fontWeight: 700 }}>{autoRotate ? 'หยุดหมุน' : 'หมุนอัตโนมัติ'}</button>
         <span style={{ color: '#94a3b8', fontSize: 9, padding: '0 3px' }}>ลากเพื่อหมุน • ล้อเมาส์เพื่อซูม</span>
       </div>
-      <AnatomyNavigator parts={activeParts} selectedId={selectedAnatomy?.id} onSelect={selectAnatomy} />
+      <AnatomyNavigator
+        parts={activeParts}
+        selectedId={selectedAnatomy?.id}
+        onSelect={selectAnatomy}
+        bottomOffset={result?.localization_normal_gated ? 58 : 12}
+      />
       {calibrationMode && (
         <div style={{ position: 'absolute', top: 94, left: 12, right: 12, zIndex: 16, maxWidth: 520, padding: '7px 10px', borderRadius: 7, background: 'rgba(120,53,15,0.92)', border: '1px solid rgba(251,191,36,0.65)', color: '#fef3c7', fontSize: 10, fontFamily: 'sans-serif' }}>
           <strong>Calibration mode:</strong> เลือกเลขด้านล่าง แล้วกด Alt+click บนผิวโครงสร้างจริงเพื่อคัดลอก anchor ไปที่ Console
@@ -945,21 +950,21 @@ const HeartModel3D = ({ result = null }) => {
           aria-live="polite"
           aria-label={`ข้อมูล ${selectedAnatomy.nameEn}`}
           style={{
-            position: 'absolute', top: 52, right: 12, width: 'min(280px, calc(100% - 24px))',
+            position: 'absolute', top: 52, right: 12, width: 'min(420px, calc(100% - 24px))', maxHeight: 'calc(100% - 64px)', overflowY: 'auto', boxSizing: 'border-box',
             background: 'rgba(4,10,24,0.94)', backdropFilter: 'blur(14px)',
             border: '1px solid rgba(56,189,248,0.7)', borderRadius: 12,
-            padding: '12px 14px', color: '#e2e8f0', zIndex: 30,
+            padding: '18px 20px', color: '#e2e8f0', zIndex: 30,
             fontFamily: 'sans-serif', boxShadow: '0 8px 30px rgba(0,0,0,0.28)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
             <div>
-              <div style={{ color: '#7dd3fc', fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Anatomy</div>
-              <div style={{ color: '#7dd3fc', fontSize: 10, marginTop: 2 }}>จุด {selectedAnatomy.number} · {selectedAnatomy.category}</div>
-              <div style={{ color: '#38bdf8', fontSize: 10, fontWeight: 700, marginTop: 5 }}>{selectedAnatomy.viewLabelEn} · {selectedAnatomy.viewLabelTh}</div>
-              <div style={{ color: '#cbd5e1', fontSize: 10, lineHeight: 1.35, marginTop: 3 }}>{selectedAnatomy.viewDescription}</div>
-              <h3 style={{ margin: '3px 0 0', color: '#f8fafc', fontSize: 15, lineHeight: 1.25 }}>{selectedAnatomy.nameEn}</h3>
-              <div style={{ color: '#cbd5e1', fontSize: 11, marginTop: 2 }}>{selectedAnatomy.nameTh}</div>
+              <div style={{ color: '#7dd3fc', fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Anatomy</div>
+              <div style={{ color: '#7dd3fc', fontSize: 12, marginTop: 4 }}>จุด {selectedAnatomy.number} · {selectedAnatomy.category}</div>
+              <div style={{ color: '#38bdf8', fontSize: 12, fontWeight: 700, marginTop: 8 }}>{selectedAnatomy.viewLabelEn} · {selectedAnatomy.viewLabelTh}</div>
+              <div style={{ color: '#cbd5e1', fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>{selectedAnatomy.viewDescription}</div>
+              <h3 style={{ margin: '6px 0 0', color: '#f8fafc', fontSize: 20, lineHeight: 1.25 }}>{selectedAnatomy.nameEn}</h3>
+              <div style={{ color: '#cbd5e1', fontSize: 13, marginTop: 4 }}>{selectedAnatomy.nameTh}</div>
             </div>
             <button
               type="button"
@@ -968,19 +973,19 @@ const HeartModel3D = ({ result = null }) => {
               style={{ background: 'transparent', border: 0, color: '#94a3b8', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 2 }}
             >×</button>
           </div>
-          <div style={{ color: '#e2e8f0', fontSize: 11, lineHeight: 1.55, margin: '10px 0 8px' }}><strong>ตำแหน่ง:</strong> {selectedAnatomy.location}</div>
-          <p style={{ color: '#e2e8f0', fontSize: 11, lineHeight: 1.55, margin: '8px 0' }}><strong>หน้าที่:</strong> {selectedAnatomy.function}</p>
-          <div style={{ color: '#bae6fd', fontSize: 10, lineHeight: 1.45, padding: '7px 8px', borderRadius: 6, background: 'rgba(14,165,233,0.12)' }}><strong>การไหลเวียน:</strong> {selectedAnatomy.flow}</div>
-          <div style={{ borderTop: '1px solid rgba(148,163,184,0.2)', paddingTop: 8, color: '#7dd3fc', fontSize: 10 }}>
+          <div style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.65, margin: '16px 0 12px' }}><strong>ตำแหน่ง:</strong> {selectedAnatomy.location}</div>
+          <p style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.65, margin: '12px 0' }}><strong>หน้าที่:</strong> {selectedAnatomy.function}</p>
+          <div style={{ color: '#bae6fd', fontSize: 13, lineHeight: 1.55, padding: '10px 12px', borderRadius: 8, background: 'rgba(14,165,233,0.12)' }}><strong>การไหลเวียน:</strong> {selectedAnatomy.flow}</div>
+          <div style={{ borderTop: '1px solid rgba(148,163,184,0.2)', paddingTop: 12, color: '#7dd3fc', fontSize: 12, lineHeight: 1.55 }}>
             จุดนี้เป็นคำอธิบายกายวิภาคของโมเดล ไม่ใช่ตำแหน่งโรคหรือผลวินิจฉัยจาก ECG
           </div>
-          <div style={{ color: '#94a3b8', fontSize: 9, marginTop: 8 }}>
+          <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.5, marginTop: 10 }}>
             ข้อมูลนี้เป็นคำอธิบายกายวิภาค ไม่ใช่การวินิจฉัยจาก ECG
           </div>
           <button
             type="button"
             onClick={() => selectAnatomy(null)}
-            style={{ marginTop: 10, width: '100%', border: '1px solid rgba(125,211,252,0.35)', borderRadius: 6, background: 'rgba(14,165,233,0.12)', color: '#bae6fd', cursor: 'pointer', padding: '6px 8px', fontSize: 10, fontWeight: 700 }}
+            style={{ marginTop: 14, width: '100%', border: '1px solid rgba(125,211,252,0.35)', borderRadius: 7, background: 'rgba(14,165,233,0.12)', color: '#bae6fd', cursor: 'pointer', padding: '10px 12px', fontSize: 12, fontWeight: 700 }}
           >
             กลับมุมมองเต็ม / Reset view
           </button>
