@@ -2,12 +2,14 @@ import React from 'react';
 import { usePatient } from '../../context/PatientContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useNavigationLock } from '../../context/NavigationLockContext';
 import { ChevronDown, Menu, User } from 'lucide-react';
 
 export const TopBar = ({ onMenuClick }) => {
   const { selectedPatient, patients, setSelectedPatient } = usePatient();
   const { t } = useLanguage();
   const { isDarkMode: dk } = useTheme();
+  const { isLocked } = useNavigationLock();
 
   const initials = selectedPatient?.name
     ? selectedPatient.name.trim().split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -21,7 +23,8 @@ export const TopBar = ({ onMenuClick }) => {
       {/* Left: hamburger + patient card */}
       <div className="flex items-center gap-3">
         <button
-          onClick={onMenuClick}
+          onClick={() => { if (!isLocked) onMenuClick?.(); }}
+          disabled={isLocked}
           className={`lg:hidden p-2 rounded-xl transition-all ${dk ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'}`}
         >
           <Menu size={20} />
@@ -58,7 +61,7 @@ export const TopBar = ({ onMenuClick }) => {
 
       {/* Right: quick switch */}
       <div className="relative group">
-        <button className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+        <button disabled={isLocked} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
           dk
             ? 'border-white/[0.07] text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'
             : 'border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
@@ -80,7 +83,8 @@ export const TopBar = ({ onMenuClick }) => {
               return (
                 <button
                   key={p.id}
-                  onClick={() => setSelectedPatient(p)}
+                  onClick={() => { if (!isLocked) setSelectedPatient(p); }}
+                  disabled={isLocked}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
                     isActive
                       ? dk ? 'bg-sky-500/[0.12] text-sky-300' : 'bg-sky-50 text-sky-700'

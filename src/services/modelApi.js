@@ -65,16 +65,17 @@ export const modelApi = {
   demoSamples: async (limit = 24) =>
     parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/demo-samples?limit=${limit}`)),
 
-  analyzeSample: async (sampleId) => {
+  analyzeSample: async (sampleId, options = {}) => {
     const form = new FormData();
     form.append('sample_id', sampleId);
     return parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/analyze`, {
       method: 'POST',
       body: form,
+      signal: options.signal,
     }));
   },
 
-  analyzeFile: async (file) => {
+  analyzeFile: async (file, options = {}) => {
     if (file.size > ECG_UPLOAD_MAX_BYTES) {
       throw new Error(`ECG file is too large. Max ${(ECG_UPLOAD_MAX_BYTES / 1024 / 1024).toFixed(1)} MB.`);
     }
@@ -83,12 +84,13 @@ export const modelApi = {
     return parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/analyze`, {
       method: 'POST',
       body: form,
+      signal: options.signal,
     }));
   },
 
   // Real clinical-file path: standard formats + neurokit2 measurements + honest
   // localizer gating (see backend /ecg/analyze).
-  analyzeEcgFile: async (fileOrFiles, ocrOnly = false, layoutOverride = null) => {
+  analyzeEcgFile: async (fileOrFiles, ocrOnly = false, layoutOverride = null, options = {}) => {
     const form = new FormData();
     if (Array.isArray(fileOrFiles)) {
       fileOrFiles.forEach(f => {
@@ -109,6 +111,7 @@ export const modelApi = {
       method: 'POST',
       headers: authHeaders(),
       body: form,
+      signal: options.signal,
     }));
   },
 
@@ -116,11 +119,12 @@ export const modelApi = {
     headers: authHeaders(),
   })),
 
-  saveEcgReport: async ({ patient_id, result, notes, source_name }) => {
+  saveEcgReport: async ({ patient_id, result, notes, source_name }, options = {}) => {
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ patient_id, result, notes: notes || '', source_name: source_name || null }),
+      signal: options.signal,
     }));
   },
 
@@ -143,13 +147,14 @@ export const modelApi = {
     headers: authHeaders(),
   })),
 
-  analyzeEcgSample: async (sampleId) => {
+  analyzeEcgSample: async (sampleId, options = {}) => {
     const form = new FormData();
     form.append('sample_id', sampleId);
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',
       headers: authHeaders(),
       body: form,
+      signal: options.signal,
     }));
   },
 
@@ -169,13 +174,14 @@ export const modelApi = {
     }));
   },
 
-  uploadReportAttachment: async (reportId, file) => {
+  uploadReportAttachment: async (reportId, file, options = {}) => {
     const form = new FormData();
     form.append('file', file);
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/attachments/reports/${reportId}/attachments`, {
       method: 'POST',
       headers: authHeaders(),
       body: form,
+      signal: options.signal,
     }));
   },
 

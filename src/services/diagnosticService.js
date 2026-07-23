@@ -18,12 +18,13 @@ export const diagnosticService = {
   /**
    * Capture current decision-support state
    */
-  async captureSnapshot(data) {
+  async captureSnapshot(data, options = {}) {
     try {
       const response = await fetch(`${API_URL}/reports/capture`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
+        signal: options.signal,
       });
       
       const result = await response.json();

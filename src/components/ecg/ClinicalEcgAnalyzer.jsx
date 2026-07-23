@@ -7,6 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { usePatient } from '../../context/PatientContext';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useNavigationLock } from '../../context/NavigationLockContext';
 import { canPreviewImageFile, modelApi, isImageEcgFile } from '../../services/modelApi';
 
 // Measurement metrics → display config. `approx` marks values that come from
@@ -873,6 +874,7 @@ export default function ClinicalEcgAnalyzer() {
   const { selectedPatient } = usePatient();
   const { showToast } = useToast();
   const { language } = useLanguage();
+  const { setNavigationLocked } = useNavigationLock();
   const locale = language === 'th' ? 'th-TH' : 'en-US';
   const [uploadedFiles, setUploadedFiles] = useState(null);
   const [attachments, setAttachments] = useState([]);
@@ -894,6 +896,8 @@ export default function ClinicalEcgAnalyzer() {
   const analyzeInFlightRef = useRef(false);
   const pdfInFlightRef = useRef(false);
   const saveInFlightRef = useRef(false);
+  const analysisAbortRef = useRef(null);
+  const saveAbortRef = useRef(null);
   const hasImageUpload = Array.isArray(uploadedFiles) && uploadedFiles.some((file) => isImageEcgFile(file));
 
   useEffect(() => {
@@ -959,18 +963,29 @@ export default function ClinicalEcgAnalyzer() {
     if (analyzeInFlightRef.current || loading) return;
     if (!uploadedFiles && !sampleId) { setError('เลือกตัวอย่างจริง หรืออัปโหลดไฟล์ก่อน'); return; }
     analyzeInFlightRef.current = true;
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
+    setNavigationLocked(true, 'กำลัง Scan และอ่าน ECG… กรุณารอให้การประมวลผลเสร็จก่อนเปลี่ยนหน้า', () => controller.abort());
     setLoading(true); setError(''); setResult(null); setSavedReport(null);
     try {
       setResult(uploadedFiles
-        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null)
-        : await modelApi.analyzeEcgSample(sampleId));
+        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null, { signal: controller.signal })
+        : await modelApi.analyzeEcgSample(sampleId, { signal: controller.signal }));
     } catch (e) {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
     } finally {
       setLoading(false);
+      setNavigationLocked(false);
       analyzeInFlightRef.current = false;
+      analysisAbortRef.current = null;
     }
   };
+
+  useEffect(() => () => {
+    analysisAbortRef.current?.abort();
+    saveAbortRef.current?.abort();
+    setNavigationLocked(false);
+  }, [setNavigationLocked]);
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const downloadPdf = async () => {
@@ -1009,6 +1024,9 @@ export default function ClinicalEcgAnalyzer() {
       return;
     }
     saveInFlightRef.current = true;
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+    setNavigationLocked(true, 'กำลังบันทึกผล ECG… กรุณารอให้เสร็จก่อนเปลี่ยนหน้า', () => controller.abort());
     setSaving(true);
     try {
       const res = await modelApi.saveEcgReport({
@@ -1017,14 +1035,15 @@ export default function ClinicalEcgAnalyzer() {
         source_name: uploadedFiles 
           ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : uploadedFiles.map(f => f.name).join(', ')) 
           : sampleId,
-      });
+      }, { signal: controller.signal });
       const reportId = res.report_id;
       setSavedReport({ report_id: reportId, status: res.status || 'success' });
       if (reportId && attachments.length > 0) {
         for (const file of attachments) {
           try {
-            await modelApi.uploadReportAttachment(reportId, file);
+            await modelApi.uploadReportAttachment(reportId, file, { signal: controller.signal });
           } catch (uploadErr) {
+            if (uploadErr?.name === 'AbortError') throw uploadErr;
             showToast(`แนบไฟล์ ${file.name} ล้มเหลว: ${uploadErr.message}`, 'warning');
           }
         }
@@ -1040,7 +1059,9 @@ export default function ClinicalEcgAnalyzer() {
       showToast(`บันทึกไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
       setSaving(false);
+      setNavigationLocked(false);
       saveInFlightRef.current = false;
+      saveAbortRef.current = null;
     }
   };
 

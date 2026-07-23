@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, FileText, FileDown } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useNavigationLock } from '../context/NavigationLockContext';
 import { canPreviewImageFile, modelApi, isImageEcgFile } from '../services/modelApi';
 import { VisualizerSkeleton, MetricsSkeleton, Skeleton } from '../components/ui/Skeleton';
 import { diagnosticService } from '../services/diagnosticService';
@@ -264,6 +265,7 @@ const Analysis = () => {
   const { showToast } = useToast();
   const { selectedPatient, patients } = usePatient();
   const { language } = useLanguage();
+  const { setNavigationLocked } = useNavigationLock();
   const locale = language === 'th' ? 'th-TH' : 'en-US';
 
   const [samples, setSamples] = useState(DEFAULT_SAMPLES);
@@ -278,6 +280,8 @@ const Analysis = () => {
   const [referralLoading, setReferralLoading] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [activeVisualizerTab, setActiveVisualizerTab] = useState('3d');
+  const analysisAbortRef = useRef(null);
+  const saveAbortRef = useRef(null);
 
   // Auto-match patient to a sample signal
   const activeSample = useMemo(() => {
@@ -325,22 +329,33 @@ const Analysis = () => {
       showToast('เลือกตัวอย่าง ECG หรืออัปโหลดไฟล์ก่อน', 'warning');
       return;
     }
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
+    setNavigationLocked(true, 'กำลังวิเคราะห์ ECG และ 3D… กรุณารอให้เสร็จก่อนเปลี่ยนหน้า', () => controller.abort());
     setLoading(true);
     setResult(null);
     try {
       const analyzed = file
         ? isImageEcgFile(file)
-          ? await modelApi.analyzeEcgFile(file)
-          : await modelApi.analyzeFile(file)
-        : await modelApi.analyzeSample(sampleId);
+          ? await modelApi.analyzeEcgFile(file, false, null, { signal: controller.signal })
+          : await modelApi.analyzeFile(file, { signal: controller.signal })
+        : await modelApi.analyzeSample(sampleId, { signal: controller.signal });
       setResult(analyzed);
       setActiveVisualizerTab('3d');
     } catch (e) {
       showToast(`วิเคราะห์ไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
       setLoading(false);
+      setNavigationLocked(false);
+      analysisAbortRef.current = null;
     }
   };
+
+  useEffect(() => () => {
+    analysisAbortRef.current?.abort();
+    saveAbortRef.current?.abort();
+    setNavigationLocked(false);
+  }, [setNavigationLocked]);
 
   const saveReferralReport = async () => {
     if (!selectedPatient?.id) {
@@ -351,6 +366,9 @@ const Analysis = () => {
       showToast('ยังไม่มีผลคัดกรองที่พร้อมบันทึกรายงาน', 'warning');
       return;
     }
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+    setNavigationLocked(true, 'กำลังบันทึกรายงาน… กรุณารอให้เสร็จก่อนเปลี่ยนหน้า', () => controller.abort());
     setSavingReport(true);
     try {
       const [x, y, z] = result.source.xyz_mm;
@@ -370,12 +388,14 @@ const Analysis = () => {
         heart_rate_bpm: result.heart_rate_bpm,
         referral_destination: referralDestination,
       };
-      const saved = await diagnosticService.captureSnapshot(payload);
+      const saved = await diagnosticService.captureSnapshot(payload, { signal: controller.signal });
       showToast(saved?.report_id ? 'บันทึกรายงานส่งต่อสำเร็จ' : 'บันทึกรายงานส่งต่อแล้ว', 'success');
     } catch (e) {
       showToast(`บันทึกรายงานส่งต่อไม่สำเร็จ: ${e.message}`, 'error');
     } finally {
       setSavingReport(false);
+      setNavigationLocked(false);
+      saveAbortRef.current = null;
     }
   };
 

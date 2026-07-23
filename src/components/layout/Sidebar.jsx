@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
+import { useNavigationLock } from '../../context/NavigationLockContext';
 
 const buildSections = (t) => [
   {
@@ -46,6 +47,7 @@ export const Sidebar = ({ onClose }) => {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const { isLocked } = useNavigationLock();
   const {
     fontScale,
     fontPercent,
@@ -73,7 +75,13 @@ export const Sidebar = ({ onClose }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleNavClick = () => { if (onClose) onClose(); };
+  const handleNavClick = (event) => {
+    if (isLocked) {
+      event?.preventDefault();
+      return;
+    }
+    if (onClose) onClose();
+  };
 
   // ── tokens ────────────────────────────────────────────────────
   const sidebar  = dk ? 'bg-[#080e1a] border-white/[0.06]' : 'bg-white border-slate-200';
@@ -146,7 +154,9 @@ export const Sidebar = ({ onClose }) => {
                   key={item.path}
                   to={item.path}
                   onClick={handleNavClick}
-                  className={({ isActive }) => isActive ? navActive : navInactive}
+                  aria-disabled={isLocked}
+                  tabIndex={isLocked ? -1 : 0}
+                  className={({ isActive }) => `${isActive ? navActive : navInactive} ${isLocked ? 'pointer-events-none opacity-50' : ''}`}
                 >
                   {({ isActive }) => (
                     <>
