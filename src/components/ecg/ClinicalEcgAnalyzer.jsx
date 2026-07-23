@@ -1118,13 +1118,18 @@ export default function ClinicalEcgAnalyzer() {
   };
   const primaryFinding = result?.findings?.primary;
   const classifierReview = result?.classification?.clinical_review;
-  const topLabel = primaryFinding?.label || result?.classification?.top_label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
+  // Put an available model prediction first in the summary card. The
+  // independently reviewed finding remains visible below and can override the
+  // status when it disagrees with the model.
+  const topLabel = result?.classification?.top_label || primaryFinding?.label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
   const topProbability = result?.classification?.top_probability;
+  const confidenceBand = result?.classification?.confidence_band;
   const isPathological = primaryFinding
     ? !['normal', 'unavailable'].includes(primaryFinding.severity)
     : result?.classification?.top_label && result.classification.top_label !== 'NORM';
   const outputUnverified = primaryFinding?.severity === 'unavailable'
     || classifierReview?.status === 'unconfirmed'
+    || Boolean(result?.classification_warning)
     || (!result?.classification && Boolean(result?.classification_note));
   // Only the classifier's own probability breakdown belongs here — findings,
   // rhythm, and axis are already shown once each in their own detail cards
@@ -1479,11 +1484,17 @@ export default function ClinicalEcgAnalyzer() {
                       </div>
                     </div>
                     <div className="p-3">
+                      {result.classification_warning && (
+                        <div className={`mb-3 rounded-lg border p-2.5 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+                          {result.classification_warning}
+                        </div>
+                      )}
                       <div className={`mb-3 rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-slate-950/40' : 'border-slate-100 bg-slate-50'}`}>
                         <p className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Primary output</p>
                         <p className={`mt-1 text-lg font-black ${mainText}`}>{topLabel}</p>
                         <p className={`text-[11px] ${subText}`}>
                           {topProbability !== null && topProbability !== undefined ? `${Math.round(topProbability * 100)}% model score · ` : ''}
+                          {confidenceBand ? `${confidenceBand} raw-score band · ` : ''}
                           Axis {axisCategory.category || '-'} · Lead {measurements.lead_used || '-'}
                         </p>
                         {primaryFinding?.criteria?.length > 0 && (
