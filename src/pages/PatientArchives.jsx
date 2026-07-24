@@ -257,7 +257,7 @@ const PatientArchives = () => {
                   <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
                     <div className="flex items-center gap-2">
                       <Activity size={14} className={dk ? 'text-sky-400' : 'text-sky-600'} />
-                      <span className={`text-xs font-semibold ${secLabel}`}>Signal Playback</span>
+                      <span className={`text-xs font-semibold ${secLabel}`}>Signal Playback — 12 Leads</span>
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
                       {Object.entries(selectedArchive.physics_snapshot || {}).map(([k, v]) => (
@@ -271,11 +271,20 @@ const PatientArchives = () => {
                   </div>
                   <div className={`p-4 space-y-3 ${ecgBg}`}>
                     {[
-                      { data: selectedArchive.leads_data?.lead_i,  label: 'LEAD I',  color: '#0ea5e9' },
-                      { data: selectedArchive.leads_data?.lead_ii, label: 'LEAD II', color: '#6366f1' },
-                      { data: selectedArchive.leads_data?.v5,      label: 'V5',      color: '#8b5cf6' },
+                      { data: selectedArchive.leads_data?.lead_i,   label: 'LEAD I',   color: '#0ea5e9' },
+                      { data: selectedArchive.leads_data?.lead_ii,  label: 'LEAD II',  color: '#6366f1' },
+                      { data: selectedArchive.leads_data?.lead_iii, label: 'LEAD III', color: '#8b5cf6' },
+                      { data: selectedArchive.leads_data?.avr,      label: 'aVR',      color: '#ec4899' },
+                      { data: selectedArchive.leads_data?.avl,      label: 'aVL',      color: '#f59e0b' },
+                      { data: selectedArchive.leads_data?.avf,      label: 'aVF',      color: '#10b981' },
+                      { data: selectedArchive.leads_data?.v1,       label: 'V1',       color: '#64748b' },
+                      { data: selectedArchive.leads_data?.v2,       label: 'V2',       color: '#06b6d4' },
+                      { data: selectedArchive.leads_data?.v3,       label: 'V3',       color: '#7c3aed' },
+                      { data: selectedArchive.leads_data?.v4,       label: 'V4',       color: '#d97706' },
+                      { data: selectedArchive.leads_data?.v5,       label: 'V5',       color: '#8b5cf6' },
+                      { data: selectedArchive.leads_data?.v6,       label: 'V6',       color: '#16a34a' },
                     ].map(({ data, label, color }) => (
-                      <ECGCanvas key={label} initialData={data} label={label} color={color} height={90} />
+                      <ECGCanvas key={label} initialData={data} label={label} color={color} height={80} />
                     ))}
                   </div>
                 </div>
