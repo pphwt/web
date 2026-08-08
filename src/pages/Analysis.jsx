@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Activity, Upload, Play, MapPin, AlertTriangle, HeartPulse, Loader2, FileText, FileDown } from 'lucide-react';
 import HeartModel3D from '../components/visualizers/HeartModel3D';
+import AHABullsEye from '../components/visualizers/AHABullsEye';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { usePatient } from '../context/PatientContext';
@@ -280,7 +281,9 @@ const Analysis = () => {
   const [referralLoading, setReferralLoading] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [activeVisualizerTab, setActiveVisualizerTab] = useState('3d');
-  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(false);
+  // Image uploads run the regional research estimate in the same request.
+  // The result remains labelled research-only and unvalidated in the UI.
+  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(true);
   const analysisAbortRef = useRef(null);
   const saveAbortRef = useRef(null);
 
@@ -466,8 +469,9 @@ const Analysis = () => {
       confidence_type: result.confidence_type,
       localization_supported: result.localization_supported !== false,
       localization_note: result.localization_note,
-        validation: result.validation,
-        uncertainty: result.uncertainty,
+      validation: result.validation,
+      uncertainty: result.uncertainty,
+      localization_display: result.localization_display,
       aha: result.region,
       activation_map: result.activation_map,
       top5_nodes: result.top5_nodes,
@@ -480,18 +484,21 @@ const Analysis = () => {
   const imageHeartContext = useMemo(() => {
     if (!displayedImageUrl) return null;
     const research = result?.research_localization;
-    if (research?.supported && research.source?.norm) {
+    const display = result?.localization_display;
+    if (research?.supported && (display?.point_norm || research.source?.norm)) {
       return {
-        localization_coords: research.source.norm,
+        localization_coords: display?.point_norm || research.source.norm,
         ai_confidence: research.confidence,
         confidence_type: research.confidence_type,
         localization_supported: true,
         validation: research.validation,
         uncertainty: research.uncertainty,
+        localization_display: display,
         aha: research.region,
         activation_map: research.activation_map,
         top5_nodes: research.top5_nodes,
         regional_candidates: research.regional_candidates,
+        localization_display: display,
       };
     }
     return {
@@ -508,7 +515,7 @@ const Analysis = () => {
       activation_map: Array(75).fill(0.5),
       top5_nodes: [],
     };
-  }, [displayedImageUrl, result?.localization_note, result?.research_localization]);
+  }, [displayedImageUrl, result?.localization_note, result?.research_localization, result?.localization_display]);
 
   const visualizerHeartResult = useMemo(() => heartResult || imageHeartContext || ({
     localization_coords: null,
@@ -526,9 +533,16 @@ const Analysis = () => {
   const mainText = dk ? 'text-white' : 'text-slate-900';
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
 
-  const region = result?.region;
+  const imageResearch = result?.research_localization;
+  const localizedSource = result?.source || (imageResearch?.supported ? imageResearch.source : null);
+  const region = result?.source
+    ? result.region
+    : (imageResearch?.supported ? imageResearch.region : result?.region);
   const risk = region?.risk || 'LOW';
   const riskColor = RISK_COLOR[risk] || '#60a5fa';
+  const localizedConfidence = result?.source
+    ? result.confidence
+    : (imageResearch?.supported ? imageResearch.confidence : null);
   const referralAdvice = result?.referral_recommendation || {
     HIGH: {
       title: 'ควรส่งต่อหรือปรึกษาแพทย์โดยเร็ว',
@@ -602,7 +616,7 @@ const Analysis = () => {
                     </div>
                   )}
                 </div>
-                {result?.source && (
+                {localizedSource && region && (
                   <span className="text-[10px] font-mono" style={{ color: riskColor }}>
                     {region?.label} · {region?.territory}
                   </span>
@@ -622,7 +636,15 @@ const Analysis = () => {
                     </div>
                   </div>
                 ) : visualizerHeartResult ? (
-                  <HeartModel3D result={visualizerHeartResult} />
+                  <>
+                    <HeartModel3D result={visualizerHeartResult} />
+                    {result?.localization_display?.status === 'measured' && (
+                      <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-xl border border-white/10 bg-slate-950/80 p-2 shadow-xl">
+                        <p className="mb-1 text-center text-[9px] font-black uppercase tracking-wider text-amber-300">Research estimate</p>
+                        <AHABullsEye activeSegment={result.localization_display.aha_segment} aha={region} />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
                     <Activity size={28} className="opacity-40" />
@@ -679,6 +701,7 @@ const Analysis = () => {
                     setFile(nextFile);
                     if (nextFile) {
                       setSampleId('');
+                      if (isImageEcgFile(nextFile)) setResearchLocalizationEnabled(true);
                       setActiveVisualizerTab('3d');
                     }
                   }}
@@ -801,7 +824,7 @@ const Analysis = () => {
                 </div>
               )}
 
-              {result?.source ? (
+              {localizedSource ? (
                 <div
                   className="rounded-xl border p-3"
                   style={{
@@ -817,15 +840,19 @@ const Analysis = () => {
                 </div>
               ) : (
                 <div className={`rounded-xl border p-3 flex flex-col justify-center items-center ${dk ? 'bg-white/[0.02] border-white/[0.05]' : 'bg-slate-50 border-slate-200'}`}>
-                  <p className={`text-xs ${subText}`}>รอระบุตำแหน่ง 3D</p>
+                  <p className={`text-xs ${subText}`}>
+                    {result
+                      ? (imageResearch?.reason || result.localization_note || 'ยังไม่สามารถระบุตำแหน่งจากข้อมูลชุดนี้ได้')
+                      : 'รอผลการประมวลผล ECG'}
+                  </p>
                 </div>
               )}
 
-              {result?.source ? (
+              {localizedSource ? (
                 <div className="grid grid-cols-2 gap-2">
                   <Stat
                     label="Activation compactness"
-                    value={Number(result.confidence).toFixed(3)}
+                    value={localizedConfidence != null ? Number(localizedConfidence).toFixed(3) : 'n/a'}
                     hint="Unitless model-spread indicator; not probability or localization accuracy. Held-out simulated mean error: 50.5 mm."
                     dk={dk}
                   />

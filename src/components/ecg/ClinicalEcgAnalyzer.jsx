@@ -16,6 +16,7 @@ import {
   ClinicalWarning,
 } from '../ui/ClinicalPrimitives';
 import HeartModel3D from '../visualizers/HeartModel3D';
+import AHABullsEye from '../visualizers/AHABullsEye';
 
 // Measurement metrics → display config. `approx` marks values that come from
 // open-source (neurokit2) delineation and can be less accurate than a certified
@@ -882,18 +883,20 @@ function ResearchLocalizationPanel({ result, dk }) {
   if (result?.meta?.format !== 'image') return null;
 
   const detail = result?.research_localization;
+  const display = result?.localization_display || {};
   const supported = detail?.supported === true;
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
   const mainText = dk ? 'text-white' : 'text-slate-900';
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
   const visualResult = supported ? {
-    localization_coords: detail.source?.norm,
+    localization_coords: display.point_norm || detail.source?.norm,
     ai_confidence: detail.confidence,
     confidence_type: detail.confidence_type,
     localization_supported: true,
     validation: detail.validation,
     uncertainty: detail.uncertainty,
     aha: detail.region,
+    localization_display: display,
     activation_map: detail.activation_map,
     top5_nodes: detail.top5_nodes,
     regional_candidates: detail.regional_candidates,
@@ -926,6 +929,16 @@ function ResearchLocalizationPanel({ result, dk }) {
             <HeartModel3D result={visualResult} />
           </div>
           <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex justify-center rounded-lg border border-slate-200/60 bg-white/40 py-1 dark:border-white/[0.05] dark:bg-white/[0.02]">
+              <AHABullsEye activeSegment={display.aha_segment || detail.region?.segment || 0} aha={detail.region} />
+            </div>
+            <div className={`rounded-lg border p-2 ${dk ? 'border-amber-500/20 bg-amber-500/[0.05]' : 'border-amber-200 bg-amber-50'}`}>
+              <p className={`font-black ${dk ? 'text-amber-200' : 'text-amber-800'}`}>Research estimate · marker + AHA region</p>
+              <p className={`mt-1 ${subText}`}>Segment #{display.aha_segment || detail.region?.segment || '—'} · {display.territory || detail.region?.territory || '—'} · not a probability</p>
+              <p className={`mt-1 font-mono text-[9px] ${subText}`}>Leads: {(display.input_leads || detail.input_mapping?.model_input_leads || []).join(', ') || '—'}</p>
+              <p className={`font-mono text-[9px] ${subText}`}>Model: {display.model_version || detail.validation?.model_version || '—'} · Mesh: {display.mesh_calibration_version || '—'}</p>
+              <p className={`font-mono text-[9px] ${subText}`}>Processed: {display.processing_timestamp || result.processing_timestamp || '—'}</p>
+            </div>
             <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{detail.region?.label || '—'}</p></div>
             <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{detail.region?.territory || '—'}</p></div>
             <div><span className={subText}>Activation compactness</span><p className={`font-black ${mainText}`}>{detail.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p><p className={subText}>unitless indicator, not probability or accuracy</p></div>
@@ -1003,7 +1016,9 @@ export default function ClinicalEcgAnalyzer() {
   const [result, setResult] = useState(null);
   const [ocrOnly, setOcrOnly] = useState(false);
   const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
-  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(demoMode);
+  // Image uploads run the regional research estimate automatically. The
+  // result keeps the existing research-only disclaimer and validation state.
+  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(true);
   const [layoutOverride, setLayoutOverride] = useState('');
   const [erQuickMode, setErQuickMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1093,7 +1108,7 @@ export default function ClinicalEcgAnalyzer() {
       setResult(uploadedFiles
         ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null, {
           signal: controller.signal,
-          localizationMode: researchLocalizationEnabled ? 'research' : 'disabled',
+          localizationMode: hasImageUpload && researchLocalizationEnabled ? 'research' : 'disabled',
         })
         : await modelApi.analyzeEcgSample(sampleId, { signal: controller.signal }));
     } catch (e) {
@@ -1341,6 +1356,21 @@ export default function ClinicalEcgAnalyzer() {
   return (
     <div className="flex flex-col gap-5">
       <WorkflowStepper activeStep={activeWorkflowStep} dk={dk} />
+      {result?.pipeline?.stages?.length > 0 && (
+        <div className={`rounded-2xl border p-3 ${surface}`}>
+          <div className="mb-2 flex items-center justify-between">
+            <p className={`text-[10px] font-black uppercase tracking-wider ${secLabel}`}>Analysis pipeline</p>
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${result.pipeline.status === 'completed' ? 'border-emerald-500/30 text-emerald-500' : 'border-amber-500/30 text-amber-500'}`}>{result.pipeline.status} · {result.pipeline.elapsed_ms} ms</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {result.pipeline.stages.map((stage) => (
+              <span key={stage.name} title={stage.reason || stage.name} className={`rounded-full border px-2 py-1 text-[9px] font-semibold ${stage.status === 'completed' || stage.status === 'measured' ? 'border-emerald-500/30 text-emerald-500' : stage.status === 'not_applicable' ? 'border-slate-300 text-slate-400' : 'border-amber-500/30 text-amber-500'}`}>
+                {stage.name}: {stage.status}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Input */}
       <div className={`clinical-panel p-4 ${surface}`}>
         <ClinicalSectionHeader

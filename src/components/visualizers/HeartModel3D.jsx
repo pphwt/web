@@ -556,7 +556,7 @@ function Top5Markers({ bbRef, top5, calibration }) {
 }
 
 // ── Primary pin marker ────────────────────────────────────────────────────────
-function PinMarker({ bbRef, result, onUpdate, calibration }) {
+function PinMarker({ bbRef, result, onUpdate, calibration, modelReady }) {
   const groupRef        = useRef();
   const posRef          = useRef(null);
   const [info, setInfo] = useState(null);
@@ -570,9 +570,14 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
       setInfo(null);
       return;
     }
-    const coords = detail?.localization_coords;
+    const display = detail?.localization_display || {};
+    const coords = display?.point_norm || detail?.localization_coords;
     const conf   = detail?.ai_confidence ?? 0;
-    const aha    = detail?.aha;
+    const aha    = detail?.aha || {
+      segment: display?.aha_segment,
+      label: display?.aha_label,
+      territory: display?.territory,
+    };
     if (!coords || !bbRef.current) return;
 
     posRef.current = normToScene(coords, bbRef, calibration);
@@ -583,11 +588,13 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
     const label     = aha?.label ?? regionFromAHA(aha?.segment);
     const nextInfo  = {
       coords,
-      mm: {
-        x: (coords.x * 103.2).toFixed(1),
-        y: (coords.y * 92.2).toFixed(1),
-        z: (coords.z * 72.0).toFixed(1),
-      },
+      mm: display?.point_mm
+        ? Object.fromEntries(Object.entries(display.point_mm).map(([axis, value]) => [axis, Number(value).toFixed(1)]))
+        : {
+            x: (coords.x * 103.2).toFixed(1),
+            y: (coords.y * 92.2).toFixed(1),
+            z: (coords.z * 72.0).toFixed(1),
+          },
       segment:    aha?.segment ?? 0,
       region:     label,
       territory,
@@ -595,7 +602,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
       compactness: Number(conf).toFixed(3),
       aha,
       chamber:    getChamberName(coords),
-      researchEstimate,
+      researchEstimate: display?.display_policy === 'research_estimate' || researchEstimate,
       uncertainty: detail?.uncertainty,
     };
     setInfo(nextInfo);
@@ -624,7 +631,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
     if (currentDetail) {
       applyDetail(currentDetail);
     }
-  }, [currentDetail, calibration, bbRef.current]);
+  }, [currentDetail, calibration, modelReady]);
 
   useFrame(() => {
     if (!groupRef.current || !posRef.current) return;
@@ -755,7 +762,7 @@ const HeartModel3D = ({ result = null }) => {
   const [autoRotate, setAutoRotate] = useState(false);
   const [cameraResetToken, setCameraResetToken] = useState(0);
   const [calibrationNotice, setCalibrationNotice] = useState('');
-  const [, setModelReady] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
   const markModelReady = useCallback(() => setModelReady(true), []);
   
   const [calibration] = useState(() => {
@@ -894,7 +901,7 @@ const HeartModel3D = ({ result = null }) => {
             {result?.localization_supported !== false && (
               <Top5Markers bbRef={bbRef} top5={top5Nodes} calibration={calibration} />
             )}
-            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} />
+            <PinMarker bbRef={bbRef} result={result} onUpdate={() => {}} calibration={calibration} modelReady={modelReady} />
             <OrbitControls
               ref={controlsRef}
               enableZoom
