@@ -408,7 +408,6 @@ const LiveMonitoring = () => {
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialSupported, selectedPatient?.id]);
 
   // Cleanup serial on unmount

@@ -156,6 +156,12 @@ StreamContext (provider wraps entire app)
 
 ## Pages
 
+### `Progress` ([src/pages/Progress.jsx](src/pages/Progress.jsx))
+
+National-level reviewer view combining authenticated workflow readiness, held-out
+model evidence, scoped clinical quality counts, and a non-PHI guided demo. Demo
+cases are local synthetic data and never write to Supabase or clinical report tables.
+
 ### `LiveMonitoring` ([src/pages/LiveMonitoring.jsx](src/pages/LiveMonitoring.jsx))
 
 Primary clinical monitoring page. Shows:
@@ -204,6 +210,9 @@ All routes are protected (require valid JWT). Route structure in [src/App.jsx](s
 /auth/login          — public (Login page)
 /*                   — ProtectedRoute → MainLayout
   /page/overview     — PatientList
+  /page/progress     — Project Progress, benchmark, release gate, Evidence Pack
+  /page/showcase     — Fullscreen 7-minute / three-speaker national demo
+  /page/audit        — Facility-scoped audit integrity and security readiness
   /page/live         — LiveMonitoring
   /page/lab          — EducationalLab
   /page/ai-diagnostics — AIDiagnostics

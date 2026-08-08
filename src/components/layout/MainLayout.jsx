@@ -10,6 +10,7 @@ export const MobileMenuContext = createContext(() => {});
 export const useMobileMenu = () => useContext(MobileMenuContext);
 
 const HIDE_TOPBAR_ROUTES = ['/page/overview'];
+const PRESENTATION_ROUTES = ['/page/showcase'];
 
 const MainLayoutContent = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -41,6 +42,7 @@ const MainLayoutContent = ({ children }) => {
 
   const { pathname } = location;
   const hideTopBar = HIDE_TOPBAR_ROUTES.includes(pathname);
+  const presentationMode = PRESENTATION_ROUTES.includes(pathname);
 
   return (
     <MobileMenuContext.Provider value={() => setIsSidebarOpen(true)}>
@@ -55,23 +57,23 @@ const MainLayoutContent = ({ children }) => {
         )}
 
         {/* Sidebar */}
-        <div className={`
+        {!presentationMode && <div className={`
           fixed lg:static inset-y-0 left-0 z-50 transform
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 transition-transform duration-300 ease-in-out
         `}>
           <Sidebar onClose={() => setIsSidebarOpen(false)} />
-        </div>
+        </div>}
 
         <div className="flex-1 flex flex-col min-w-0">
-          {!hideTopBar && <TopBar onMenuClick={() => setIsSidebarOpen(true)} />}
-          <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-5 xl:p-6 custom-scrollbar">
+          {!hideTopBar && !presentationMode && <TopBar onMenuClick={() => setIsSidebarOpen(true)} />}
+          <main className={`flex-1 overflow-auto custom-scrollbar ${presentationMode ? 'p-0' : 'p-3 sm:p-4 lg:p-5 xl:p-6'}`}>
             {children}
           </main>
         </div>
 
         {/* PDPA Cookie Consent Banner */}
-        <PdpaNoticeBanner />
+        {!presentationMode && <PdpaNoticeBanner />}
 
         {isLocked && (
           <div

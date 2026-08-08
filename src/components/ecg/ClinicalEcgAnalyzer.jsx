@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Upload, Play, Loader2, AlertTriangle, Info, Database, CheckCircle2, FileDown,
-  ChevronDown, Bookmark, ThumbsUp, ThumbsDown, ZoomIn, Maximize2, Activity,
+  ChevronDown, Bookmark, ThumbsUp, ThumbsDown, ZoomIn, Maximize2, Activity, LockKeyhole,
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { usePatient } from '../../context/PatientContext';
@@ -15,6 +15,7 @@ import {
   ClinicalStatusBadge,
   ClinicalWarning,
 } from '../ui/ClinicalPrimitives';
+import HeartModel3D from '../visualizers/HeartModel3D';
 
 // Measurement metrics → display config. `approx` marks values that come from
 // open-source (neurokit2) delineation and can be less accurate than a certified
@@ -875,6 +876,119 @@ const DEFAULT_SAMPLES = [
 
 const DEFAULT_CLAIM_WORDING = 'Bioelectric ECG Image Reader digitizes photographed or scanned 12-lead ECG printouts, extracts waveform/interval measurements, surfaces traceable screening findings, and supports clinician review/sign-off. It is decision-support only and does not provide an autonomous diagnosis.';
 
+const WORKFLOW_STEPS = ['Input', 'Signal Quality', 'Digitization', 'Measurements', 'AI Screening', 'Clinician Review', 'Export'];
+
+function ResearchLocalizationPanel({ result, dk }) {
+  if (result?.meta?.format !== 'image') return null;
+
+  const detail = result?.research_localization;
+  const supported = detail?.supported === true;
+  const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
+  const mainText = dk ? 'text-white' : 'text-slate-900';
+  const subText = dk ? 'text-slate-400' : 'text-slate-500';
+  const visualResult = supported ? {
+    localization_coords: detail.source?.norm,
+    ai_confidence: detail.confidence,
+    confidence_type: detail.confidence_type,
+    localization_supported: true,
+    validation: detail.validation,
+    uncertainty: detail.uncertainty,
+    aha: detail.region,
+    activation_map: detail.activation_map,
+    top5_nodes: detail.top5_nodes,
+    regional_candidates: detail.regional_candidates,
+  } : { localization_supported: false };
+
+  return (
+    <section className={`rounded-2xl border p-3 ${surface}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-amber-300' : 'text-amber-700'}`}>Experimental 3D localization</p>
+          <h3 className={`mt-1 text-sm font-black ${mainText}`}>Research estimate — AHA segment / territory</h3>
+        </div>
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${dk ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>NOT CLINICALLY VALIDATED</span>
+      </div>
+
+      {!detail || result.localization_mode !== 'research' ? (
+        <div className={`rounded-xl border border-dashed p-4 text-[11px] leading-relaxed ${dk ? 'border-white/[0.1] text-slate-400' : 'border-slate-300 text-slate-500'}`}>
+          3D localization ยังปิดอยู่ ค่าเริ่มต้นของ clinical workflow คือไม่แสดง marker เพื่อป้องกันการตีความเกินหลักฐาน ให้เปิด Experimental 3D localization แล้วประมวลผลภาพใหม่
+        </div>
+      ) : !supported ? (
+        <div className={`rounded-xl border p-4 text-[11px] leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          ไม่แสดง marker: {detail.reason || 'ไม่สามารถประเมินตำแหน่งได้'}
+          {(detail.input_mapping?.missing_clinical_leads || detail.input_mapping?.missing_model_input_leads)?.length > 0 && (
+            <div className="mt-1">Missing leads: {(detail.input_mapping.missing_clinical_leads || detail.input_mapping.missing_model_input_leads).join(', ')}</div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="h-[360px] min-h-[300px] overflow-hidden rounded-xl border border-sky-500/20 bg-slate-950/10">
+            <HeartModel3D result={visualResult} />
+          </div>
+          <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
+            <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{detail.region?.label || '—'}</p></div>
+            <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{detail.region?.territory || '—'}</p></div>
+            <div><span className={subText}>Activation compactness</span><p className={`font-black ${mainText}`}>{detail.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p><p className={subText}>unitless indicator, not probability or accuracy</p></div>
+            <div>
+              <span className={subText}>Top regional candidates</span>
+              <div className="mt-1 space-y-1">
+                {(detail.regional_candidates || []).slice(0, 3).map((candidate) => (
+                  <div key={`${candidate.rank}-${candidate.aha_segment}`} className={`rounded-lg border px-2 py-1.5 ${dk ? 'border-white/[0.07]' : 'border-slate-200'}`}>
+                    <p className={`font-black ${mainText}`}>#{candidate.rank} AHA {candidate.aha_segment} · {candidate.label}</p>
+                    <p className={subText}>{candidate.territory} · relative activation {Number(candidate.relative_activation_score || 0).toFixed(3)} · not probability</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div><span className={subText}>Input mapping</span><p className={`font-mono text-[9px] ${mainText}`}>{detail.input_mapping?.version || '—'}</p></div>
+            <div><span className={subText}>Validation</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>clinical_12_lead_validated: false</p></div>
+            <div><span className={subText}>3D uncertainty</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail.uncertainty?.calibration_status === 'pending' ? 'not available — calibration pending' : `${detail.uncertainty?.uncertainty_radius_mm} mm`}</p><p className={subText}>coverage target: {detail.uncertainty?.coverage_target ?? '—'}</p></div>
+            <div><span className={subText}>Mesh calibration</span><p className={`font-mono text-[9px] ${mainText}`}>{detail.uncertainty?.mesh_calibration_version || 'heart-mesh-calibration-v1'}</p></div>
+            <p className={`border-t pt-2 leading-relaxed ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-200 text-slate-500'}`}>{detail.localization_note}</p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function WorkflowStepper({ activeStep, dk }) {
+  return (
+    <div className={`rounded-2xl border p-3 ${dk ? 'border-white/[0.06] bg-[#0d1525]' : 'border-slate-200 bg-white'}`} aria-label="ECG workflow progress">
+      <div className="flex items-center justify-between gap-1 overflow-x-auto">
+        {WORKFLOW_STEPS.map((step, index) => (
+          <React.Fragment key={step}>
+            <div className="flex min-w-fit flex-col items-center gap-1">
+              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black ${index <= activeStep ? 'bg-sky-600 text-white' : dk ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                {index < activeStep ? <CheckCircle2 size={13} /> : index + 1}
+              </span>
+              <span className={`text-[9px] font-bold ${index <= activeStep ? (dk ? 'text-sky-300' : 'text-sky-700') : dk ? 'text-slate-500' : 'text-slate-400'}`}>{step}</span>
+            </div>
+            {index < WORKFLOW_STEPS.length - 1 && <span className={`h-px min-w-5 flex-1 ${index < activeStep ? 'bg-sky-500' : dk ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function QualityEvidence({ q, dk }) {
+  if (!q) return null;
+  const artifactCodes = [...new Set((q.artifact_profile || []).map((item) => item.code))];
+  return (
+    <div className="mt-2 space-y-1">
+      {q.per_lead && Object.keys(q.per_lead).length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {Object.entries(q.per_lead).map(([lead, evidence]) => (
+            <span key={lead} className={`rounded-full border px-2 py-0.5 text-[9px] font-bold ${evidence.status === 'PASS' ? 'border-emerald-500/30 text-emerald-500' : evidence.status === 'WARN' ? 'border-amber-500/30 text-amber-500' : 'border-rose-500/30 text-rose-500'}`} title={(evidence.reasons || []).join(', ')}>{lead}: {evidence.status}</span>
+          ))}
+        </div>
+      )}
+      {artifactCodes.length > 0 && <p className={`text-[10px] ${dk ? 'text-amber-300' : 'text-amber-700'}`}>Artifacts: {artifactCodes.join(', ')}</p>}
+    </div>
+  );
+}
+
 export default function ClinicalEcgAnalyzer() {
   const { isDarkMode: dk } = useTheme();
   const { selectedPatient } = usePatient();
@@ -888,6 +1002,8 @@ export default function ClinicalEcgAnalyzer() {
   const [sampleId, setSampleId] = useState('');
   const [result, setResult] = useState(null);
   const [ocrOnly, setOcrOnly] = useState(false);
+  const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
+  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(demoMode);
   const [layoutOverride, setLayoutOverride] = useState('');
   const [erQuickMode, setErQuickMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -975,7 +1091,10 @@ export default function ClinicalEcgAnalyzer() {
     setLoading(true); setError(''); setResult(null); setSavedReport(null);
     try {
       setResult(uploadedFiles
-        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null, { signal: controller.signal })
+        ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null, {
+          signal: controller.signal,
+          localizationMode: researchLocalizationEnabled ? 'research' : 'disabled',
+        })
         : await modelApi.analyzeEcgSample(sampleId, { signal: controller.signal }));
     } catch (e) {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
@@ -1208,9 +1327,20 @@ export default function ClinicalEcgAnalyzer() {
       status: label === 'NORM' ? (probability > 0.5 ? 'normal' : 'unavailable') : (probability > 0.35 ? 'abnormal' : 'unavailable'),
     };
   });
+  const artifactManifest = result?.artifact_manifest || {};
+  const provenance = [
+    ['Source', artifactManifest.source_name || result?.source_name || sampleId || uploadedFiles?.map((file) => file.name).join(', ') || '—'],
+    ['Artifact hash', artifactManifest.artifact_hash || 'assigned when stored'],
+    ['Report hash', savedReport?.report_hash || result?.report_hash || 'assigned when saved'],
+    ['Model version', result?.classification?.model || 'measurements-only'],
+    ['Processed', result ? 'current analysis session' : '—'],
+    ['Reviewer', result?.review?.reviewed_by || 'clinician sign-off required'],
+  ];
+  const activeWorkflowStep = savedReport?.report_id ? 6 : result ? 5 : loading ? 3 : (uploadedFiles || sampleId ? 1 : 0);
 
   return (
     <div className="flex flex-col gap-5">
+      <WorkflowStepper activeStep={activeWorkflowStep} dk={dk} />
       {/* Input */}
       <div className={`clinical-panel p-4 ${surface}`}>
         <ClinicalSectionHeader
@@ -1344,6 +1474,20 @@ export default function ClinicalEcgAnalyzer() {
               อ่านเฉพาะผลวิเคราะห์และตัวเลขหัวกระดาษ (OCR Only — ข้ามการดึงคลื่นไฟฟ้าหัวใจเพื่อรันทันที)
             </label>
             </div>
+            <label className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-200 bg-amber-50'}`}>
+              <input
+                id="research-localization-checkbox"
+                type="checkbox"
+                checked={researchLocalizationEnabled}
+                disabled={loading || ocrOnly}
+                onChange={(e) => setResearchLocalizationEnabled(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className={`text-[10px] leading-relaxed ${dk ? 'text-amber-200' : 'text-amber-800'}`}>
+                <b>{demoMode ? 'DEMO: ' : ''}Experimental 3D localization (Research estimate)</b><br />
+                ใช้ named-lead mapping กับโมเดลวิจัยเดิม แสดง AHA segment/territory เท่านั้น ไม่ใช่การวินิจฉัย และยังไม่ผ่าน validation ในผู้ป่วยจริง
+              </span>
+            </label>
           </div>
         )}
         {ocrUnavailable && (
@@ -1673,6 +1817,9 @@ export default function ClinicalEcgAnalyzer() {
             </div>
           </div>
 
+          <QualityEvidence q={q} dk={dk} />
+          <ResearchLocalizationPanel result={result} dk={dk} />
+
           {(q || result.localization_note || result.localization) && (
             <div className={`rounded-2xl border p-3 ${surface}`}>
               {q && (
@@ -1695,6 +1842,22 @@ export default function ClinicalEcgAnalyzer() {
               </div>
             </div>
           )}
+
+          <div className={`rounded-2xl border p-4 ${surface}`}>
+            <div className="mb-3 flex items-center gap-2">
+              <LockKeyhole size={14} className={dk ? 'text-sky-300' : 'text-sky-700'} />
+              <p className={`text-[10px] font-black uppercase tracking-wider ${secLabel}`}>Provenance & clinician review</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {provenance.map(([label, value]) => (
+                <div key={label} className={`rounded-lg border p-2 ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-100 bg-slate-50'}`}>
+                  <p className={`text-[9px] font-bold uppercase tracking-wider ${secLabel}`}>{label}</p>
+                  <p className={`mt-1 break-words text-[10px] font-semibold ${mainText}`}>{value}</p>
+                </div>
+              ))}
+            </div>
+            <p className={`mt-2 text-[9px] leading-relaxed ${subText}`}>Review status remains pending until an authorized clinician signs off. Unsupported or repeat-required results cannot be approved.</p>
+          </div>
 
           <div className={`rounded-2xl border p-4 ${surface}`}>
             <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${secLabel}`}>

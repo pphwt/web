@@ -577,8 +577,9 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
 
     posRef.current = normToScene(coords, bbRef, calibration);
 
+    const researchEstimate = detail?.validation?.clinical_12_lead_validated === false;
     const territory = aha?.territory ?? '—';
-    const risk      = aha?.risk ?? 'LOW';
+    const risk      = researchEstimate ? 'ESTIMATE' : (aha?.risk ?? 'LOW');
     const label     = aha?.label ?? regionFromAHA(aha?.segment);
     const nextInfo  = {
       coords,
@@ -591,9 +592,11 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
       region:     label,
       territory,
       risk,
-      compactness: Math.round(conf * 100),
+      compactness: Number(conf).toFixed(3),
       aha,
       chamber:    getChamberName(coords),
+      researchEstimate,
+      uncertainty: detail?.uncertainty,
     };
     setInfo(nextInfo);
     onUpdate?.(nextInfo);
@@ -632,7 +635,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
   if (result?.localization_supported === false) return null;
   if (result?.localization_normal_gated === true) return null;
 
-  const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e' };
+  const RISK_COLOR = { HIGH: '#ef4444', MODERATE: '#f59e0b', LOW: '#22c55e', ESTIMATE: '#f59e0b' };
   const TERR_COLOR = { LAD: '#ef4444', RCA: '#22c55e', LCx: '#f59e0b' };
   const riskColor  = RISK_COLOR[info.risk] ?? '#60a5fa';
   const terrColor  = TERR_COLOR[info.territory] ?? '#60a5fa';
@@ -668,13 +671,13 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
           lineHeight: 1.5, boxShadow: `0 0 16px ${riskColor}44`, minWidth: 160,
         }}>
           <div style={{ color: riskColor, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, marginBottom: 2 }}>
-            &#9899; {info.risk} RISK
+            &#9899; {info.researchEstimate ? 'RESEARCH ESTIMATE' : `${info.risk} RISK`}
           </div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#f1f5f9', marginBottom: 1 }}>
             Seg {info.segment} &mdash; {info.region}
           </div>
           <div style={{ fontSize: 10, color: '#cbd5e1', marginBottom: 3, fontWeight: 'bold' }}>
-            {info.chamber}
+            {info.researchEstimate ? 'AHA segment / territory estimate' : info.chamber}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
             <div style={{ width: 7, height: 7, borderRadius: 2, backgroundColor: terrColor }} />
@@ -684,7 +687,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration }) {
             {info.mm.x} / {info.mm.y} / {info.mm.z} mm
           </div>
           <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 700, marginTop: 3 }}>
-            Activation compactness {info.compactness}%
+            {info.researchEstimate ? `Activation compactness ${info.compactness} · not probability` : `Activation compactness ${info.compactness} · unitless`}
           </div>
         </div>
       </Html>
@@ -823,7 +826,10 @@ const HeartModel3D = ({ result = null }) => {
   }, [resetView, result]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/v1/localization/nodes`)
+    const token = localStorage.getItem('bio_token');
+    fetch(`${API_BASE}/api/v1/localization/nodes`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.nodes) setNodePositions(d.nodes); })
       .catch(() => {});

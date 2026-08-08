@@ -280,6 +280,7 @@ const Analysis = () => {
   const [referralLoading, setReferralLoading] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [activeVisualizerTab, setActiveVisualizerTab] = useState('3d');
+  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(false);
   const analysisAbortRef = useRef(null);
   const saveAbortRef = useRef(null);
 
@@ -336,8 +337,11 @@ const Analysis = () => {
     setResult(null);
     try {
       const analyzed = file
-        ? isImageEcgFile(file)
-          ? await modelApi.analyzeEcgFile(file, false, null, { signal: controller.signal })
+          ? isImageEcgFile(file)
+          ? await modelApi.analyzeEcgFile(file, false, null, {
+            signal: controller.signal,
+            localizationMode: researchLocalizationEnabled ? 'research' : 'disabled',
+          })
           : await modelApi.analyzeFile(file, { signal: controller.signal })
         : await modelApi.analyzeSample(sampleId, { signal: controller.signal });
       setResult(analyzed);
@@ -462,7 +466,8 @@ const Analysis = () => {
       confidence_type: result.confidence_type,
       localization_supported: result.localization_supported !== false,
       localization_note: result.localization_note,
-      validation: result.validation,
+        validation: result.validation,
+        uncertainty: result.uncertainty,
       aha: result.region,
       activation_map: result.activation_map,
       top5_nodes: result.top5_nodes,
@@ -474,6 +479,21 @@ const Analysis = () => {
 
   const imageHeartContext = useMemo(() => {
     if (!displayedImageUrl) return null;
+    const research = result?.research_localization;
+    if (research?.supported && research.source?.norm) {
+      return {
+        localization_coords: research.source.norm,
+        ai_confidence: research.confidence,
+        confidence_type: research.confidence_type,
+        localization_supported: true,
+        validation: research.validation,
+        uncertainty: research.uncertainty,
+        aha: research.region,
+        activation_map: research.activation_map,
+        top5_nodes: research.top5_nodes,
+        regional_candidates: research.regional_candidates,
+      };
+    }
     return {
       localization_coords: null,
       ai_confidence: 0,
@@ -488,7 +508,7 @@ const Analysis = () => {
       activation_map: Array(75).fill(0.5),
       top5_nodes: [],
     };
-  }, [displayedImageUrl, result?.localization_note]);
+  }, [displayedImageUrl, result?.localization_note, result?.research_localization]);
 
   const visualizerHeartResult = useMemo(() => heartResult || imageHeartContext || ({
     localization_coords: null,
@@ -664,6 +684,21 @@ const Analysis = () => {
                   }}
                 />
               </label>
+              {isImageEcgFile(file) && (
+                <label className={`mb-3 flex items-start gap-2 rounded-lg border px-2.5 py-2 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-200 bg-amber-50'}`}>
+                  <input
+                    type="checkbox"
+                    checked={researchLocalizationEnabled}
+                    disabled={loading}
+                    onChange={(e) => setResearchLocalizationEnabled(e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className={`text-[10px] leading-relaxed ${dk ? 'text-amber-200' : 'text-amber-800'}`}>
+                    <b>Experimental 3D localization (Research estimate)</b><br />
+                    Named-lead mapping, AHA segment/territory only; not clinically validated.
+                  </span>
+                </label>
+              )}
               {file && (
                 <button onClick={() => setFile(null)} className={`text-[10px] mb-3 ${dk ? 'text-slate-500' : 'text-slate-400'} hover:underline`}>
                   ล้างไฟล์ (กลับไปใช้ตัวอย่าง)
@@ -790,8 +825,8 @@ const Analysis = () => {
                 <div className="grid grid-cols-2 gap-2">
                   <Stat
                     label="Activation compactness"
-                    value={`${Math.round(result.confidence * 100)}%`}
-                    hint="Model spread indicator; not localization accuracy. Held-out simulated mean error: 50.5 mm."
+                    value={Number(result.confidence).toFixed(3)}
+                    hint="Unitless model-spread indicator; not probability or localization accuracy. Held-out simulated mean error: 50.5 mm."
                     dk={dk}
                   />
                   <Stat label="Heart rate"

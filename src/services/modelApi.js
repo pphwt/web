@@ -55,21 +55,74 @@ const authHeaders = () => {
 };
 
 export const modelApi = {
+  refreshAccessToken: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/auth/refresh`, {
+    method: 'POST',
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
+  progressSummary: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/progress/summary`, {
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
+  evidencePack: async (options = {}) => {
+    const response = await fetch(`${CLINICAL_API_BASE}/api/v1/progress/evidence-pack`, {
+      headers: authHeaders(),
+      signal: options.signal,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || `Evidence pack HTTP ${response.status}`);
+    }
+    const disposition = response.headers.get('content-disposition') || '';
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || 'bioelectric-evidence.zip';
+    return { blob: await response.blob(), filename };
+  },
+
+  auditEvents: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/audit/events?limit=${options.limit || 100}`, {
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
+  auditIntegrity: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/audit/integrity`, {
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
   health: async () => parseJson(await fetch(`${MODEL_API_BASE}/api/v1/health`)),
 
-  metrics: async () => parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/metrics`)),
+  metrics: async () => parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/metrics`, {
+    headers: authHeaders(),
+  })),
 
   samples: async (limit = 24) =>
-    parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/samples?limit=${limit}`)),
+    parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/samples?limit=${limit}`, {
+      headers: authHeaders(),
+    })),
 
   demoSamples: async (limit = 24) =>
-    parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/demo-samples?limit=${limit}`)),
+    parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/demo-samples?limit=${limit}`, {
+      headers: authHeaders(),
+    })),
+
+  demoCases: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/demo/cases`, {
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
+  runDemoCase: async (caseId, options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/demo/cases/${encodeURIComponent(caseId)}/run`, {
+    method: 'POST',
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
 
   analyzeSample: async (sampleId, options = {}) => {
     const form = new FormData();
     form.append('sample_id', sampleId);
     return parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/analyze`, {
       method: 'POST',
+      headers: authHeaders(),
       body: form,
       signal: options.signal,
     }));
@@ -83,6 +136,7 @@ export const modelApi = {
     form.append('file', file);
     return parseJson(await fetch(`${MODEL_API_BASE}/api/v1/localization/analyze`, {
       method: 'POST',
+      headers: authHeaders(),
       body: form,
       signal: options.signal,
     }));
@@ -106,6 +160,9 @@ export const modelApi = {
     }
     if (layoutOverride) {
       form.append('layout_override', layoutOverride);
+    }
+    if (options.localizationMode) {
+      form.append('localization_mode', options.localizationMode);
     }
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/analyze`, {
       method: 'POST',

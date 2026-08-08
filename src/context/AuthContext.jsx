@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { modelApi } from '../services/modelApi';
 
 const AuthContext = createContext();
 
@@ -57,15 +58,41 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      try {
-        setUser(userFromToken(token));
-      } catch {
-        removeStoredItem('bio_token');
-        setToken(null);
-      }
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return undefined;
+    }
+
+    let refreshTimer;
+    try {
+      const parsedUser = userFromToken(token);
+      setUser(parsedUser);
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const refreshDelay = Math.max(30_000, (payload.exp * 1000) - Date.now() - (5 * 60 * 1000));
+      refreshTimer = window.setTimeout(async () => {
+        try {
+          const refreshed = await modelApi.refreshAccessToken();
+          setStoredItem('bio_token', refreshed.access_token);
+          setToken(refreshed.access_token);
+          setUser(userFromToken(refreshed.access_token));
+        } catch {
+          // A revoked token must end the browser session rather than retrying
+          // indefinitely or keeping a stale role in memory.
+          removeStoredItem('bio_token');
+          setToken(null);
+          setUser(null);
+        }
+      }, refreshDelay);
+    } catch {
+      removeStoredItem('bio_token');
+      setToken(null);
+      setUser(null);
     }
     setIsLoading(false);
+    return () => {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+    };
   }, [token]);
 
   const login = (newToken, userData) => {

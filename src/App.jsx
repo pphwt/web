@@ -19,6 +19,10 @@ import ClinicalEcg from './pages/ClinicalEcg';
 import Login from './pages/Login';
 import PatientArchives from './pages/PatientArchives';
 import HelpManual from './pages/HelpManual';
+import Progress from './pages/Progress';
+import AIDiagnostics from './pages/AIDiagnostics';
+import Audit from './pages/Audit';
+import Showcase from './pages/Showcase';
 
 function App() {
   return (
@@ -41,6 +45,10 @@ function App() {
                             <Routes>
                               <Route path="/page/overview" element={<PatientList />} />
                               <Route path="/" element={<Navigate to="/page/overview" replace />} />
+                              <Route path="/page/progress" element={<Progress />} />
+                              <Route path="/page/showcase" element={<Showcase />} />
+                              <Route path="/page/audit" element={<Audit />} />
+                              <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
                               <Route path="/page/live" element={<LiveMonitoring />} />
                               <Route path="/page/reports" element={<Reports />} />
                               <Route path="/page/analysis" element={<Analysis />} />
