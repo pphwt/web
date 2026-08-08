@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { HeartPulse, Eye, EyeOff, CheckCircle2, XCircle, Moon, Sun, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_BASE } from '../utils/constants';
+import { API_BASE, API_CONFIGURATION_ERROR, API_ORIGIN } from '../utils/constants';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -64,13 +64,16 @@ const Login = () => {
     setIsSubmitting(true);
 
     try {
+      if (API_CONFIGURATION_ERROR) {
+        throw new Error(API_CONFIGURATION_ERROR);
+      }
+
       const formData = new FormData();
       formData.append('username', username);
       formData.append('password', password);
 
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
-        headers: { 'ngrok-skip-browser-warning': '69420' },
         body: formData,
       });
 
@@ -110,9 +113,8 @@ const Login = () => {
       setModalState({
         type: 'error',
         title: 'เชื่อมต่อไม่ได้',
-        message: error?.message
-          ? 'ไม่สามารถติดต่อ API ได้ กรุณาตรวจสอบเครือข่ายหรือเซิร์ฟเวอร์'
-          : 'ไม่สามารถติดต่อ API ได้ กรุณาลองใหม่อีกครั้ง',
+        message: API_CONFIGURATION_ERROR
+          || `ไม่สามารถติดต่อ ECG API ที่ ${API_ORIGIN} ได้ กรุณาตรวจสอบว่า backend เปิดอยู่และ URL ถูกต้อง`,
       });
     } finally {
       setIsSubmitting(false);
@@ -139,8 +141,7 @@ const Login = () => {
       const response = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': '69420'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ username: username.trim() }),
       });
