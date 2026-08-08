@@ -5,8 +5,6 @@ import {
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
   X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw, Stethoscope,
   BookOpen,
-  LineChart,
-  Presentation,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -20,8 +18,6 @@ const buildSections = (t, language, role) => [
     label: 'หลัก',
     items: [
       { icon: Users,      label: t('nav_patients'),  path: '/page/overview' },
-      { icon: LineChart,   label: language === 'th' ? 'ความก้าวหน้าโครงการ' : 'Project Progress', path: '/page/progress' },
-      { icon: Presentation, label: language === 'th' ? 'โหมดนำเสนอกรรมการ' : 'National Showcase', path: '/page/showcase' },
       { icon: ShieldCheck, label: language === 'th' ? 'หลักฐาน AI' : 'AI Evidence', path: '/page/ai-diagnostics' },
       ...(['doctor', 'admin'].includes(role) ? [{ icon: ShieldCheck, label: language === 'th' ? 'Audit และความปลอดภัย' : 'Audit & Security', path: '/page/audit' }] : []),
       { icon: HeartPulse, label: t('nav_analysis'),  path: '/page/analysis' },
