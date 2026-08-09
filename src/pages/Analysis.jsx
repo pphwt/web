@@ -583,81 +583,11 @@ const Analysis = () => {
           </span>
         </header>
 
-        <div className="relative grid grid-cols-1 gap-5">
+        {/* Top split section: Left 15% ECG Data selection, Right 85% 3D Heart Visualizer */}
+        <div className="relative flex flex-col lg:flex-row gap-5 items-start">
 
-          {/* Left: 3D + waveform */}
-          <div className="flex flex-col gap-5">
-            <div className={`rounded-2xl border overflow-hidden shadow-xl ${surface}`}>
-              <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
-                <div className="flex items-center gap-4">
-                  <span className={`text-xs font-semibold ${secLabel}`}>การแสดงผล</span>
-                  {displayedImageUrl && (
-                    <div className="flex rounded-lg bg-slate-100 p-0.5 dark:bg-white/5">
-                      <button
-                        onClick={() => setActiveVisualizerTab('3d')}
-                        className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all ${
-                          activeVisualizerTab === '3d'
-                            ? 'bg-white shadow-sm dark:bg-slate-800 text-sky-500'
-                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                        }`}
-                      >
-                        โมเดลหัวใจ 3D
-                      </button>
-                      <button
-                        onClick={() => setActiveVisualizerTab('image')}
-                        className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all ${
-                          activeVisualizerTab === 'image'
-                            ? 'bg-white shadow-sm dark:bg-slate-800 text-sky-500'
-                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                        }`}
-                      >
-                        ภาพ ECG ที่อัปโหลด
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {localizedSource && region && (
-                  <span className="text-[10px] font-mono" style={{ color: riskColor }}>
-                    {region?.label} · {region?.territory}
-                  </span>
-                )}
-              </div>
-              <div className="h-[calc(100vh-190px)] min-h-[560px] xl:min-h-[680px] max-h-[960px]">
-                {loading ? (
-                  <VisualizerSkeleton dk={dk} />
-                ) : activeVisualizerTab === 'image' && displayedImageUrl ? (
-                  <div className="flex h-full flex-col gap-2 p-3">
-                    <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-                      <img
-                        src={displayedImageUrl}
-                        alt="Uploaded ECG preview"
-                        className="h-full w-full object-contain"
-                      />
-                    </div>
-                  </div>
-                ) : visualizerHeartResult ? (
-                  <>
-                    <HeartModel3D result={visualizerHeartResult} />
-                    {result?.localization_display?.status === 'measured' && (
-                      <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-xl border border-white/10 bg-slate-950/80 p-2 shadow-xl">
-                        <p className="mb-1 text-center text-[9px] font-black uppercase tracking-wider text-amber-300">Research estimate</p>
-                        <AHABullsEye activeSegment={result.localization_display.aha_segment} aha={region} />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
-                    <Activity size={28} className="opacity-40" />
-                    <p className="text-xs">เลือก ECG แล้วกด “ประเมินเพื่อคัดกรอง” เพื่อแสดงตำแหน่ง</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* ECG input above the visualization */}
-          <div className="order-first mr-auto flex w-full flex-col gap-4 sm:w-[400px]">
+          {/* Left: ECG input selection (~15% width) */}
+          <div className="w-full lg:w-[18%] xl:w-[15%] shrink-0 min-w-[220px] flex flex-col gap-4">
 
             {/* Input */}
             <div className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>
@@ -743,6 +673,78 @@ const Analysis = () => {
             </div>
 
           </div>
+
+          {/* Right: 3D Heart Visualizer (~85% width) */}
+          <div className="w-full lg:w-[82%] xl:w-[85%] flex-1 flex flex-col gap-5">
+            <div className={`rounded-2xl border overflow-hidden shadow-xl ${surface}`}>
+              <div className={`flex items-center justify-between px-4 py-3 border-b ${divider}`}>
+                <div className="flex items-center gap-4">
+                  <span className={`text-xs font-semibold ${secLabel}`}>การแสดงผล</span>
+                  {displayedImageUrl && (
+                    <div className="flex rounded-lg bg-slate-100 p-0.5 dark:bg-white/5">
+                      <button
+                        onClick={() => setActiveVisualizerTab('3d')}
+                        className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all ${
+                          activeVisualizerTab === '3d'
+                            ? 'bg-white shadow-sm dark:bg-slate-800 text-sky-500'
+                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        โมเดลหัวใจ 3D
+                      </button>
+                      <button
+                        onClick={() => setActiveVisualizerTab('image')}
+                        className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all ${
+                          activeVisualizerTab === 'image'
+                            ? 'bg-white shadow-sm dark:bg-slate-800 text-sky-500'
+                            : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        ภาพ ECG ที่อัปโหลด
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {localizedSource && region && (
+                  <span className="text-[10px] font-mono" style={{ color: riskColor }}>
+                    {region?.label} · {region?.territory}
+                  </span>
+                )}
+              </div>
+              <div className="h-[calc(100vh-190px)] min-h-[560px] xl:min-h-[680px] max-h-[960px]">
+                {loading ? (
+                  <VisualizerSkeleton dk={dk} />
+                ) : activeVisualizerTab === 'image' && displayedImageUrl ? (
+                  <div className="flex h-full flex-col gap-2 p-3">
+                    <div className={`min-h-0 flex-1 overflow-hidden rounded-xl border ${dk ? 'bg-white border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+                      <img
+                        src={displayedImageUrl}
+                        alt="Uploaded ECG preview"
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                  </div>
+                ) : visualizerHeartResult ? (
+                  <>
+                    <HeartModel3D result={visualizerHeartResult} />
+                    {result?.localization_display?.status === 'measured' && (
+                      <div className="pointer-events-none absolute bottom-5 right-5 z-10 rounded-xl border border-white/10 bg-slate-950/80 p-2 shadow-xl">
+                        <p className="mb-1 text-center text-[9px] font-black uppercase tracking-wider text-amber-300">Research estimate</p>
+                        <AHABullsEye activeSegment={result.localization_display.aha_segment} aha={region} />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className={`h-full flex flex-col items-center justify-center gap-2 ${subText}`}>
+                    <Activity size={28} className="opacity-40" />
+                    <p className="text-xs">เลือก ECG แล้วกด “ประเมินเพื่อคัดกรอง” เพื่อแสดงตำแหน่ง</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+
         </div>
 
         {loading && (
