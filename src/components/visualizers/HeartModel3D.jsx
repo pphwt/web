@@ -171,15 +171,18 @@ const ANATOMY_PARTS = [
   },
 ];
 
-function normToScene(n, bbRef, cal) {
+function normToScene(n, bbRef, cal, alreadyInWebMeshSpace = false) {
   if (!bbRef.current) return new THREE.Vector3(0, 0, 0);
   const { bb, scale } = bbRef.current;
   const mn = bb.min.clone().multiplyScalar(scale);
   const mx = bb.max.clone().multiplyScalar(scale);
-  
-  const kx = (cal?.xOffset ?? 0.25) + n.x * (cal?.xScale ?? 0.50);
-  const ky = (cal?.yOffset ?? 0.15) + n.y * (cal?.yScale ?? 0.40);
-  const kz = (cal?.zOffset ?? 0.25) + n.z * (cal?.zScale ?? 0.50);
+
+  // localization_display.web_mesh_point_norm is already transformed by the
+  // versioned backend mesh manifest. Applying the legacy UI calibration again
+  // would shift the marker away from the reported AHA region.
+  const kx = alreadyInWebMeshSpace ? n.x : (cal?.xOffset ?? 0.25) + n.x * (cal?.xScale ?? 0.50);
+  const ky = alreadyInWebMeshSpace ? n.y : (cal?.yOffset ?? 0.15) + n.y * (cal?.yScale ?? 0.40);
+  const kz = alreadyInWebMeshSpace ? n.z : (cal?.zOffset ?? 0.25) + n.z * (cal?.zScale ?? 0.50);
 
   return new THREE.Vector3(
     mn.x + kx * (mx.x - mn.x),
@@ -571,7 +574,8 @@ function PinMarker({ bbRef, result, onUpdate, calibration, modelReady }) {
       return;
     }
     const display = detail?.localization_display || {};
-    const coords = display?.point_norm || detail?.localization_coords;
+    const webMeshCoords = display?.web_mesh_point_norm;
+    const coords = webMeshCoords || display?.point_norm || detail?.localization_coords;
     const conf   = detail?.ai_confidence ?? 0;
     const aha    = detail?.aha || {
       segment: display?.aha_segment,
@@ -580,7 +584,7 @@ function PinMarker({ bbRef, result, onUpdate, calibration, modelReady }) {
     };
     if (!coords || !bbRef.current) return;
 
-    posRef.current = normToScene(coords, bbRef, calibration);
+    posRef.current = normToScene(coords, bbRef, calibration, Boolean(webMeshCoords));
 
     const researchEstimate = detail?.validation?.clinical_12_lead_validated === false;
     const territory = aha?.territory ?? '—';
@@ -703,6 +707,35 @@ function PinMarker({ bbRef, result, onUpdate, calibration, modelReady }) {
   );
 }
 
+function HeartStaticFallback({ result, message = 'กำลังโหลดโมเดลหัวใจ 3D' }) {
+  const display = result?.localization_display || {};
+  const region = display.aha_label || result?.aha?.label;
+  const territory = display.territory || result?.aha?.territory;
+  return (
+    <div style={{
+      height: '100%', width: '100%', position: 'relative', overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'linear-gradient(145deg, #f8fafc, #e2e8f0)', color: '#334155',
+      fontFamily: 'sans-serif', padding: 16, textAlign: 'center',
+    }}>
+      <img
+        src="/models/heart/normal/heart1-clean.png"
+        alt="แบบจำลองหัวใจสำรอง"
+        style={{ width: '86%', height: '86%', objectFit: 'contain', opacity: 0.92 }}
+      />
+      <div style={{
+        position: 'absolute', left: 12, right: 12, bottom: 12,
+        borderRadius: 8, padding: '7px 10px', background: 'rgba(15,23,42,0.86)',
+        color: '#e2e8f0', fontSize: 10, lineHeight: 1.45,
+      }}>
+        <strong>{message}</strong>
+        {region && <div>{region}{territory ? ` · ${territory} territory` : ''}</div>}
+        <div>Regional electrical activity estimate · not an exact disease point</div>
+      </div>
+    </div>
+  );
+}
+
 class WebGLErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -716,37 +749,7 @@ class WebGLErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.hasError) {
-      return (
-        <div style={{
-          height: '100%', width: '100%',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          background: '#040a18', color: '#94a3b8',
-          fontFamily: 'sans-serif', fontSize: '11px',
-          padding: '20px', textAlign: 'center',
-          border: '1px dashed rgba(255,255,255,0.1)',
-          borderRadius: '12px'
-        }}>
-          <span style={{ fontSize: '20px', marginBottom: '8px' }}>⚠️</span>
-          <p style={{ fontWeight: 'bold', color: '#f1f5f9', marginBottom: '4px' }}>
-            WebGL context creation failed
-          </p>
-          <p style={{ maxWidth: '280px', lineHeight: '1.4' }}>
-            The browser has run out of WebGL contexts. Please reload the page or close other tabs to free up resources.
-          </p>
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{
-              marginTop: '12px', padding: '6px 12px',
-              background: '#38bdf8', color: '#040a18',
-              border: 'none', borderRadius: '4px',
-              fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            Reload Page
-          </button>
-        </div>
-      );
+      return <HeartStaticFallback result={this.props.result} message="ไม่สามารถเปิด WebGL ได้ — แสดงภาพหัวใจสำรอง" />;
     }
     return this.props.children;
   }
@@ -863,7 +866,12 @@ const HeartModel3D = ({ result = null }) => {
 
   return (
     <div className="w-full h-full bg-transparent overflow-hidden relative">
-      <WebGLErrorBoundary>
+      {!modelReady && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none' }}>
+          <HeartStaticFallback result={result} />
+        </div>
+      )}
+      <WebGLErrorBoundary result={result}>
         <Canvas
           shadows
           camera={{ position: [0, 0.35, 4.2], fov: 40 }}

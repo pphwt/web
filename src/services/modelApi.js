@@ -78,6 +78,16 @@ export const modelApi = {
     return { blob: await response.blob(), filename };
   },
 
+  researchRuns: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/research/runs`, {
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
+  researchRun: async (runId, options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/research/runs/${encodeURIComponent(runId)}`, {
+    headers: authHeaders(),
+    signal: options.signal,
+  })),
+
   auditEvents: async (options = {}) => parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/audit/events?limit=${options.limit || 100}`, {
     headers: authHeaders(),
     signal: options.signal,

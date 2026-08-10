@@ -23,6 +23,7 @@ import Progress from './pages/Progress';
 import AIDiagnostics from './pages/AIDiagnostics';
 import Audit from './pages/Audit';
 import Showcase from './pages/Showcase';
+import ResearchLab from './pages/ResearchLab';
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
                               <Route path="/" element={<Navigate to="/page/overview" replace />} />
                               <Route path="/page/progress" element={<Progress />} />
                               <Route path="/page/showcase" element={<Showcase />} />
+                              <Route path="/page/research-lab" element={<ResearchLab />} />
                               <Route path="/page/audit" element={<Audit />} />
                               <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
                               <Route path="/page/live" element={<LiveMonitoring />} />

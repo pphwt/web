@@ -847,14 +847,14 @@ function InfoPair({ label, value, dk, valueClassName }) {
   );
 }
 
-function PredictionChip({ label, probability, status, dk }) {
+function PredictionChip({ label, score, status, dk }) {
   const token = statusToken(status, dk);
-  const percent = probability !== null && probability !== undefined ? `${Math.round(probability * 100)}%` : null;
+  const scoreLabel = score !== null && score !== undefined ? `score ${Number(score).toFixed(3)}` : null;
   return (
     <div className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-100 bg-white shadow-sm'}`}>
       <span className={`min-w-0 truncate text-[11px] font-bold ${dk ? 'text-slate-200' : 'text-slate-700'}`}>{label}</span>
       <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold ${token.badge}`}>
-        {percent || token.label}
+        {scoreLabel || token.label}
       </span>
     </div>
   );
@@ -884,68 +884,72 @@ function ResearchLocalizationPanel({ result, dk }) {
 
   const detail = result?.research_localization;
   const display = result?.localization_display || {};
-  const supported = detail?.supported === true;
+  const supported = detail?.supported === true && display.status === 'measured';
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
   const mainText = dk ? 'text-white' : 'text-slate-900';
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
-  const visualResult = supported ? {
-    localization_coords: display.point_norm || detail.source?.norm,
-    ai_confidence: detail.confidence,
-    confidence_type: detail.confidence_type,
-    localization_supported: true,
-    validation: detail.validation,
-    uncertainty: detail.uncertainty,
-    aha: detail.region,
+  const missingLeads = detail?.input_mapping?.missing_clinical_leads
+    || detail?.input_mapping?.missing_model_input_leads
+    || [];
+  const unavailableReason = detail?.reason
+    || display.reason
+    || result?.research_localization_note
+    || 'ข้อมูล ECG ไม่ผ่าน quality, layout หรือ calibration gate';
+  const visualResult = {
+    localization_coords: display.web_mesh_point_norm || display.point_norm || detail?.source?.norm,
+    ai_confidence: detail?.confidence,
+    confidence_type: detail?.confidence_type,
+    localization_supported: supported,
+    validation: detail?.validation || { clinical_12_lead_validated: false },
+    uncertainty: detail?.uncertainty,
+    aha: detail?.region,
     localization_display: display,
-    activation_map: detail.activation_map,
-    top5_nodes: detail.top5_nodes,
-    regional_candidates: detail.regional_candidates,
-  } : { localization_supported: false };
+    activation_map: detail?.activation_map,
+    top5_nodes: detail?.top5_nodes,
+    regional_candidates: detail?.regional_candidates,
+  };
 
   return (
     <section className={`rounded-2xl border p-3 ${surface}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-amber-300' : 'text-amber-700'}`}>Experimental 3D localization</p>
-          <h3 className={`mt-1 text-sm font-black ${mainText}`}>Research estimate — AHA segment / territory</h3>
+          <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>3D regional screening support</p>
+          <h3 className={`mt-1 text-sm font-black ${mainText}`}>Regional estimate — AHA segment / territory</h3>
         </div>
         <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${dk ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>NOT CLINICALLY VALIDATED</span>
       </div>
 
-      {!detail || result.localization_mode !== 'research' ? (
-        <div className={`rounded-xl border border-dashed p-4 text-[11px] leading-relaxed ${dk ? 'border-white/[0.1] text-slate-400' : 'border-slate-300 text-slate-500'}`}>
-          3D localization ยังปิดอยู่ ค่าเริ่มต้นของ clinical workflow คือไม่แสดง marker เพื่อป้องกันการตีความเกินหลักฐาน ให้เปิด Experimental 3D localization แล้วประมวลผลภาพใหม่
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="h-[360px] min-h-[300px] overflow-hidden rounded-xl border border-sky-500/20 bg-slate-950/10">
+          <HeartModel3D result={visualResult} />
         </div>
-      ) : !supported ? (
-        <div className={`rounded-xl border p-4 text-[11px] leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-          ไม่แสดง marker: {detail.reason || 'ไม่สามารถประเมินตำแหน่งได้'}
-          {(detail.input_mapping?.missing_clinical_leads || detail.input_mapping?.missing_model_input_leads)?.length > 0 && (
-            <div className="mt-1">Missing leads: {(detail.input_mapping.missing_clinical_leads || detail.input_mapping.missing_model_input_leads).join(', ')}</div>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="h-[360px] min-h-[300px] overflow-hidden rounded-xl border border-sky-500/20 bg-slate-950/10">
-            <HeartModel3D result={visualResult} />
+        <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex justify-center rounded-lg border border-slate-200/60 bg-white/40 py-1 dark:border-white/[0.05] dark:bg-white/[0.02]">
+            <AHABullsEye activeSegment={supported ? (display.aha_segment || detail?.region?.segment || 0) : 0} aha={detail?.region} />
           </div>
-          <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="flex justify-center rounded-lg border border-slate-200/60 bg-white/40 py-1 dark:border-white/[0.05] dark:bg-white/[0.02]">
-              <AHABullsEye activeSegment={display.aha_segment || detail.region?.segment || 0} aha={detail.region} />
+          {!supported ? (
+            <div className={`rounded-lg border p-3 leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+              <p className="font-black">แสดงหัวใจโดยยังไม่ปัก marker</p>
+              <p className="mt-1">{unavailableReason}</p>
+              {missingLeads.length > 0 && <p className="mt-1">Missing leads: {missingLeads.join(', ')}</p>}
+              <p className="mt-2 opacity-80">ระบบจะไม่ฝืนสร้างตำแหน่งเมื่อหลักฐานไม่เพียงพอ</p>
             </div>
+          ) : (
+            <>
             <div className={`rounded-lg border p-2 ${dk ? 'border-amber-500/20 bg-amber-500/[0.05]' : 'border-amber-200 bg-amber-50'}`}>
-              <p className={`font-black ${dk ? 'text-amber-200' : 'text-amber-800'}`}>Research estimate · marker + AHA region</p>
-              <p className={`mt-1 ${subText}`}>Segment #{display.aha_segment || detail.region?.segment || '—'} · {display.territory || detail.region?.territory || '—'} · not a probability</p>
-              <p className={`mt-1 font-mono text-[9px] ${subText}`}>Leads: {(display.input_leads || detail.input_mapping?.model_input_leads || []).join(', ') || '—'}</p>
-              <p className={`font-mono text-[9px] ${subText}`}>Model: {display.model_version || detail.validation?.model_version || '—'} · Mesh: {display.mesh_calibration_version || '—'}</p>
+              <p className={`font-black ${dk ? 'text-amber-200' : 'text-amber-800'}`}>Regional electrical activity estimate</p>
+              <p className={`mt-1 ${subText}`}>AHA #{display.aha_segment || detail?.region?.segment || '—'} · {display.territory || detail?.region?.territory || '—'} · not a probability</p>
+              <p className={`mt-1 font-mono text-[9px] ${subText}`}>Leads: {(display.input_leads || detail?.input_mapping?.model_input_leads || []).join(', ') || '—'}</p>
+              <p className={`font-mono text-[9px] ${subText}`}>Model: {display.model_version || detail?.validation?.model_version || '—'} · Mesh: {display.mesh_calibration_version || '—'}</p>
               <p className={`font-mono text-[9px] ${subText}`}>Processed: {display.processing_timestamp || result.processing_timestamp || '—'}</p>
             </div>
-            <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{detail.region?.label || '—'}</p></div>
-            <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{detail.region?.territory || '—'}</p></div>
-            <div><span className={subText}>Activation compactness</span><p className={`font-black ${mainText}`}>{detail.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p><p className={subText}>unitless indicator, not probability or accuracy</p></div>
+            <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{detail?.region?.label || display.aha_label || '—'}</p></div>
+            <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{detail?.region?.territory || display.territory || '—'}</p></div>
+            <div><span className={subText}>Activation compactness</span><p className={`font-black ${mainText}`}>{detail?.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p><p className={subText}>unitless indicator, not probability or accuracy</p></div>
             <div>
               <span className={subText}>Top regional candidates</span>
               <div className="mt-1 space-y-1">
-                {(detail.regional_candidates || []).slice(0, 3).map((candidate) => (
+                {(display.regional_candidates || detail?.regional_candidates || []).slice(0, 3).map((candidate) => (
                   <div key={`${candidate.rank}-${candidate.aha_segment}`} className={`rounded-lg border px-2 py-1.5 ${dk ? 'border-white/[0.07]' : 'border-slate-200'}`}>
                     <p className={`font-black ${mainText}`}>#{candidate.rank} AHA {candidate.aha_segment} · {candidate.label}</p>
                     <p className={subText}>{candidate.territory} · relative activation {Number(candidate.relative_activation_score || 0).toFixed(3)} · not probability</p>
@@ -953,14 +957,14 @@ function ResearchLocalizationPanel({ result, dk }) {
                 ))}
               </div>
             </div>
-            <div><span className={subText}>Input mapping</span><p className={`font-mono text-[9px] ${mainText}`}>{detail.input_mapping?.version || '—'}</p></div>
+            <div><span className={subText}>Input mapping</span><p className={`font-mono text-[9px] ${mainText}`}>{detail?.input_mapping?.version || display.mapping_version || '—'}</p></div>
             <div><span className={subText}>Validation</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>clinical_12_lead_validated: false</p></div>
-            <div><span className={subText}>3D uncertainty</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail.uncertainty?.calibration_status === 'pending' ? 'not available — calibration pending' : `${detail.uncertainty?.uncertainty_radius_mm} mm`}</p><p className={subText}>coverage target: {detail.uncertainty?.coverage_target ?? '—'}</p></div>
-            <div><span className={subText}>Mesh calibration</span><p className={`font-mono text-[9px] ${mainText}`}>{detail.uncertainty?.mesh_calibration_version || 'heart-mesh-calibration-v1'}</p></div>
-            <p className={`border-t pt-2 leading-relaxed ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-200 text-slate-500'}`}>{detail.localization_note}</p>
-          </div>
+            <div><span className={subText}>3D uncertainty</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail?.uncertainty?.calibration_status === 'pending' ? 'not available — calibration pending' : `${detail?.uncertainty?.uncertainty_radius_mm ?? 'not available'} mm`}</p><p className={subText}>coverage target: {detail?.uncertainty?.coverage_target ?? '—'}</p></div>
+            <p className={`border-t pt-2 leading-relaxed ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-200 text-slate-500'}`}>ตำแหน่งนี้เป็น regional research estimate ไม่ใช่จุดโรคที่ยืนยันแล้ว</p>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -1016,9 +1020,8 @@ export default function ClinicalEcgAnalyzer() {
   const [result, setResult] = useState(null);
   const [ocrOnly, setOcrOnly] = useState(false);
   const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
-  // Image uploads run the regional research estimate automatically. The
-  // result keeps the existing research-only disclaimer and validation state.
-  const [researchLocalizationEnabled, setResearchLocalizationEnabled] = useState(true);
+  // Image uploads run the guarded regional estimate automatically. The API
+  // withholds the marker when image, signal or calibration evidence is weak.
   const [layoutOverride, setLayoutOverride] = useState('');
   const [erQuickMode, setErQuickMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1108,7 +1111,7 @@ export default function ClinicalEcgAnalyzer() {
       setResult(uploadedFiles
         ? await modelApi.analyzeEcgFile(uploadedFiles, ocrOnly, layoutOverride || null, {
           signal: controller.signal,
-          localizationMode: hasImageUpload && researchLocalizationEnabled ? 'research' : 'disabled',
+          localizationMode: hasImageUpload ? 'auto' : 'disabled',
         })
         : await modelApi.analyzeEcgSample(sampleId, { signal: controller.signal }));
     } catch (e) {
@@ -1334,12 +1337,17 @@ export default function ClinicalEcgAnalyzer() {
   // rhythm, and axis are already shown once each in their own detail cards
   // above; repeating them in this list just restated the same conclusions
   // in a second format without adding information.
-  const predictionItems = (result?.classification?.labels || []).slice(0, 6).map((label) => {
-    const probability = result.classification.probabilities?.[label] ?? 0;
+  const rankedPredictions = result?.classification?.top_predictions?.length
+    ? result.classification.top_predictions
+    : Object.entries(result?.classification?.probabilities || {})
+      .sort(([, left], [, right]) => Number(right) - Number(left))
+      .map(([label, score], index) => ({ rank: index + 1, label, score }));
+  const predictionItems = rankedPredictions.slice(0, 3).map((prediction) => {
+    const score = prediction.score ?? 0;
     return {
-      label,
-      probability,
-      status: label === 'NORM' ? (probability > 0.5 ? 'normal' : 'unavailable') : (probability > 0.35 ? 'abnormal' : 'unavailable'),
+      label: `#${prediction.rank} ${prediction.label}`,
+      score,
+      status: prediction.label === 'NORM' ? (score > 0.5 ? 'normal' : 'unavailable') : (score > 0.35 ? 'abnormal' : 'unavailable'),
     };
   });
   const artifactManifest = result?.artifact_manifest || {};
@@ -1504,20 +1512,6 @@ export default function ClinicalEcgAnalyzer() {
               อ่านเฉพาะผลวิเคราะห์และตัวเลขหัวกระดาษ (OCR Only — ข้ามการดึงคลื่นไฟฟ้าหัวใจเพื่อรันทันที)
             </label>
             </div>
-            <label className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-200 bg-amber-50'}`}>
-              <input
-                id="research-localization-checkbox"
-                type="checkbox"
-                checked={researchLocalizationEnabled}
-                disabled={loading || ocrOnly}
-                onChange={(e) => setResearchLocalizationEnabled(e.target.checked)}
-                className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-              />
-              <span className={`text-[10px] leading-relaxed ${dk ? 'text-amber-200' : 'text-amber-800'}`}>
-                <b>{demoMode ? 'DEMO: ' : ''}Experimental 3D localization (Research estimate)</b><br />
-                ใช้ named-lead mapping กับโมเดลวิจัยเดิม แสดง AHA segment/territory เท่านั้น ไม่ใช่การวินิจฉัย และยังไม่ผ่าน validation ในผู้ป่วยจริง
-              </span>
-            </label>
           </div>
         )}
         {ocrUnavailable && (
@@ -1723,7 +1717,7 @@ export default function ClinicalEcgAnalyzer() {
                   <div className="mb-3 flex items-center gap-2">
                     <h3 className={`text-base font-black ${mainText}`}>AI Predictions</h3>
                     <Info size={13} className={subText} />
-                    <span className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">4</span>
+                    <span className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white shadow-lg">{predictionItems.length || '—'}</span>
                   </div>
                   <div className={`overflow-hidden rounded-xl border ${dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
                     <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500 px-3 py-3 text-white">
@@ -1757,7 +1751,7 @@ export default function ClinicalEcgAnalyzer() {
                         <p className={`text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Primary output</p>
                         <p className={`mt-1 text-lg font-black ${mainText}`}>{topLabel}</p>
                         <p className={`text-[11px] ${subText}`}>
-                          {topProbability !== null && topProbability !== undefined ? `${Math.round(topProbability * 100)}% model score · ` : ''}
+                          {topProbability !== null && topProbability !== undefined ? `raw model score ${Number(topProbability).toFixed(3)} · ` : ''}
                           {confidenceBand ? `${confidenceBand} raw-score band · ` : ''}
                           Axis {axisCategory.category || '-'} · Lead {measurements.lead_used || '-'}
                         </p>
@@ -1779,10 +1773,10 @@ export default function ClinicalEcgAnalyzer() {
                           Model output is unconfirmed by independent ECG measurements: {(classifierReview.reasons || []).join(' ')}
                         </div>
                       )}
-                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Classifier probabilities (all 6 classes)</p>
+                      <p className={`mb-2 text-[10px] font-bold uppercase tracking-wider ${secLabel}`}>Top preliminary screening scores</p>
                       <div className="grid grid-cols-1 gap-2">
                         {predictionItems.length ? predictionItems.map((item) => (
-                          <PredictionChip key={`${item.label}-${item.probability}`} dk={dk} {...item} />
+                          <PredictionChip key={`${item.label}-${item.score}`} dk={dk} {...item} />
                         )) : (
                           <div className={`rounded-lg border p-3 text-xs ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-100 text-slate-500'}`}>
                             No classifier output available.
@@ -1847,8 +1841,8 @@ export default function ClinicalEcgAnalyzer() {
             </div>
           </div>
 
-          <QualityEvidence q={q} dk={dk} />
           <ResearchLocalizationPanel result={result} dk={dk} />
+          <QualityEvidence q={q} dk={dk} />
 
           {(q || result.localization_note || result.localization) && (
             <div className={`rounded-2xl border p-3 ${surface}`}>
