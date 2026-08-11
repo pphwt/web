@@ -1189,7 +1189,9 @@ export default function ClinicalEcgAnalyzer() {
     // React state updates are asynchronous; this ref closes the small window
     // where two rapid clicks could otherwise start duplicate uploads.
     if (analyzeInFlightRef.current || loading) return;
-    if (!uploadedFiles && !sampleId && !researchSampleId) { setError('เลือกตัวอย่าง หรืออัปโหลดไฟล์ก่อน'); return; }
+    const selectedInput = uploadedFiles?.length
+      || (sampleSource === 'research' ? researchSampleId : sampleId);
+    if (!selectedInput) { setError('เลือกตัวอย่าง หรืออัปโหลดไฟล์ก่อน'); return; }
     analyzeInFlightRef.current = true;
     const controller = new AbortController();
     analysisAbortRef.current = controller;
@@ -1552,6 +1554,8 @@ export default function ClinicalEcgAnalyzer() {
                   setUploadedFiles(null);
                   setLayoutOverride('');
                   setHighlightedLead(null);
+                  if (value === 'research') setSampleId('');
+                  else setResearchSampleId('');
                 }
               }}
               className={`rounded-md px-2 py-1.5 text-[9px] font-black transition ${sampleSource === value ? 'bg-sky-600 text-white shadow-sm' : dk ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-white'}`}
@@ -1873,7 +1877,7 @@ export default function ClinicalEcgAnalyzer() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={saveToRecord}
-                        disabled={saving || Boolean(savedReport?.report_id) || !canWriteClinicalRecord}
+                        disabled={saving || Boolean(savedReport?.report_id)}
                         title={!canWriteClinicalRecord ? 'ต้องอัปโหลด ECG และเลือกผู้ป่วยก่อนบันทึกเวชระเบียน' : undefined}
                         className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition disabled:opacity-60 ${savedReport?.report_id ? 'bg-emerald-600' : 'bg-sky-600 hover:bg-sky-700'}`}
                       >
@@ -2109,7 +2113,7 @@ export default function ClinicalEcgAnalyzer() {
               </label>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={downloadReferralLetter} disabled={referralLoading || !canWriteClinicalRecord} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" onClick={downloadReferralLetter} disabled={referralLoading} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
                 {referralLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} ใบส่งตัว PDF
               </button>
               {!canWriteClinicalRecord && <span className={`self-center text-[9px] ${subText}`}>ตัวอย่างสาธารณะ/จำลองใช้ดูผลเท่านั้น ไม่บันทึกเข้าเวชระเบียน</span>}
