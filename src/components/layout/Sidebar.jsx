@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Activity, FileText, LogOut, Users, Archive,
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
-  X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw, Stethoscope,
+  X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw,
   BookOpen,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -20,14 +20,8 @@ const buildSections = (t, language, role) => [
       { icon: Users,      label: t('nav_patients'),  path: '/page/overview' },
       { icon: ShieldCheck, label: language === 'th' ? 'หลักฐาน AI' : 'AI Evidence', path: '/page/ai-diagnostics' },
       ...(['doctor', 'admin'].includes(role) ? [{ icon: ShieldCheck, label: language === 'th' ? 'Audit และความปลอดภัย' : 'Audit & Security', path: '/page/audit' }] : []),
-      { icon: HeartPulse, label: t('nav_analysis'),  path: '/page/analysis' },
+      { icon: HeartPulse, label: language === 'th' ? 'วิเคราะห์ ECG และหัวใจ 3D' : 'ECG Analysis & 3D Heart', path: '/page/clinical-ecg' },
       { icon: Activity,   label: t('nav_monitoring'), path: '/page/live' },
-    ],
-  },
-  {
-    label: 'คัดกรอง',
-    items: [
-      { icon: Stethoscope, label: 'อ่านผล ECG (ไฟล์จริง)',   path: '/page/clinical-ecg' },
     ],
   },
   {

@@ -889,11 +889,14 @@ const ECG_CLASS_LABELS = {
 };
 
 function ResearchLocalizationPanel({ result, dk }) {
-  if (result?.meta?.format !== 'image') return null;
+  if (!result) return null;
 
   const detail = result?.research_localization;
   const display = result?.localization_display || {};
-  const supported = detail?.supported === true && display.status === 'measured';
+  const legacySource = result?.source;
+  const supported = (detail?.supported === true && display.status === 'measured')
+    || Boolean(legacySource && result.localization_supported !== false);
+  const region = detail?.region || result?.region || {};
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
   const mainText = dk ? 'text-white' : 'text-slate-900';
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
@@ -904,19 +907,6 @@ function ResearchLocalizationPanel({ result, dk }) {
     || display.reason
     || result?.research_localization_note
     || 'ข้อมูล ECG ไม่ผ่าน quality, layout หรือ calibration gate';
-  const visualResult = {
-    localization_coords: display.web_mesh_point_norm || display.point_norm || detail?.source?.norm,
-    ai_confidence: detail?.confidence,
-    confidence_type: detail?.confidence_type,
-    localization_supported: supported,
-    validation: detail?.validation || { clinical_12_lead_validated: false },
-    uncertainty: detail?.uncertainty,
-    aha: detail?.region,
-    localization_display: display,
-    activation_map: detail?.activation_map,
-    top5_nodes: detail?.top5_nodes,
-    regional_candidates: detail?.regional_candidates,
-  };
 
   return (
     <section className={`rounded-2xl border p-3 ${surface}`}>
@@ -928,13 +918,10 @@ function ResearchLocalizationPanel({ result, dk }) {
         <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${dk ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>NOT CLINICALLY VALIDATED</span>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="h-[360px] min-h-[300px] overflow-hidden rounded-xl border border-sky-500/20 bg-slate-950/10">
-          <HeartModel3D result={visualResult} />
-        </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
         <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
           <div className="flex justify-center rounded-lg border border-slate-200/60 bg-white/40 py-1 dark:border-white/[0.05] dark:bg-white/[0.02]">
-            <AHABullsEye activeSegment={supported ? (display.aha_segment || detail?.region?.segment || 0) : 0} aha={detail?.region} />
+            <AHABullsEye activeSegment={supported ? (display.aha_segment || detail?.region?.segment || region?.segment || 0) : 0} aha={region} />
           </div>
           {!supported ? (
             <div className={`rounded-lg border p-3 leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
@@ -952,13 +939,13 @@ function ResearchLocalizationPanel({ result, dk }) {
               <p className={`font-mono text-[9px] ${subText}`}>Model: {display.model_version || detail?.validation?.model_version || '—'} · Mesh: {display.mesh_calibration_version || '—'}</p>
               <p className={`font-mono text-[9px] ${subText}`}>Processed: {display.processing_timestamp || result.processing_timestamp || '—'}</p>
             </div>
-            <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{detail?.region?.label || display.aha_label || '—'}</p></div>
-            <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{detail?.region?.territory || display.territory || '—'}</p></div>
+            <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{region?.label || display.aha_label || '—'}</p></div>
+            <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{region?.territory || display.territory || '—'}</p></div>
             <div><span className={subText}>Activation compactness</span><p className={`font-black ${mainText}`}>{detail?.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p><p className={subText}>unitless indicator, not probability or accuracy</p></div>
             <div>
               <span className={subText}>Top regional candidates</span>
               <div className="mt-1 space-y-1">
-                {(display.regional_candidates || detail?.regional_candidates || []).slice(0, 3).map((candidate) => (
+                {(display.regional_candidates || detail?.regional_candidates || result?.regional_candidates || []).slice(0, 3).map((candidate) => (
                   <div key={`${candidate.rank}-${candidate.aha_segment}`} className={`rounded-lg border px-2 py-1.5 ${dk ? 'border-white/[0.07]' : 'border-slate-200'}`}>
                     <p className={`font-black ${mainText}`}>#{candidate.rank} AHA {candidate.aha_segment} · {candidate.label}</p>
                     <p className={subText}>{candidate.territory} · relative activation {Number(candidate.relative_activation_score || 0).toFixed(3)} · not probability</p>
@@ -967,7 +954,7 @@ function ResearchLocalizationPanel({ result, dk }) {
               </div>
             </div>
             <div><span className={subText}>Input mapping</span><p className={`font-mono text-[9px] ${mainText}`}>{detail?.input_mapping?.version || display.mapping_version || '—'}</p></div>
-            <div><span className={subText}>Validation</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>clinical_12_lead_validated: false</p></div>
+            <div><span className={subText}>Validation</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail?.validation?.clinical_12_lead_validated === true ? 'validated by manifest' : 'clinical_12_lead_validated: false'}</p></div>
             <div><span className={subText}>3D uncertainty</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail?.uncertainty?.calibration_status === 'pending' ? 'not available — calibration pending' : `${detail?.uncertainty?.uncertainty_radius_mm ?? 'not available'} mm`}</p><p className={subText}>coverage target: {detail?.uncertainty?.coverage_target ?? '—'}</p></div>
             <p className={`border-t pt-2 leading-relaxed ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-200 text-slate-500'}`}>ตำแหน่งนี้เป็น regional research estimate ไม่ใช่จุดโรคที่ยืนยันแล้ว</p>
             </>
@@ -1015,6 +1002,94 @@ function QualityEvidence({ q, dk }) {
   );
 }
 
+function EcgVisualizerPanel({ result, loading, imageUrl, processedImageUrl, activeTab, setActiveTab, screeningSummary, dk }) {
+  const display = result?.localization_display || {};
+  const detail = result?.research_localization || {};
+  const legacySource = result?.source;
+  const supported = (detail.supported === true && display.status === 'measured')
+    || Boolean(legacySource && result.localization_supported !== false);
+  const region = detail.region || result?.region || {};
+  const coords = display.web_mesh_point_norm || display.point_norm || detail.source?.norm || legacySource?.norm || null;
+  const visualResult = {
+    localization_coords: coords,
+    localization_supported: supported,
+    localization_note: detail.reason || display.reason || result?.localization_note || 'รอผลวิเคราะห์ ECG',
+    confidence_type: detail.confidence_type || result?.confidence_type,
+    ai_confidence: detail.confidence ?? result?.confidence,
+    validation: detail.validation || result?.validation || { clinical_12_lead_validated: false },
+    uncertainty: detail.uncertainty || result?.uncertainty,
+    localization_display: display,
+    aha: region,
+    activation_map: detail.activation_map || result?.activation_map || Array(75).fill(0.5),
+    top5_nodes: detail.top5_nodes || result?.top5_nodes || [],
+    regional_candidates: display.regional_candidates || detail.regional_candidates || result?.regional_candidates || [],
+    localization_normal_gated: result?.localization_normal_gated,
+  };
+  const image = processedImageUrl || imageUrl;
+  const title = screeningSummary?.title_th
+    || (result?.ground_truth_label ? String(result.ground_truth_label) : null)
+    || 'รอผลการวิเคราะห์ ECG';
+  const reason = detail.reason || display.reason || result?.localization_note || 'ยังไม่มีหลักฐานเพียงพอสำหรับการปัก marker';
+
+  return (
+    <section className={`clinical-panel overflow-hidden ${dk ? 'bg-[#0b1220] border-white/[0.07]' : 'bg-white border-slate-200'}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 ${dk ? 'border-white/[0.07]' : 'border-slate-100'}`}>
+        <div>
+          <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>Unified ECG workspace</p>
+          <h2 className={`mt-1 text-sm font-black ${dk ? 'text-white' : 'text-slate-900'}`}>หัวใจ 3D และผลคัดกรองเบื้องต้น</h2>
+        </div>
+        <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${supported ? 'border-sky-500/30 bg-sky-500/10 text-sky-500' : 'border-amber-500/30 bg-amber-500/10 text-amber-600'}`}>
+          {supported ? 'REGIONAL RESEARCH ESTIMATE' : 'รอหลักฐานสำหรับ MARKER'}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+        <div className="flex rounded-lg bg-slate-100 p-0.5 dark:bg-white/5">
+          <button type="button" onClick={() => setActiveTab('3d')} className={`rounded-md px-3 py-1.5 text-[10px] font-bold ${activeTab === '3d' ? 'bg-white text-sky-600 shadow-sm dark:bg-slate-800' : 'text-slate-500'}`}>หัวใจ 3D</button>
+          {image && <button type="button" onClick={() => setActiveTab('image')} className={`rounded-md px-3 py-1.5 text-[10px] font-bold ${activeTab === 'image' ? 'bg-white text-sky-600 shadow-sm dark:bg-slate-800' : 'text-slate-500'}`}>ภาพ ECG</button>}
+        </div>
+        {supported && <span className={`text-[10px] font-bold ${dk ? 'text-sky-300' : 'text-sky-700'}`}>{region.label || display.aha_label || 'AHA region'} · {region.territory || display.territory || '—'}</span>}
+      </div>
+      <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="relative h-[420px] min-h-[340px] overflow-hidden rounded-xl border border-sky-500/20 bg-slate-950/10">
+          {activeTab === 'image' && image ? (
+            <img src={image} alt="ECG source" className="h-full w-full object-contain bg-white" />
+          ) : (
+            <HeartModel3D result={visualResult} />
+          )}
+          {loading && <div className="absolute inset-x-4 bottom-4 rounded-lg border border-sky-400/30 bg-slate-950/80 px-3 py-2 text-center text-[10px] font-bold text-sky-200">กำลังประมวลผล ECG และประเมินตำแหน่งระดับภูมิภาค…</div>}
+        </div>
+        <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
+          <div>
+            <p className={`font-bold uppercase tracking-wider ${dk ? 'text-slate-500' : 'text-slate-400'}`}>ผลคัดกรองทันที</p>
+            <p className={`mt-1 text-base font-black ${dk ? 'text-white' : 'text-slate-900'}`}>{title}</p>
+            {result && <span className="mt-1 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-800">รอแพทย์ตรวจยืนยัน</span>}
+          </div>
+          {supported ? (
+            <div className={`rounded-lg border p-2 ${dk ? 'border-sky-500/20 bg-sky-500/[0.06]' : 'border-sky-200 bg-sky-50'}`}>
+              <p className={`font-black ${dk ? 'text-sky-200' : 'text-sky-800'}`}>Marker พร้อมใช้งาน</p>
+              <p className={dk ? 'text-slate-300' : 'text-slate-600'}>AHA {display.aha_segment || region.segment || '—'} · {region.territory || display.territory || '—'}</p>
+              <p className="mt-1 text-[9px] opacity-70">เป็น regional electrical activity estimate ไม่ใช่จุดโรคที่ยืนยันแล้ว</p>
+            </div>
+          ) : (
+            <div className={`rounded-lg border p-2 leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+              <p className="font-black">แสดงหัวใจโดยยังไม่ปัก marker</p>
+              <p className="mt-1">{reason}</p>
+            </div>
+          )}
+          <div className={`rounded-lg border p-2 ${dk ? 'border-white/[0.07]' : 'border-slate-200 bg-white'}`}>
+            <p className={dk ? 'text-slate-400' : 'text-slate-500'}>สถานะ</p>
+            <p className={`font-black ${dk ? 'text-slate-200' : 'text-slate-700'}`}>{result?.pipeline?.status || (loading ? 'processing' : 'ready')}</p>
+            {screeningSummary?.recommended_action_th && <p className="mt-1 text-[9px]">คำแนะนำ: {screeningSummary.recommended_action_th}</p>}
+          </div>
+          <div className={`flex justify-center rounded-lg border py-1 ${dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+            <AHABullsEye activeSegment={supported ? (display.aha_segment || region.segment || 0) : 0} aha={region} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function ClinicalEcgAnalyzer() {
   const { isDarkMode: dk } = useTheme();
   const { selectedPatient } = usePatient();
@@ -1025,7 +1100,10 @@ export default function ClinicalEcgAnalyzer() {
   const [uploadedFiles, setUploadedFiles] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [samples, setSamples] = useState(DEFAULT_SAMPLES);
+  const [researchSamples, setResearchSamples] = useState([]);
+  const [sampleSource, setSampleSource] = useState('clinical');
   const [sampleId, setSampleId] = useState('');
+  const [researchSampleId, setResearchSampleId] = useState('');
   const [result, setResult] = useState(null);
   const [ocrOnly, setOcrOnly] = useState(false);
   const demoMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === '1';
@@ -1039,6 +1117,10 @@ export default function ClinicalEcgAnalyzer() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [highlightedLead, setHighlightedLead] = useState(null);
   const [sampleDropdownOpen, setSampleDropdownOpen] = useState(false);
+  const [activeVisualizerTab, setActiveVisualizerTab] = useState('3d');
+  const [referralDestination, setReferralDestination] = useState('โรงพยาบาลแม่ข่าย / แผนกหัวใจ');
+  const [clinicianNote, setClinicianNote] = useState('');
+  const [referralLoading, setReferralLoading] = useState(false);
   const inputRef = useRef(null);
   const resultRef = useRef(null);
   const sampleDropdownRef = useRef(null);
@@ -1066,14 +1148,6 @@ export default function ClinicalEcgAnalyzer() {
   }, [sampleDropdownOpen]);
 
   useEffect(() => {
-    if (result && resultRef.current) {
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
-    }
-  }, [result]);
-
-  useEffect(() => {
     modelApi.ecgSamples()
       .then((d) => {
         if (d?.samples && d.samples.length > 0) {
@@ -1083,6 +1157,11 @@ export default function ClinicalEcgAnalyzer() {
       .catch(() => {});
     modelApi.ecgFormats()
       .then(setFormatInfo)
+      .catch(() => {});
+    modelApi.samples()
+      .then((payload) => {
+        if (payload?.samples?.length) setResearchSamples(payload.samples);
+      })
       .catch(() => {});
   }, []);
 
@@ -1110,7 +1189,7 @@ export default function ClinicalEcgAnalyzer() {
     // React state updates are asynchronous; this ref closes the small window
     // where two rapid clicks could otherwise start duplicate uploads.
     if (analyzeInFlightRef.current || loading) return;
-    if (!uploadedFiles && !sampleId) { setError('เลือกตัวอย่างจริง หรืออัปโหลดไฟล์ก่อน'); return; }
+    if (!uploadedFiles && !sampleId && !researchSampleId) { setError('เลือกตัวอย่าง หรืออัปโหลดไฟล์ก่อน'); return; }
     analyzeInFlightRef.current = true;
     const controller = new AbortController();
     analysisAbortRef.current = controller;
@@ -1122,7 +1201,9 @@ export default function ClinicalEcgAnalyzer() {
           signal: controller.signal,
           localizationMode: hasImageUpload ? 'auto' : 'disabled',
         })
-        : await modelApi.analyzeEcgSample(sampleId, { signal: controller.signal }));
+        : sampleSource === 'research'
+          ? await modelApi.analyzeSample(researchSampleId, { signal: controller.signal })
+          : await modelApi.analyzeEcgSample(sampleId, { signal: controller.signal }));
     } catch (e) {
       setError(e.message || 'วิเคราะห์ไม่สำเร็จ');
     } finally {
@@ -1142,6 +1223,10 @@ export default function ClinicalEcgAnalyzer() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const downloadPdf = async () => {
     if (pdfInFlightRef.current || pdfLoading) return;
+    if (sampleSource === 'research') {
+      showToast('ตัวอย่าง 3D Research ไม่มี clinical report PDF ให้ดาวน์โหลด', 'warning');
+      return;
+    }
     pdfInFlightRef.current = true;
     setPdfLoading(true);
     try {
@@ -1165,6 +1250,7 @@ export default function ClinicalEcgAnalyzer() {
 
   const [saving, setSaving] = useState(false);
   const [savedReport, setSavedReport] = useState(null);
+  const canWriteClinicalRecord = Boolean(uploadedFiles?.length && selectedPatient?.id && result);
   const saveToRecord = async () => {
     if (saveInFlightRef.current || saving || savedReport?.report_id) return;
     if (!result) {
@@ -1173,6 +1259,10 @@ export default function ClinicalEcgAnalyzer() {
     }
     if (!selectedPatient?.id) {
       showToast('เลือกผู้ป่วยก่อน (จากหน้า Patients) เพื่อบันทึกเข้าเวชระเบียน', 'warning');
+      return;
+    }
+    if (!uploadedFiles?.length) {
+      showToast('ตัวอย่างสาธิต/ข้อมูลสาธารณะไม่ถูกบันทึกเป็นเวชระเบียน ให้ใช้อัปโหลด ECG จริงก่อน', 'warning');
       return;
     }
     saveInFlightRef.current = true;
@@ -1184,6 +1274,8 @@ export default function ClinicalEcgAnalyzer() {
       const res = await modelApi.saveEcgReport({
         patient_id: selectedPatient.id,
         result,
+        notes: clinicianNote,
+        referral_destination: referralDestination,
         source_name: uploadedFiles 
           ? (uploadedFiles.length === 1 ? uploadedFiles[0].name : uploadedFiles.map(f => f.name).join(', ')) 
           : sampleId,
@@ -1214,6 +1306,39 @@ export default function ClinicalEcgAnalyzer() {
       setNavigationLocked(false);
       saveInFlightRef.current = false;
       saveAbortRef.current = null;
+    }
+  };
+
+  const downloadReferralLetter = async () => {
+    if (!result || !canWriteClinicalRecord) {
+      showToast('ใบส่งตัวใช้ได้กับผลจากไฟล์ ECG ที่อัปโหลดและผ่านการวิเคราะห์แล้ว', 'warning');
+      return;
+    }
+    setReferralLoading(true);
+    try {
+      const blob = await modelApi.ecgReferralLetterBlob({
+        result,
+        files: uploadedFiles,
+        patient: selectedPatient,
+        clinicianNote,
+        referralDestination,
+        locale,
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = locale.startsWith('th')
+        ? `ใบส่งตัว_${selectedPatient?.name || 'ECG'}.pdf`
+        : `Referral_${selectedPatient?.name || 'ECG'}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      showToast('ดาวน์โหลดใบส่งตัวสำเร็จ', 'success');
+    } catch (e) {
+      showToast(`สร้างใบส่งตัวไม่สำเร็จ: ${e.message}`, 'error');
+    } finally {
+      setReferralLoading(false);
     }
   };
 
@@ -1369,7 +1494,9 @@ export default function ClinicalEcgAnalyzer() {
     ['Processed', result ? 'current analysis session' : '—'],
     ['Reviewer', result?.review?.reviewed_by || 'clinician sign-off required'],
   ];
-  const activeWorkflowStep = savedReport?.report_id ? 6 : result ? 5 : loading ? 3 : (uploadedFiles || sampleId ? 1 : 0);
+  const activeWorkflowStep = savedReport?.report_id ? 6 : result ? 5 : loading ? 3 : (uploadedFiles || sampleId || researchSampleId ? 1 : 0);
+  const processedImageUrl = digitizationOverlay?.processed_image || '';
+  const selectedResearchSample = researchSamples.find((item) => item.id === researchSampleId);
 
   return (
     <div className="flex flex-col gap-5">
@@ -1389,7 +1516,8 @@ export default function ClinicalEcgAnalyzer() {
           </div>
         </div>
       )}
-      {/* Input */}
+      {/* Unified input + visualizer workspace */}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
       <div className={`clinical-panel p-4 ${surface}`}>
         <ClinicalSectionHeader
           eyebrow="ECG REVIEW · STEP 1"
@@ -1403,6 +1531,34 @@ export default function ClinicalEcgAnalyzer() {
           </ClinicalWarning>
         )}
 
+        <div className={`mb-3 grid grid-cols-3 gap-1 rounded-lg border p-1 ${dk ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+          {[
+            ['clinical', 'PTB-XL'],
+            ['research', '3D Research'],
+            ['upload', 'อัปโหลด'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setSampleSource(value);
+                setResult(null);
+                setError('');
+                setSavedReport(null);
+                if (value === 'upload') {
+                  setSampleId('');
+                  setResearchSampleId('');
+                } else {
+                  setUploadedFiles(null);
+                  setLayoutOverride('');
+                  setHighlightedLead(null);
+                }
+              }}
+              className={`rounded-md px-2 py-1.5 text-[9px] font-black transition ${sampleSource === value ? 'bg-sky-600 text-white shadow-sm' : dk ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-white'}`}
+            >{label}</button>
+          ))}
+        </div>
+
         <div className={`group relative mb-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold ${dk ? 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
           <Info size={11} />
           Clinician CDS claim
@@ -1411,7 +1567,7 @@ export default function ClinicalEcgAnalyzer() {
           </div>
         </div>
 
-        {samples.length > 0 && (
+        {sampleSource === 'clinical' && samples.length > 0 && (
           <>
             <label className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${secLabel}`}>
               <Database size={11} /> ตัวอย่างจริง PTB-XL (มี label ยืนยัน)
@@ -1466,6 +1622,26 @@ export default function ClinicalEcgAnalyzer() {
           </>
         )}
 
+        {sampleSource === 'research' && (
+          <div className={`mb-3 rounded-xl border p-3 ${dk ? 'border-amber-500/25 bg-amber-500/[0.06]' : 'border-amber-200 bg-amber-50'}`}>
+            <label className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-amber-200' : 'text-amber-800'}`}>
+              <Database size={11} /> ตัวอย่างจำลองสำหรับโมเดล 3D
+            </label>
+            <select
+              value={researchSampleId}
+              onChange={(e) => { setResearchSampleId(e.target.value); setResult(null); setSavedReport(null); setError(''); }}
+              className={`mt-2 w-full rounded-lg border px-3 py-2 text-xs ${dk ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-amber-200 bg-white text-slate-700'}`}
+            >
+              <option value="">— เลือกตัวอย่างจำลอง 3D —</option>
+              {researchSamples.map((sample) => <option key={sample.id} value={sample.id}>{sample.name || sample.primary_label || sample.id}</option>)}
+            </select>
+            <p className={`mt-2 text-[9px] leading-relaxed ${dk ? 'text-amber-200/80' : 'text-amber-800/80'}`}>
+              RESEARCH / SYNTHETIC · ใช้ดู marker และ ground truth เท่านั้น ไม่ใช่ข้อมูลผู้ป่วยจริง
+            </p>
+            {selectedResearchSample?.ground_truth_label && <p className="mt-1 text-[9px]">Label: {selectedResearchSample.ground_truth_label}</p>}
+          </div>
+        )}
+
         <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2.5 text-xs cursor-pointer mb-3 ${dk ? 'border-white/[0.12] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:bg-slate-50'}`}>
           <Upload size={14} />
           <span className="truncate">
@@ -1476,6 +1652,7 @@ export default function ClinicalEcgAnalyzer() {
           <input ref={inputRef} type="file" multiple disabled={loading} accept=".npy,.csv,.xlsx,.xls,.xml,.hea,.dat,.dcm,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.heic,.heif,.pdf,image/*,application/pdf" className="hidden"
             onChange={(e) => { 
               const list = Array.from(e.target.files || []); 
+              if (list.length > 0) setSampleSource('upload');
               setUploadedFiles(list.length > 0 ? list : null); 
               setSampleId(''); 
               setLayoutOverride('');
@@ -1547,6 +1724,18 @@ export default function ClinicalEcgAnalyzer() {
         </button>
         {hasImageUpload && <ScanPipelineStatus loading={loading} scanStatus={scanStatus} dk={dk} />}
         {error && <p className="mt-2 text-[11px] text-rose-500">{error}</p>}
+      </div>
+
+      <EcgVisualizerPanel
+        result={result}
+        loading={loading}
+        imageUrl={imagePreviewUrl}
+        processedImageUrl={processedImageUrl}
+        activeTab={activeVisualizerTab}
+        setActiveTab={setActiveVisualizerTab}
+        screeningSummary={screeningSummary}
+        dk={dk}
+      />
       </div>
 
       {(imagePreviewUrl || digitizationOverlay?.processed_image) && (
@@ -1684,7 +1873,8 @@ export default function ClinicalEcgAnalyzer() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={saveToRecord}
-                        disabled={saving || Boolean(savedReport?.report_id)}
+                        disabled={saving || Boolean(savedReport?.report_id) || !canWriteClinicalRecord}
+                        title={!canWriteClinicalRecord ? 'ต้องอัปโหลด ECG และเลือกผู้ป่วยก่อนบันทึกเวชระเบียน' : undefined}
                         className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-white shadow-sm transition disabled:opacity-60 ${savedReport?.report_id ? 'bg-emerald-600' : 'bg-sky-600 hover:bg-sky-700'}`}
                       >
                         {saving ? <Loader2 size={13} className="animate-spin" /> : <Bookmark size={13} />}
@@ -1899,6 +2089,32 @@ export default function ClinicalEcgAnalyzer() {
               </div>
             </div>
           )}
+
+          <div className={`rounded-2xl border p-4 ${surface}`}>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className={`text-[10px] font-black uppercase tracking-wider ${secLabel}`}>Clinician review & referral</p>
+                <p className={`mt-1 text-[11px] ${subText}`}>กรอกข้อมูลประกอบการส่งต่อก่อนออกเอกสาร PDF</p>
+              </div>
+              <span className={`rounded-full border px-2 py-1 text-[9px] font-bold ${canWriteClinicalRecord ? 'border-emerald-500/30 text-emerald-500' : 'border-slate-300 text-slate-400'}`}>{canWriteClinicalRecord ? 'UPLOAD SOURCE' : 'DEMO / PUBLIC ONLY'}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <label className={`text-[10px] font-bold ${secLabel}`}>
+                โรงพยาบาล/แผนกปลายทาง
+                <input value={referralDestination} onChange={(e) => setReferralDestination(e.target.value)} className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs outline-none focus:border-sky-500 ${dk ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+              </label>
+              <label className={`text-[10px] font-bold ${secLabel}`}>
+                บันทึกแพทย์/เจ้าหน้าที่
+                <textarea value={clinicianNote} onChange={(e) => setClinicianNote(e.target.value)} rows={2} className={`mt-1 w-full resize-none rounded-lg border px-3 py-2 text-xs outline-none focus:border-sky-500 ${dk ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={downloadReferralLetter} disabled={referralLoading || !canWriteClinicalRecord} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+                {referralLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />} ใบส่งตัว PDF
+              </button>
+              {!canWriteClinicalRecord && <span className={`self-center text-[9px] ${subText}`}>ตัวอย่างสาธารณะ/จำลองใช้ดูผลเท่านั้น ไม่บันทึกเข้าเวชระเบียน</span>}
+            </div>
+          </div>
 
           <div className={`rounded-2xl border p-4 ${surface}`}>
             <div className="mb-3 flex items-center gap-2">

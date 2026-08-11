@@ -493,7 +493,7 @@ const PatientList = () => {
                   transition={{ duration: 0.2 }}
                   onClick={() => {
                     setSelectedPatient(p);
-                    navigate('/page/analysis');
+                    navigate('/page/clinical-ecg');
                   }}
                   className={`group cursor-pointer rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg ${priorityBorder}`}
                 >
@@ -578,7 +578,7 @@ const PatientList = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedPatient(p);
-                        navigate('/page/analysis');
+                        navigate('/page/clinical-ecg');
                       }}
                       className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-1.5 transition active:scale-95"
                     >

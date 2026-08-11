@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import { PatientProvider } from './context/PatientContext';
 import { AuthProvider } from './context/AuthContext';
@@ -14,7 +14,6 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import PatientList from './pages/PatientList';
 import LiveMonitoring from './pages/LiveMonitoring';
 import Reports from './pages/Reports';
-import Analysis from './pages/Analysis';
 import ClinicalEcg from './pages/ClinicalEcg';
 import Login from './pages/Login';
 import PatientArchives from './pages/PatientArchives';
@@ -24,6 +23,11 @@ import AIDiagnostics from './pages/AIDiagnostics';
 import Audit from './pages/Audit';
 import Showcase from './pages/Showcase';
 import ResearchLab from './pages/ResearchLab';
+
+function LegacyAnalysisRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/page/clinical-ecg${location.search}${location.hash}`} replace />;
+}
 
 function App() {
   return (
@@ -53,8 +57,8 @@ function App() {
                               <Route path="/page/ai-diagnostics" element={<AIDiagnostics />} />
                               <Route path="/page/live" element={<LiveMonitoring />} />
                               <Route path="/page/reports" element={<Reports />} />
-                              <Route path="/page/analysis" element={<Analysis />} />
                               <Route path="/page/clinical-ecg" element={<ClinicalEcg />} />
+                              <Route path="/page/analysis" element={<LegacyAnalysisRedirect />} />
                               <Route path="/page/archives" element={<PatientArchives />} />
                               <Route path="/page/help" element={<HelpManual />} />
                               <Route path="*" element={<Navigate to="/" replace />} />

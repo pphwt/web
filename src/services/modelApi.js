@@ -23,7 +23,7 @@ const parseJson = async (response) => {
 const ECG_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_UPLOAD_MAX_BYTES || 2_000_000);
 const ECG_IMAGE_UPLOAD_MAX_BYTES = Number(import.meta.env.VITE_ECG_IMAGE_UPLOAD_MAX_BYTES || 20_000_000);
 
-// Exported so every upload surface (Analysis.jsx, ClinicalEcgAnalyzer.jsx)
+// Exported so every upload surface shares the same ECG format and size rules.
 // shares one definition instead of re-declaring this regex -- previously
 // duplicated in 4 places, which is how new formats (e.g. webp) silently
 // missed some of them.
@@ -184,13 +184,48 @@ export const modelApi = {
     headers: authHeaders(),
   })),
 
-  saveEcgReport: async ({ patient_id, result, notes, source_name }, options = {}) => {
+  saveEcgReport: async ({ patient_id, result, notes, source_name, referral_destination }, options = {}) => {
     return parseJson(await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ patient_id, result, notes: notes || '', source_name: source_name || null }),
+      body: JSON.stringify({
+        patient_id,
+        result,
+        notes: notes || '',
+        source_name: source_name || null,
+        referral_destination: referral_destination || null,
+      }),
       signal: options.signal,
     }));
+  },
+
+  ecgReferralLetterBlob: async ({ result, files, file, sampleId, patient, clinicianNote, referralDestination, locale = 'th-TH' }, options = {}) => {
+    const form = new FormData();
+    form.append('patient_name', patient?.name || 'ไม่ระบุชื่อ');
+    form.append('patient_id_card', patient?.id_card || '');
+    form.append('patient_age', String(patient?.age || ''));
+    form.append('patient_gender', patient?.gender || '');
+    form.append('patient_blood_type', patient?.blood_type || '');
+    form.append('patient_allergies', patient?.allergies || '');
+    form.append('clinician_note', clinicianNote || '');
+    form.append('referral_destination', referralDestination || '');
+    form.append('locale', locale);
+    if (result) form.append('ecg_result_json', JSON.stringify(result));
+    else if (Array.isArray(files)) files.forEach((item) => form.append('files', item));
+    else if (file) form.append('file', file);
+    else form.append('sample_id', sampleId || '');
+
+    const response = await fetch(`${CLINICAL_API_BASE}/api/v1/ecg/referral-letter`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: form,
+      signal: options.signal,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || `Referral letter HTTP ${response.status}`);
+    }
+    return response.blob();
   },
 
   ecgReportBlob: async ({ file, files, sampleId, locale = 'th-TH' }) => {
