@@ -879,6 +879,15 @@ const DEFAULT_CLAIM_WORDING = 'Bioelectric ECG Image Reader digitizes photograph
 
 const WORKFLOW_STEPS = ['Input', 'Signal Quality', 'Digitization', 'Measurements', 'AI Screening', 'Clinician Review', 'Export'];
 
+const ECG_CLASS_LABELS = {
+  NORM: 'ไม่พบรูปแบบผิดปกติเด่น',
+  MI: 'ลักษณะที่อาจสัมพันธ์กับกล้ามเนื้อหัวใจขาดเลือด/ตาย',
+  STTC: 'ความเปลี่ยนแปลงของ ST/T',
+  CD: 'ความผิดปกติของการนำไฟฟ้าหัวใจ',
+  HYP: 'ลักษณะที่อาจสัมพันธ์กับหัวใจห้องโต/กล้ามเนื้อหนา',
+  AFIB: 'ลักษณะที่อาจสัมพันธ์กับหัวใจห้องบนสั่นพลิ้ว',
+};
+
 function ResearchLocalizationPanel({ result, dk }) {
   if (result?.meta?.format !== 'image') return null;
 
@@ -1319,10 +1328,11 @@ export default function ClinicalEcgAnalyzer() {
   };
   const primaryFinding = result?.findings?.primary;
   const classifierReview = result?.classification?.clinical_review;
+  const screeningSummary = result?.screening_summary;
   // Put an available model prediction first in the summary card. The
   // independently reviewed finding remains visible below and can override the
   // status when it disagrees with the model.
-  const topLabel = result?.classification?.top_label || primaryFinding?.label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
+  const topLabel = screeningSummary?.title_th || result?.classification?.top_label || primaryFinding?.label || (rhythm.label ? 'RHYTHM' : 'MEASUREMENTS');
   const topProbability = result?.classification?.top_probability;
   const confidenceBand = result?.classification?.confidence_band;
   const isPathological = primaryFinding
@@ -1345,7 +1355,7 @@ export default function ClinicalEcgAnalyzer() {
   const predictionItems = rankedPredictions.slice(0, 3).map((prediction) => {
     const score = prediction.score ?? 0;
     return {
-      label: `#${prediction.rank} ${prediction.label}`,
+      label: `#${prediction.rank} ${prediction.label} · ${ECG_CLASS_LABELS[prediction.label] || 'กลุ่มคัดกรอง'}`,
       score,
       status: prediction.label === 'NORM' ? (score > 0.5 ? 'normal' : 'unavailable') : (score > 0.35 ? 'abnormal' : 'unavailable'),
     };
@@ -1745,6 +1755,29 @@ export default function ClinicalEcgAnalyzer() {
                       {result.classification_warning && (
                         <div className={`mb-3 rounded-lg border p-2.5 text-[10px] font-semibold leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
                           {result.classification_warning}
+                        </div>
+                      )}
+                      {screeningSummary && (
+                        <div className={`mb-3 rounded-xl border p-3 ${screeningSummary.status === 'withheld'
+                          ? (dk ? 'border-amber-500/30 bg-amber-500/[0.08]' : 'border-amber-300 bg-amber-50')
+                          : screeningSummary.severity === 'normal'
+                            ? (dk ? 'border-emerald-500/25 bg-emerald-500/[0.07]' : 'border-emerald-200 bg-emerald-50')
+                            : (dk ? 'border-rose-500/25 bg-rose-500/[0.07]' : 'border-rose-200 bg-rose-50')
+                        }`}>
+                          <p className={`text-[10px] font-black uppercase tracking-wider ${secLabel}`}>ผลคัดกรองทันที</p>
+                          <p className={`mt-1 text-base font-black ${mainText}`}>{screeningSummary.title_th}</p>
+                          <span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-black ${dk ? 'border-amber-400/30 bg-amber-400/10 text-amber-200' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+                            {screeningSummary.review_label_th || 'รอแพทย์ตรวจยืนยัน'}
+                          </span>
+                          <p className={`mt-1 text-[11px] leading-relaxed ${subText}`}>{screeningSummary.summary_th}</p>
+                          <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] font-semibold ${dk ? 'border-white/[0.08] text-slate-200' : 'border-white/80 bg-white/70 text-slate-700'}`}>
+                            คำแนะนำ: {screeningSummary.recommended_action_th}
+                          </div>
+                          {screeningSummary.model_class && (
+                            <p className={`mt-2 font-mono text-[9px] ${subText}`}>
+                              Class {screeningSummary.model_class} · raw score {Number(screeningSummary.raw_model_score ?? 0).toFixed(3)} · preliminary screening, not a diagnosis
+                            </p>
+                          )}
                         </div>
                       )}
                       <div className={`mb-3 rounded-lg border p-3 ${dk ? 'border-white/[0.07] bg-slate-950/40' : 'border-slate-100 bg-slate-50'}`}>
