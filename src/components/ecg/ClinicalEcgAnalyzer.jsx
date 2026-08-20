@@ -330,9 +330,27 @@ const SCAN_STAGE_LABELS = {
   trace_extraction: 'อ่านเส้น ECG',
   calibration: 'สอบเทียบ Grid',
   signal_validation: 'ตรวจสัญญาณ',
-  measurements: 'วัดค่า',
-  classification: 'ประเมินโมเดลโรค',
-  localization: 'ตรวจสิทธิ์ 3D',
+  measurements: 'วัดค่าคลื่น',
+  classification: 'วิเคราะห์โรค',
+  localization: 'ระบุตำแหน่ง 3D',
+};
+
+const STAGE_STATUS_TEXT = {
+  complete: 'ผ่าน',
+  review: 'ตรวจทาน',
+  failed: 'ไม่ผ่าน',
+  blocked: 'ข้าม',
+  pending: 'รอดำเนินการ',
+};
+
+const CAPABILITY_LABELS = {
+  source_preview: 'ภาพต้นฉบับ',
+  overlay: 'Overlay กราฟ',
+  waveform_review: 'ดูกราฟคลื่น',
+  measurements: 'ค่าการวัด',
+  classification: 'คัดกรองโรค',
+  localization: 'พิกัด 3D',
+  regional_localization: 'โซนกล้ามเนื้อหัวใจ',
 };
 
 function ScanPipelineStatus({ loading, scanStatus, dk }) {
@@ -346,37 +364,61 @@ function ScanPipelineStatus({ loading, scanStatus, dk }) {
     { key: 'calibration', status: 'pending' },
     { key: 'signal_validation', status: 'pending' },
   ];
+
   const colorFor = (status) => ({
-    complete: dk ? 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    review: dk ? 'border-amber-500/25 bg-amber-500/[0.08] text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-700',
-    failed: dk ? 'border-rose-500/25 bg-rose-500/[0.08] text-rose-300' : 'border-rose-200 bg-rose-50 text-rose-700',
+    complete: dk ? 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    review: dk ? 'border-amber-500/30 bg-amber-500/[0.08] text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-800',
+    failed: dk ? 'border-rose-500/30 bg-rose-500/[0.08] text-rose-300' : 'border-rose-200 bg-rose-50 text-rose-800',
     blocked: dk ? 'border-white/[0.08] bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500',
-    pending: dk ? 'border-sky-500/20 bg-sky-500/[0.05] text-sky-300' : 'border-sky-200 bg-sky-50 text-sky-600',
+    pending: dk ? 'border-sky-500/20 bg-sky-500/[0.05] text-sky-300' : 'border-sky-200 bg-sky-50 text-sky-700',
   }[status] || (dk ? 'border-white/[0.08] text-slate-400' : 'border-slate-200 text-slate-500'));
 
+  const statusBadgeColor = (status) => ({
+    complete: dk ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-800',
+    review: dk ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800',
+    failed: dk ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-100 text-rose-800',
+    blocked: dk ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-200 text-slate-600',
+    pending: dk ? 'bg-sky-500/20 text-sky-300' : 'bg-sky-100 text-sky-700',
+  }[status] || (dk ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'));
+
+  const isPartial = scanStatus?.status === 'partial' || stages.some(s => s.status === 'review');
+
   return (
-    <div className={`mt-3 rounded-xl border p-3 ${dk ? 'border-white/[0.08] bg-slate-950/25' : 'border-slate-200 bg-white'}`}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className={`flex items-center gap-2 text-[11px] font-black ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
-          {loading ? <Loader2 size={13} className="animate-spin text-sky-500" /> : <CheckCircle2 size={13} className="text-emerald-500" />}
-          {loading ? 'กำลัง Scan และอ่าน ECG…' : `Scan ${scanStatus?.status || 'complete'}`}
+    <div className={`mt-3 rounded-xl border p-3.5 shadow-sm ${dk ? 'border-white/[0.08] bg-slate-950/40' : 'border-slate-200 bg-white'}`}>
+      <div className="mb-3 flex items-center justify-between gap-2 border-b pb-2.5 border-slate-100 dark:border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          {loading ? (
+            <Loader2 size={15} className="animate-spin text-sky-500" />
+          ) : isPartial ? (
+            <AlertTriangle size={15} className="text-amber-500" />
+          ) : (
+            <CheckCircle2 size={15} className="text-emerald-500" />
+          )}
+          <span className={`text-xs font-bold ${dk ? 'text-slate-200' : 'text-slate-800'}`}>
+            {loading ? 'กำลัง Scan และอ่านภาพ ECG…' : isPartial ? 'สแกนสำเร็จ (มีข้อควรตรวจทาน)' : 'สแกนและอ่านภาพสมบูรณ์'}
+          </span>
         </div>
-        <span className={`text-[9px] font-semibold ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
-          Scan ก่อน · AI เฉพาะข้อมูลที่ผ่านเกณฑ์
+        <span className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${isPartial ? (dk ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-800') : (dk ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-100 text-emerald-800')}`}>
+          {scanStatus?.status || (loading ? 'processing' : 'ready')}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
+
+      {/* Grid: 2 columns with full labels */}
+      <div className="grid grid-cols-2 gap-1.5">
         {stages.map((stage) => (
           <div
             key={stage.key}
             title={stage.reason || ''}
-            className={`rounded-lg border px-2 py-1.5 ${colorFor(stage.status)}`}
+            className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${colorFor(stage.status)}`}
           >
-            <div className="truncate text-[11px] font-black">{SCAN_STAGE_LABELS[stage.key] || stage.key}</div>
-            <div className="truncate text-[10px] font-semibold uppercase opacity-75">{stage.status}</div>
+            <span className="font-semibold">{SCAN_STAGE_LABELS[stage.key] || stage.key}</span>
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${statusBadgeColor(stage.status)}`}>
+              {STAGE_STATUS_TEXT[stage.status] || stage.status}
+            </span>
           </div>
         ))}
       </div>
+
       {scanStatus?.capabilities && (
         <div className={`mt-2 text-[9px] font-semibold ${dk ? 'text-slate-400' : 'text-slate-500'}`}>
           ใช้งานได้: {Object.entries(scanStatus.capabilities).filter(([, enabled]) => enabled).map(([name]) => name.replaceAll('_', ' ')).join(' · ') || 'source preview only'}
@@ -909,54 +951,115 @@ function ResearchLocalizationPanel({ result, dk }) {
     || 'ข้อมูล ECG ไม่ผ่าน quality, layout หรือ calibration gate';
 
   return (
-    <section className={`rounded-2xl border p-3 ${surface}`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <section className={`rounded-2xl border p-4 transition-all duration-300 ${surface}`}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 border-slate-100 dark:border-white/[0.06]">
         <div>
-          <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-sky-300' : 'text-sky-700'}`}>3D regional screening support</p>
-          <h3 className={`mt-1 text-sm font-black ${mainText}`}>Regional estimate — AHA segment / territory</h3>
+          <p className={`text-[10px] font-black uppercase tracking-wider ${dk ? 'text-sky-400' : 'text-sky-600'}`}>3D Regional Screening Support</p>
+          <h3 className={`mt-0.5 text-sm font-bold ${mainText}`}>Regional Estimate — AHA 17-Segment & Territory</h3>
         </div>
-        <span className={`rounded-full border px-2 py-1 text-[9px] font-black ${dk ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>NOT CLINICALLY VALIDATED</span>
+        <span className={`rounded-full border px-2.5 py-1 text-[9px] font-bold tracking-wide ${dk ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          NOT CLINICALLY VALIDATED
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <div className={`space-y-2 rounded-xl border p-3 text-[10px] ${dk ? 'border-white/[0.07] bg-white/[0.025]' : 'border-slate-200 bg-slate-50'}`}>
-          <div className="flex justify-center rounded-lg border border-slate-200/60 bg-white/40 py-1 dark:border-white/[0.05] dark:bg-white/[0.02]">
-            <AHABullsEye activeSegment={supported ? (display.aha_segment || detail?.region?.segment || region?.segment || 0) : 0} aha={region} />
-          </div>
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+        {/* Left column: AHA Bulls-Eye Diagram + Info */}
+        <div className={`w-full lg:w-[280px] shrink-0 rounded-xl border p-3 flex flex-col items-center justify-center ${dk ? 'border-white/[0.07] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+          <AHABullsEye activeSegment={supported ? (display.aha_segment || detail?.region?.segment || region?.segment || 0) : 0} aha={region} />
+        </div>
+
+        {/* Right column: Detailed Analysis & Estimation Metrics */}
+        <div className="flex-1 w-full min-w-0 flex flex-col gap-3">
           {!supported ? (
-            <div className={`rounded-lg border p-3 leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-              <p className="font-black">แสดงหัวใจโดยยังไม่ปัก marker</p>
-              <p className="mt-1">{unavailableReason}</p>
-              {missingLeads.length > 0 && <p className="mt-1">Missing leads: {missingLeads.join(', ')}</p>}
-              <p className="mt-2 opacity-80">ระบบจะไม่ฝืนสร้างตำแหน่งเมื่อหลักฐานไม่เพียงพอ</p>
+            <div className={`rounded-xl border p-4 leading-relaxed ${dk ? 'border-amber-500/25 bg-amber-500/[0.06] text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+              <div className="flex items-center gap-2 font-bold text-xs">
+                <AlertTriangle size={15} />
+                <span>แสดงแผนผังหัวใจโดยยังไม่ปัก Marker</span>
+              </div>
+              <p className="mt-1.5 text-xs">{unavailableReason}</p>
+              {missingLeads.length > 0 && <p className="mt-1 text-[11px] font-mono opacity-90">Missing leads: {missingLeads.join(', ')}</p>}
+              <p className="mt-2 text-[10px] opacity-75">ระบบจะไม่ฝืนสร้างตำแหน่งเมื่อหลักฐานสัญญาณไฟฟ้าไม่เพียงพอ</p>
             </div>
           ) : (
             <>
-            <div className={`rounded-lg border p-2 ${dk ? 'border-amber-500/20 bg-amber-500/[0.05]' : 'border-amber-200 bg-amber-50'}`}>
-              <p className={`font-black ${dk ? 'text-amber-200' : 'text-amber-800'}`}>Regional electrical activity estimate</p>
-              <p className={`mt-1 ${subText}`}>AHA #{display.aha_segment || detail?.region?.segment || '—'} · {display.territory || detail?.region?.territory || '—'} · not a probability</p>
-              <p className={`mt-1 font-mono text-[9px] ${subText}`}>Leads: {(display.input_leads || detail?.input_mapping?.model_input_leads || []).join(', ') || '—'}</p>
-              <p className={`font-mono text-[9px] ${subText}`}>Model: {display.model_version || detail?.validation?.model_version || '—'} · Mesh: {display.mesh_calibration_version || '—'}</p>
-              <p className={`font-mono text-[9px] ${subText}`}>Processed: {display.processing_timestamp || result.processing_timestamp || '—'}</p>
-            </div>
-            <div><span className={subText}>AHA segment</span><p className={`font-black ${mainText}`}>{region?.label || display.aha_label || '—'}</p></div>
-            <div><span className={subText}>Territory</span><p className={`font-black ${mainText}`}>{region?.territory || display.territory || '—'}</p></div>
-            <div><span className={subText}>Activation compactness</span><p className={`font-black ${mainText}`}>{detail?.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p><p className={subText}>unitless indicator, not probability or accuracy</p></div>
-            <div>
-              <span className={subText}>Top regional candidates</span>
-              <div className="mt-1 space-y-1">
-                {(display.regional_candidates || detail?.regional_candidates || result?.regional_candidates || []).slice(0, 3).map((candidate) => (
-                  <div key={`${candidate.rank}-${candidate.aha_segment}`} className={`rounded-lg border px-2 py-1.5 ${dk ? 'border-white/[0.07]' : 'border-slate-200'}`}>
-                    <p className={`font-black ${mainText}`}>#{candidate.rank} AHA {candidate.aha_segment} · {candidate.label}</p>
-                    <p className={subText}>{candidate.territory} · relative activation {Number(candidate.relative_activation_score || 0).toFixed(3)} · not probability</p>
+              {/* Row 1: Estimate Overview & Metadata */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Card 1: Primary Estimate */}
+                <div className={`rounded-xl border p-3.5 space-y-2 ${dk ? 'border-amber-500/20 bg-amber-500/[0.04]' : 'border-amber-200 bg-amber-50/50'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${dk ? 'text-amber-300' : 'text-amber-800'}`}>
+                      Primary Regional Estimate
+                    </span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${dk ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800'}`}>
+                      AHA #{display.aha_segment || detail?.region?.segment || '—'}
+                    </span>
                   </div>
-                ))}
+                  <div>
+                    <p className={`text-xs font-bold ${mainText}`}>{region?.label || display.aha_label || '—'}</p>
+                    <p className={`text-[11px] mt-0.5 ${subText}`}>{region?.territory || display.territory || '—'} Territory (not a probability)</p>
+                  </div>
+                  <div className={`pt-2 border-t text-[10px] space-y-1 font-mono ${dk ? 'border-white/[0.06] text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+                    <div>Input Leads: <span className={mainText}>{(display.input_leads || detail?.input_mapping?.model_input_leads || []).join(', ') || '—'}</span></div>
+                    <div>Model: <span className={mainText}>{display.model_version || detail?.validation?.model_version || 'localizer-v1'}</span></div>
+                    <div>Mesh: <span className={mainText}>{display.mesh_calibration_version || 'heart-mesh-calibration-v1'}</span></div>
+                  </div>
+                </div>
+
+                {/* Card 2: 3D Uncertainty & Validation */}
+                <div className={`rounded-xl border p-3.5 space-y-2 ${dk ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+                  <span className={`text-[11px] font-bold uppercase tracking-wider ${secLabel}`}>
+                    3D Uncertainty & Gate
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <span className={`text-[10px] ${subText}`}>Activation Compactness</span>
+                      <p className={`text-xs font-bold ${mainText}`}>{detail?.confidence != null ? Number(detail.confidence).toFixed(3) : '—'}</p>
+                      <span className={`text-[9px] ${subText}`}>unitless indicator</span>
+                    </div>
+                    <div>
+                      <span className={`text-[10px] ${subText}`}>3D Uncertainty Radius</span>
+                      <p className={`text-xs font-bold ${mainText}`}>
+                        {detail?.uncertainty?.calibration_status === 'pending' ? 'Pending' : `${detail?.uncertainty?.uncertainty_radius_mm ?? '—'} mm`}
+                      </p>
+                      <span className={`text-[9px] ${subText}`}>target: {detail?.uncertainty?.coverage_target ?? '—'}</span>
+                    </div>
+                  </div>
+                  <div className={`pt-2 border-t text-[10px] flex items-center justify-between ${dk ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                    <span className={subText}>Validation Manifest:</span>
+                    <span className={`font-semibold ${detail?.validation?.clinical_12_lead_validated === true ? 'text-emerald-500' : 'text-amber-500'}`}>
+                      {detail?.validation?.clinical_12_lead_validated === true ? '✓ Validated' : 'Unvalidated (Research)'}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div><span className={subText}>Input mapping</span><p className={`font-mono text-[9px] ${mainText}`}>{detail?.input_mapping?.version || display.mapping_version || '—'}</p></div>
-            <div><span className={subText}>Validation</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail?.validation?.clinical_12_lead_validated === true ? 'validated by manifest' : 'clinical_12_lead_validated: false'}</p></div>
-            <div><span className={subText}>3D uncertainty</span><p className={`font-semibold ${dk ? 'text-amber-200' : 'text-amber-800'}`}>{detail?.uncertainty?.calibration_status === 'pending' ? 'not available — calibration pending' : `${detail?.uncertainty?.uncertainty_radius_mm ?? 'not available'} mm`}</p><p className={subText}>coverage target: {detail?.uncertainty?.coverage_target ?? '—'}</p></div>
-            <p className={`border-t pt-2 leading-relaxed ${dk ? 'border-white/[0.07] text-slate-400' : 'border-slate-200 text-slate-500'}`}>ตำแหน่งนี้เป็น regional research estimate ไม่ใช่จุดโรคที่ยืนยันแล้ว</p>
+
+              {/* Row 2: Top Regional Candidates */}
+              <div className={`rounded-xl border p-3.5 ${dk ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+                <span className={`text-[11px] font-bold uppercase tracking-wider ${secLabel}`}>
+                  Top Regional Candidates (โซนทางเลือกที่มีคะแนนใกล้เคียง)
+                </span>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {(display.regional_candidates || detail?.regional_candidates || result?.regional_candidates || []).slice(0, 3).map((candidate) => (
+                    <div key={`${candidate.rank}-${candidate.aha_segment}`} className={`rounded-lg border p-2.5 ${dk ? 'border-white/[0.07] bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${mainText}`}>#{candidate.rank} AHA {candidate.aha_segment}</span>
+                        <span className={`text-[10px] font-mono ${subText}`}>{candidate.territory}</span>
+                      </div>
+                      <p className={`text-[11px] font-medium mt-1 truncate ${mainText}`}>{candidate.label}</p>
+                      <div className="mt-2 flex items-center justify-between text-[9px]">
+                        <span className={subText}>Activation Score:</span>
+                        <span className="font-mono font-bold text-sky-500">{Number(candidate.relative_activation_score || 0).toFixed(3)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Disclaimer */}
+              <div className={`rounded-lg border px-3 py-2 text-[10px] flex items-center gap-2 ${dk ? 'border-white/[0.06] bg-white/[0.01] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                <Info size={13} className="shrink-0 text-sky-500" />
+                <span>ตำแหน่งนี้เป็น Regional Research Estimate เพื่อสนับสนุนการคัดกรองเบื้องต้น ไม่ใช่คำยืนยันการวินิจฉัยโรคสุดท้าย</span>
+              </div>
             </>
           )}
         </div>
