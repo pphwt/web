@@ -942,6 +942,8 @@ function ResearchLocalizationPanel({ result, dk }) {
   const surface = dk ? 'bg-[#0d1525] border-white/[0.06]' : 'bg-white border-slate-200';
   const mainText = dk ? 'text-white' : 'text-slate-900';
   const subText = dk ? 'text-slate-400' : 'text-slate-500';
+  const secLabel = dk ? 'text-slate-400' : 'text-slate-500';
+
   const missingLeads = detail?.input_mapping?.missing_clinical_leads
     || detail?.input_mapping?.missing_model_input_leads
     || [];
