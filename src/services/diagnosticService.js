@@ -1,8 +1,10 @@
 /**
- * DiagnosticService
+ * ReferralSupportService
  * Handles communication with the backend for capturing snapshots and retrieving history.
  */
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+import { API_BASE } from '../utils/constants';
+
+const API_URL = API_BASE;
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('bio_token');
@@ -14,14 +16,15 @@ const getAuthHeaders = () => {
 
 export const diagnosticService = {
   /**
-   * Capture current diagnostic state
+   * Capture current decision-support state
    */
-  async captureSnapshot(data) {
+  async captureSnapshot(data, options = {}) {
     try {
-      const response = await fetch(`${API_URL}/reports/capture/`, {
+      const response = await fetch(`${API_URL}/reports/capture`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
+        signal: options.signal,
       });
       
       const result = await response.json();
@@ -40,7 +43,7 @@ export const diagnosticService = {
    */
   async getHistory(patientId) {
     try {
-      const response = await fetch(`${API_URL}/reports/history/${patientId}/`, {
+      const response = await fetch(`${API_URL}/reports/history/${patientId}`, {
         headers: getAuthHeaders()
       });
       const result = await response.json();
@@ -57,9 +60,10 @@ export const diagnosticService = {
   /**
    * Download a report as PDF
    */
-  async downloadReportPDF(reportId) {
+  async downloadReportPDF(reportId, locale = 'th-TH') {
     try {
-      const response = await fetch(`${API_URL}/reports/export/${reportId}/`, {
+      const params = new URLSearchParams({ locale });
+      const response = await fetch(`${API_URL}/reports/export/${reportId}?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('bio_token')}`
         }
@@ -71,13 +75,33 @@ export const diagnosticService = {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Diagnostic_Report_${reportId.substring(0, 8)}.pdf`;
+      a.download = locale.startsWith('th')
+        ? `รายงานส่งต่อ_${reportId.substring(0, 8)}.pdf`
+        : `Referral_Support_Report_${reportId.substring(0, 8)}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
       console.error('Failed to download PDF:', error);
+      throw error;
+    }
+  },
+
+  async reviewReport(reportId, payload) {
+    try {
+      const response = await fetch(`${API_URL}/reports/${reportId}/review`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.detail || 'Failed to review report');
+      }
+      return result;
+    } catch (error) {
+      console.error('Failed to review report:', error);
       throw error;
     }
   }

@@ -9,9 +9,6 @@ RUN npm install
 
 # Copy source and build
 COPY . .
-# Note: VITE_API_URL should be passed as a build argument or env variable
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: Serve the application with Nginx

@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { modelApi } from '../services/modelApi';
+import { API_BASE } from '../utils/constants';
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ const AIDiagnostics = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/monitoring/stats`, {
+        const res = await fetch(`${API_BASE}/monitoring/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -97,8 +98,8 @@ const AIDiagnostics = () => {
   const subText  = dk ? 'text-slate-400'                    : 'text-slate-500';
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
-      <div className="max-w-[1800px] mx-auto flex flex-col gap-5">
+    <div className="min-h-full bg-[var(--bg-main)] px-2 py-3 text-[var(--text-main)] transition-colors duration-300 sm:px-4 lg:px-6">
+      <div className="clinical-page flex flex-col gap-4 lg:gap-5">
 
         {/* ── Header ───────────────────────────────────────────── */}
         <header className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border p-4 ${surface}`}>
@@ -117,13 +118,13 @@ const AIDiagnostics = () => {
           <div className="flex items-center gap-2">
             <div className={`rounded-xl border px-3 py-1.5 text-center ${
               dk ? 'bg-emerald-500/[0.08] border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
-            }`} title="EP-PINN transmembrane-potential reconstruction R² on synthetic data">
+            }`} title="EP-PINN transmembrane-potential reconstruction R² on synthetic data for research decision support">
               <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-emerald-400/70' : 'text-emerald-700/70'}`}>EP-PINN Recon. R²</p>
               <p className={`text-sm font-bold ${dk ? 'text-emerald-400' : 'text-emerald-700'}`}>{metrics?.ep_pinn?.recon_r2 ?? '—'}</p>
             </div>
             <div className={`rounded-xl border px-3 py-1.5 text-center ${
               dk ? 'bg-amber-500/[0.08] border-amber-500/20' : 'bg-amber-50 border-amber-200'
-            }`} title="CardiacLocalizer 3D source localization — mean error on the held-out test set">
+            }`} title="CardiacLocalizer 3D source localization — held-out test mean error for prototype screening support">
               <p className={`text-[9px] font-semibold uppercase tracking-wider ${dk ? 'text-amber-400/70' : 'text-amber-700/70'}`}>3D Loc. Error</p>
               <p className={`text-sm font-bold ${dk ? 'text-amber-400' : 'text-amber-700'}`}>{metrics ? `${metrics.localizer.mean_error_mm} mm` : '—'}</p>
             </div>
@@ -195,7 +196,7 @@ const AIDiagnostics = () => {
                 )}
               </div>
 
-              <div className={`px-4 pt-4 text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-amber-400' : 'text-amber-600'}`}>CardiacLocalizer — 3D source localization</div>
+              <div className={`px-4 pt-4 text-[10px] font-bold uppercase tracking-wider ${dk ? 'text-amber-400' : 'text-amber-600'}`}>CardiacLocalizer — 3D source localization for triage</div>
               <div className={`grid grid-cols-3 gap-3 p-4`}>
                 <MetricBadge dk={dk} label="Mean Error" value={metrics ? `${metrics.localizer.mean_error_mm} mm` : '—'}
                   color={dk ? 'text-amber-400' : 'text-amber-600'} />
@@ -217,7 +218,7 @@ const AIDiagnostics = () => {
 
               <p className={`px-4 pb-4 text-[10px] leading-relaxed ${subText}`}>
                 {metrics?.disclaimer ??
-                  'Research prototype - held-out localization mean error 10.6 mm, Top-3 node accuracy 84.0%, not a validated diagnostic.'}
+                  'Research prototype for screening and referral decision support only. Held-out localization mean error 10.6 mm and Top-3 node accuracy 84.0% must be interpreted by clinicians; this is not a final diagnosis.'}
               </p>
             </div>
 

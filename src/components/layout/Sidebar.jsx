@@ -3,34 +3,31 @@ import { NavLink } from 'react-router-dom';
 import {
   Activity, FileText, LogOut, Users, Archive,
   FlaskConical, Sun, Moon, Database, ShieldCheck, HelpCircle,
-  X, ChevronUp, HeartPulse,
+  X, ChevronUp, HeartPulse, Type, Minus, Plus, RotateCcw,
+  BookOpen,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAccessibility } from '../../context/AccessibilityContext';
+import { useNavigationLock } from '../../context/NavigationLockContext';
 
-const buildSections = (t) => [
+const buildSections = (t, language, role) => [
   {
     label: 'หลัก',
     items: [
       { icon: Users,      label: t('nav_patients'),  path: '/page/overview' },
-      { icon: HeartPulse, label: t('nav_analysis'),  path: '/page/analysis' },
+      { icon: ShieldCheck, label: language === 'th' ? 'หลักฐาน AI' : 'AI Evidence', path: '/page/ai-diagnostics' },
+      ...(['doctor', 'admin'].includes(role) ? [{ icon: ShieldCheck, label: language === 'th' ? 'Audit และความปลอดภัย' : 'Audit & Security', path: '/page/audit' }] : []),
+      { icon: HeartPulse, label: language === 'th' ? 'วิเคราะห์ ECG และหัวใจ 3D' : 'ECG Analysis & 3D Heart', path: '/page/clinical-ecg' },
       { icon: Activity,   label: t('nav_monitoring'), path: '/page/live' },
-    ],
-  },
-  {
-    label: 'วินิจฉัย',
-    items: [
-      { icon: Database,    label: t('sandbox_title'),     path: '/page/sandbox' },
-      { icon: ShieldCheck, label: t('ai_diag_title'),      path: '/page/ai-diagnostics' },
     ],
   },
   {
     label: 'ข้อมูล',
     items: [
       { icon: Archive,      label: t('nav_archives'), path: '/page/archives' },
-      { icon: FlaskConical, label: t('nav_lab'),      path: '/page/lab' },
       { icon: FileText,     label: t('nav_reports'),  path: '/page/reports' },
     ],
   },
@@ -46,10 +43,21 @@ export const Sidebar = ({ onClose }) => {
   const { user, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const { isLocked } = useNavigationLock();
+  const {
+    fontScale,
+    fontPercent,
+    minScale,
+    maxScale,
+    setFontScale,
+    increaseFont,
+    decreaseFont,
+    resetFont,
+  } = useAccessibility();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const sections = buildSections(t);
+  const sections = buildSections(t, language, user?.role);
   const dk = isDarkMode;
 
   // Close dropdown on outside click
@@ -63,7 +71,13 @@ export const Sidebar = ({ onClose }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleNavClick = () => { if (onClose) onClose(); };
+  const handleNavClick = (event) => {
+    if (isLocked) {
+      event?.preventDefault();
+      return;
+    }
+    if (onClose) onClose();
+  };
 
   // ── tokens ────────────────────────────────────────────────────
   const sidebar  = dk ? 'bg-[#080e1a] border-white/[0.06]' : 'bg-white border-slate-200';
@@ -75,7 +89,7 @@ export const Sidebar = ({ onClose }) => {
     ? 'bg-sky-500/15 border-sky-500/20 text-sky-400'
     : 'bg-sky-50 border-sky-200 text-sky-600';
 
-  const navBase     = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 text-sm';
+  const navBase     = 'clinical-focus w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-150 text-sm';
   const navActive   = dk
     ? `${navBase} bg-sky-500/[0.12] text-sky-300 font-semibold`
     : `${navBase} bg-sky-50 text-sky-700 font-semibold`;
@@ -127,7 +141,7 @@ export const Sidebar = ({ onClose }) => {
       <nav className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-3 space-y-4">
         {sections.map(({ label, items }) => (
           <div key={label}>
-            <p className={`mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] ${secLabel}`}>
+            <p className={`mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] ${secLabel}`}>
               {label}
             </p>
             <div className="space-y-0.5">
@@ -136,7 +150,9 @@ export const Sidebar = ({ onClose }) => {
                   key={item.path}
                   to={item.path}
                   onClick={handleNavClick}
-                  className={({ isActive }) => isActive ? navActive : navInactive}
+                  aria-disabled={isLocked}
+                  tabIndex={isLocked ? -1 : 0}
+                  className={({ isActive }) => `${isActive ? navActive : navInactive} ${isLocked ? 'pointer-events-none opacity-50' : ''}`}
                 >
                   {({ isActive }) => (
                     <>
@@ -156,6 +172,21 @@ export const Sidebar = ({ onClose }) => {
           </div>
         ))}
       </nav>
+
+      {/* ── Footer: system documentation link ───────────────── */}
+      <div className={`px-3 pb-1 border-t ${divider} pt-2`}>
+        <a
+          href="/docs/system-explainer.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] transition-colors ${
+            dk ? 'text-slate-500 hover:text-sky-400 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-sky-600 hover:bg-slate-50'
+          }`}
+        >
+          <BookOpen size={13} className="opacity-70 shrink-0" />
+          <span className="truncate">เอกสารระบบ (System Docs)</span>
+        </a>
+      </div>
 
       {/* ── User card + dropdown ─────────────────────────────── */}
       <div className={`px-3 pt-3 pb-4 border-t ${divider}`} ref={menuRef}>
@@ -182,6 +213,57 @@ export const Sidebar = ({ onClose }) => {
                       {label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className={`my-1 h-px ${divider}`} />
+
+              <div className="px-1 py-1.5">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className={`flex items-center gap-1.5 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${secLabel}`}>
+                    <Type size={12} /> Text Size
+                  </p>
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                    dk ? 'bg-white/[0.05] text-slate-300' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {fontPercent}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={decreaseFont}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${dropdownItem.replace('w-full px-3 py-2.5 text-sm', '')}`}
+                    title="Decrease text size"
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <input
+                    type="range"
+                    min={minScale}
+                    max={maxScale}
+                    step="0.05"
+                    value={fontScale}
+                    onChange={(event) => setFontScale(event.target.value)}
+                    className="flex-1"
+                    aria-label="Text size"
+                  />
+                  <button
+                    type="button"
+                    onClick={increaseFont}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${dropdownItem.replace('w-full px-3 py-2.5 text-sm', '')}`}
+                    title="Increase text size"
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetFont}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all ${dropdownItem.replace('w-full px-3 py-2.5 text-sm', '')}`}
+                    title="Reset text size"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
                 </div>
               </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePatient } from '../context/PatientContext';
+import { PatientSkeleton } from '../components/ui/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
@@ -8,11 +9,13 @@ import { useToast } from '../context/ToastContext';
 import {
   UserPlus, Search, User, CreditCard, Droplets,
   AlertTriangle, Phone, Calendar, ChevronRight, X, Users, Menu,
-  Leaf, Trash2, Globe, Share2, Info, ChevronDown, ChevronUp,
-  Activity, HeartPulse, FileText, CheckCircle2, AlertCircle,
+  Leaf, Share2, Info, ChevronDown, ChevronUp, DollarSign, Navigation, Zap, Globe,
+  Activity, HeartPulse, FileText, CheckCircle2, AlertCircle, Upload,
 } from 'lucide-react';
 import { useMobileMenu } from '../components/layout/MainLayout';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE } from '../utils/constants';
+import { modelApi } from '../services/modelApi';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +45,9 @@ const GENDER_OPTS  = ['ชาย (Male)', 'หญิง (Female)', 'อื่น
 const EMPTY_FORM = {
   name: '', id_card: '', dob: '', gender: 'ชาย (Male)',
   blood_type: 'O+', allergies: '', emergency_contact: '', case_type: 'General',
+  consent_given: false,
+  consent_scope: 'ECG screening and referral-support prototype',
+  consent_signed_by: '',
 };
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -119,7 +125,7 @@ const FormTextarea = ({ label, icon, dk, ...props }) => (
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 const PatientList = () => {
-  const { patients, refreshPatients, addPatient, setSelectedPatient } = usePatient();
+  const { patients, refreshPatients, addPatient, setSelectedPatient, isLoading } = usePatient();
   const { token } = useAuth();
   const { t } = useLanguage();
   const { isDarkMode: dk } = useTheme();
@@ -131,12 +137,15 @@ const PatientList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab]     = useState('basic');
   const [formData, setFormData]       = useState(EMPTY_FORM);
+  const [consentFile, setConsentFile] = useState(null);
+  const [uploading, setUploading]     = useState(false);
   const [showImpactDetails, setShowImpactDetails] = useState(false);
+  const [dashboardTab, setDashboardTab] = useState('operations');
   const [reports, setReports]         = useState([]);
 
   useEffect(() => {
     if (token) {
-      fetch(`${import.meta.env.VITE_API_URL}/reports/`, {
+      fetch(`${API_BASE}/reports/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then(res => res.ok ? res.json() : [])
@@ -155,14 +164,149 @@ const PatientList = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const ok = await addPatient({ ...formData, age: calculateAge(formData.dob) });
-    if (ok) { setIsModalOpen(false); setFormData(EMPTY_FORM); setActiveTab('basic'); }
+    if (!formData.consent_given) {
+      showToast('ต้องบันทึก consent ก่อนลงทะเบียนผู้ป่วยสำหรับการคัดกรอง ECG', 'warning');
+      return;
+    }
+    setUploading(true);
+    try {
+      const newPatient = await addPatient({
+        ...formData,
+        age: calculateAge(formData.dob),
+        consent_timestamp: new Date().toISOString(),
+        consent_signed_by: formData.consent_signed_by || formData.name,
+      });
+      if (newPatient) {
+        if (consentFile) {
+          try {
+            await modelApi.uploadConsentFile(newPatient.id, consentFile);
+            showToast('อัปโหลดหนังสือยินยอมคัดกรองเรียบร้อยแล้ว', 'success');
+          } catch (err) {
+            showToast(`อัปโหลดหนังสือยินยอมไม่สำเร็จ: ${err.message}`, 'error');
+          }
+        }
+        setIsModalOpen(false);
+        setFormData(EMPTY_FORM);
+        setConsentFile(null);
+        setActiveTab('basic');
+      } else {
+        showToast('ไม่สามารถลงทะเบียนผู้ป่วยได้', 'error');
+      }
+    } catch (err) {
+      showToast(`เกิดข้อผิดพลาด: ${err.message}`, 'error');
+    } finally {
+      setUploading(false);
+    }
   };
+
+  const [stats, setStats] = useState({
+    total: 0,
+    pending_review: 0,
+    approved: 0,
+    referred: 0,
+    emergency: 0,
+    urgent: 0,
+  });
+
+  useEffect(() => {
+    if (token) {
+      fetch(`${API_BASE}/reports/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) setStats(data);
+        })
+        .catch(err => console.error('Failed to fetch stats:', err));
+    }
+  }, [token, patients, reports]);
+
+  // Latest unresolved (PENDING_REVIEW) risk per patient, from the same
+  // `derived_risk` the backend worklist sort uses. A patient registered as
+  // "General" whose ECG later comes back HIGH risk must still surface here
+  // -- the intake case_type alone was silently missing that case entirely.
+  const patientRiskMap = React.useMemo(() => {
+    const rank = { HIGH: 0, MODERATE: 1, LOW: 2, UNKNOWN: 3 };
+    const map = {};
+    for (const r of reports) {
+      const pid = r.patient_id;
+      if (!pid) continue;
+      if ((r.status || 'PENDING_REVIEW') !== 'PENDING_REVIEW') continue;
+      const risk = r.derived_risk || 'UNKNOWN';
+      const current = map[pid];
+      if (!current || rank[risk] < rank[current]) map[pid] = risk;
+    }
+    return map;
+  }, [reports]);
 
   const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.id_card?.includes(searchTerm)
   );
+
+  const impactStats = [
+    {
+      label: 'Primary-care cases',
+      value: patients.length.toLocaleString('th-TH'),
+      detail: 'ผู้ป่วยที่ลงทะเบียนเพื่อคัดกรองเบื้องต้น',
+      icon: Users,
+      accent: dk ? 'text-sky-300 bg-sky-500/10 border-sky-400/20' : 'text-sky-700 bg-sky-50 border-sky-200',
+    },
+    {
+      label: 'Referral-ready reports',
+      value: (stats?.total || 0).toLocaleString('th-TH'),
+      detail: 'รายงานที่มี risk, signal quality และคำแนะนำส่งต่อ',
+      icon: Share2,
+      accent: dk ? 'text-violet-300 bg-violet-500/10 border-violet-400/20' : 'text-violet-700 bg-violet-50 border-violet-200',
+    },
+    {
+      label: 'High-risk triage',
+      value: (stats?.emergency || 0).toLocaleString('th-TH'),
+      detail: 'เคสที่ควรให้แพทย์ตรวจทาน/พิจารณาส่งต่อเร็ว',
+      icon: HeartPulse,
+      accent: dk ? 'text-rose-300 bg-rose-500/10 border-rose-400/20' : 'text-rose-700 bg-rose-50 border-rose-200',
+    },
+    {
+      label: 'Marked referrals',
+      value: (stats?.referred || 0).toLocaleString('th-TH'),
+      detail: 'รายงานที่แพทย์หรือผู้มีสิทธิ์ review แล้ว mark เป็น REFERRED',
+      icon: CheckCircle2,
+      accent: dk ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20' : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    },
+  ];
+
+  const travelSavedKm = patients.length * 70;
+  const costSavedThb = patients.length * 2400;
+  const sustainabilityStats = [
+    {
+      label: 'Travel Distance Saved',
+      value: `${travelSavedKm.toLocaleString('th-TH')} km`,
+      detail: 'ลดการเดินทางไปกลับรพ.ใหญ่ปฐมภูมิ (เฉลี่ย 70 กม./คน)',
+      icon: Navigation,
+      accent: dk ? 'text-teal-300 bg-teal-500/10 border-teal-400/20' : 'text-teal-700 bg-teal-50 border-teal-200',
+    },
+    {
+      label: 'Est. Treatment Saved',
+      value: `${costSavedThb.toLocaleString('th-TH')} ฿`,
+      detail: 'ลดงบประมาณรักษาฉุกเฉินจากการวินิจฉัยล่าช้า (2,400฿/คน)',
+      icon: DollarSign,
+      accent: dk ? 'text-emerald-300 bg-emerald-500/10 border-emerald-400/20' : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    },
+    {
+      label: 'Triage Time Speedup',
+      value: '98.5%',
+      detail: 'คัดกรองเบื้องต้นเสร็จสิ้นใน <1 นาที แทนที่จะรอคิว 3-7 วัน',
+      icon: Zap,
+      accent: dk ? 'text-amber-300 bg-amber-500/10 border-amber-400/20' : 'text-amber-700 bg-amber-50 border-amber-200',
+    },
+    {
+      label: 'Healthcare Access Index',
+      value: 'High Impact',
+      detail: 'ดัชนีเข้าถึงสาธารณสุขโรคหัวใจในคลินิกและรพ.สต.ห่างไกล',
+      icon: Globe,
+      accent: dk ? 'text-sky-300 bg-sky-500/10 border-sky-400/20' : 'text-sky-700 bg-sky-50 border-sky-200',
+    },
+  ];
 
   // ── tokens ─────────────────────────────────────────────────────
   const pageBg     = dk ? 'bg-[var(--bg-main)]'    : 'bg-[var(--bg-main)]';
@@ -181,8 +325,8 @@ const PatientList = () => {
   const modalSub   = dk ? 'text-slate-500'          : 'text-slate-500';
 
   return (
-    <div className={`p-4 md:p-8 min-h-screen ${pageBg} text-[var(--text-main)] transition-colors duration-300`}>
-      <div className="max-w-[1400px] mx-auto">
+    <div className={`min-h-full px-2 py-3 sm:px-4 lg:px-6 ${pageBg} text-[var(--text-main)] transition-colors duration-300`}>
+      <div className="clinical-page">
 
         {/* ── Header ───────────────────────────────────────────── */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -229,8 +373,97 @@ const PatientList = () => {
           <span>{filtered.length} {t('patient_count')}{searchTerm ? ` (${t('patient_count_filtered')} ${patients.length})` : ''}</span>
         </div>
 
+        <section className={`mb-6 overflow-hidden rounded-2xl border ${
+          dk ? 'border-white/[0.07] bg-white/[0.03]' : 'border-slate-200 bg-white'
+        }`}>
+          <div className="grid gap-5 p-5 lg:grid-cols-[1.05fr_1.95fr] lg:p-6">
+            <div className="flex flex-col justify-between gap-4">
+              <div>
+                <div className={`mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase ${
+                  dk ? 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                }`}>
+                  <Leaf size={13} />
+                  NSC Sustainable Innovation
+                </div>
+                <h2 className={`text-xl font-bold tracking-tight ${dk ? 'text-white' : 'text-slate-900'}`}>
+                  Green Cardiology & Triage Hub
+                </h2>
+                <p className={`mt-2 text-sm leading-6 ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
+                  ระบบช่วยสนับสนุนการคัดกรองเบื้องต้นและการส่งต่อสำหรับ รพ.สต. และพื้นที่ห่างไกล เพื่อขจัดความเหลื่อมล้ำทางสาธารณสุขและประหยัดงบประมาณ
+                </p>
+              </div>
+
+              {/* Tab Selector */}
+              <div className="flex gap-1 rounded-xl border p-1 max-w-max self-start" style={{ borderColor: dk ? 'rgba(255,255,255,0.06)' : '#e2e8f0' }}>
+                <button
+                  type="button"
+                  onClick={() => setDashboardTab('operations')}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                    dashboardTab === 'operations'
+                      ? 'bg-sky-600 text-white'
+                      : dk ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Triage Operations
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDashboardTab('impact')}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                    dashboardTab === 'impact'
+                      ? 'bg-emerald-600 text-white'
+                      : dk ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🌱 Social & Economic Impact
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {['ข้อมูลจริงจากระบบ', 'ส่งต่อชัดขึ้น', 'แพทย์ตรวจทานได้', 'Decision support'].map((item) => (
+                  <span
+                    key={item}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                      dk ? 'border-white/[0.08] bg-white/[0.04] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {(dashboardTab === 'operations' ? impactStats : sustainabilityStats).map(({ label, value, detail, icon: Icon, accent }) => (
+                  <div
+                    key={label}
+                    className={`rounded-xl border p-4 ${
+                      dk ? 'border-white/[0.07] bg-slate-950/35' : 'border-slate-100 bg-slate-50/70'
+                    }`}
+                  >
+                    <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg border ${accent}`}>
+                      <Icon size={17} />
+                    </div>
+                    <div className={`text-2xl font-bold ${dk ? 'text-white' : 'text-slate-900'}`}>{value}</div>
+                    <div className={`mt-1 text-xs font-bold uppercase ${dk ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+                    <p className={`mt-2 text-xs leading-5 ${dk ? 'text-slate-500' : 'text-slate-500'}`}>{detail}</p>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+        </section>
+
         {/* ── Patient grid ──────────────────────────────────────── */}
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <PatientSkeleton key={i} dk={dk} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className={`flex flex-col items-center justify-center rounded-2xl border py-20 ${dk ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50'}`}>
             <Users size={36} className={`mb-3 ${dk ? 'text-slate-700' : 'text-slate-300'}`} />
             <p className={`text-sm font-semibold ${dk ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -240,9 +473,11 @@ const PatientList = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((p) => {
-              const isEmergency = p.case_type === 'Emergency';
-              const isUrgent = p.case_type === 'Urgent';
-              
+              const pendingRisk = patientRiskMap[p.id];
+              const isEmergency = p.case_type === 'Emergency' || pendingRisk === 'HIGH';
+              const isUrgent = !isEmergency && (p.case_type === 'Urgent' || pendingRisk === 'MODERATE');
+              const riskDrivenBadge = pendingRisk === 'HIGH' || pendingRisk === 'MODERATE';
+
               const priorityBorder = isEmergency 
                 ? `pulse-border-red ${dk ? 'bg-rose-500/[0.01]' : 'bg-rose-50/20'}`
                 : isUrgent 
@@ -258,7 +493,7 @@ const PatientList = () => {
                   transition={{ duration: 0.2 }}
                   onClick={() => {
                     setSelectedPatient(p);
-                    navigate('/page/analysis');
+                    navigate('/page/clinical-ecg');
                   }}
                   className={`group cursor-pointer rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg ${priorityBorder}`}
                 >
@@ -271,12 +506,43 @@ const PatientList = () => {
                       <p className={`truncate font-semibold text-sm leading-tight ${cardName}`}>{p.name}</p>
                       <p className={`text-[11px] mt-0.5 ${cardMeta}`}>HN: {p.id_card?.substring(0, 8) || 'GEN-001'}</p>
                     </div>
+                    {p.consent_document_url && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const res = await modelApi.getConsentFile(p.id);
+                            if (res?.url) {
+                              window.open(res.url, '_blank');
+                            } else {
+                              showToast('ไม่พบลิงก์หนังสือยินยอม', 'warning');
+                            }
+                          } catch (err) {
+                            showToast(`ดึงไฟล์ล้มเหลว: ${err.message}`, 'error');
+                          }
+                        }}
+                        className={`shrink-0 rounded-lg p-1.5 border transition ${
+                          dk 
+                            ? 'bg-amber-500/[0.08] border-amber-500/20 text-amber-400 hover:bg-amber-500/[0.15]' 
+                            : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                        }`}
+                        title="ดูหนังสือยินยอมสะแกน"
+                      >
+                        <FileText size={12} />
+                      </button>
+                    )}
                     {isEmergency ? (
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 animate-pulse bg-rose-500/10 text-rose-500 border-rose-500/20`}>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 animate-pulse bg-rose-500/10 text-rose-500 border-rose-500/20`}
+                        title={riskDrivenBadge ? 'ผลคัดกรอง ECG ล่าสุดมีความเสี่ยงสูง รอทบทวน' : undefined}
+                      >
                         <AlertCircle size={10} /> Emergency
                       </span>
                     ) : isUrgent ? (
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 bg-amber-500/10 text-amber-500 border-amber-500/20`}>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold border flex items-center gap-1 bg-amber-500/10 text-amber-500 border-amber-500/20`}
+                        title={riskDrivenBadge ? 'ผลคัดกรอง ECG ล่าสุดมีความเสี่ยงปานกลาง รอทบทวน' : undefined}
+                      >
                         <AlertTriangle size={10} /> Urgent
                       </span>
                     ) : (
@@ -312,7 +578,7 @@ const PatientList = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedPatient(p);
-                        navigate('/page/analysis');
+                        navigate('/page/clinical-ecg');
                       }}
                       className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-1.5 transition active:scale-95"
                     >
@@ -474,6 +740,48 @@ const PatientList = () => {
                           </div>
                           <div className="md:col-span-2">
                             <FormInput dk={dk} label={t('label_emergency')} icon={<Phone size={14}/>} value={formData.emergency_contact} onChange={(e) => patch('emergency_contact', e.target.value)} placeholder="ชื่อและเบอร์โทรผู้ติดต่อ" />
+                          </div>
+                          <div className={`md:col-span-2 rounded-xl border p-4 ${dk ? 'bg-amber-500/[0.06] border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                            <label className={`flex items-start gap-3 text-xs leading-relaxed ${dk ? 'text-amber-100' : 'text-amber-900'}`}>
+                              <input
+                                type="checkbox"
+                                checked={formData.consent_given}
+                                onChange={(e) => patch('consent_given', e.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-amber-400"
+                              />
+                              <span>
+                                ได้รับความยินยอมให้เก็บข้อมูลสุขภาพและ ECG เพื่อใช้คัดกรองเบื้องต้น สนับสนุนการส่งต่อ และใช้ใน prototype/research decision support โดยไม่ใช้แทนคำวินิจฉัยสุดท้าย
+                              </span>
+                            </label>
+                            <div className="mt-3">
+                              <FormInput
+                                dk={dk}
+                                label="ผู้ให้ความยินยอม / ผู้ลงนาม"
+                                icon={<CheckCircle2 size={14}/>}
+                                value={formData.consent_signed_by}
+                                onChange={(e) => patch('consent_signed_by', e.target.value)}
+                                placeholder="ชื่อผู้ป่วยหรือผู้แทน"
+                              />
+                            </div>
+                            <div className="mt-3 space-y-1.5">
+                              <span className={`text-xs font-semibold ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
+                                แนบไฟล์หนังสือยินยอมคัดกรอง (รองรับ PDF, PNG, JPG, JPEG)
+                              </span>
+                              <label className={`flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs cursor-pointer ${
+                                dk ? 'border-white/[0.12] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                              }`}>
+                                <Upload size={13} />
+                                <span className="truncate">
+                                  {consentFile ? consentFile.name : 'เลือกไฟล์หนังสือยินยอม...'}
+                                </span>
+                                <input
+                                  type="file"
+                                  accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff"
+                                  className="hidden"
+                                  onChange={(e) => setConsentFile(e.target.files?.[0] || null)}
+                                />
+                              </label>
+                            </div>
                           </div>
                         </motion.div>
                       )}

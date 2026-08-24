@@ -9,6 +9,39 @@ import { useAuth } from '../context/AuthContext';
 import { usePatient } from '../context/PatientContext';
 import { useTheme } from '../context/ThemeContext';
 import { modelApi } from '../services/modelApi';
+import { API_BASE } from '../utils/constants';
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+const VitalRow = ({ label, value, unit, status, dk }) => {
+  const color =
+    status === 'high'   ? (dk ? 'text-rose-400'    : 'text-rose-600')    :
+    status === 'low'    ? (dk ? 'text-amber-400'   : 'text-amber-600')   :
+                          (dk ? 'text-emerald-400' : 'text-emerald-600');
+  return (
+    <div className={`flex items-center justify-between py-2.5 border-b last:border-0 ${dk ? 'border-white/[0.05]' : 'border-slate-100'}`}>
+      <span className={`text-xs ${dk ? 'text-slate-400' : 'text-slate-500'}`}>{label}</span>
+      <div className="flex items-center gap-1.5">
+        <span className={`text-sm font-bold ${color}`}>{value}</span>
+        <span className={`text-[10px] ${dk ? 'text-slate-600' : 'text-slate-400'}`}>{unit}</span>
+      </div>
+    </div>
+  );
+};
+
+// ─── main ─────────────────────────────────────────────────────────────────────
+
+const NeuralSandbox = () => {
+  const { t } = useLanguage();
+  const { token } = useAuth();
+  const { selectedPatient } = usePatient();
+  const { isDarkMode: dk } = useTheme();
+
+  const [archives, setArchives]           = useState([]);
+  const [selectedArchive, setSelectedArchive] = useState(null);
+  const [isRunning, setIsRunning]         = useState(false);
+  const [testResults, setTestResults]     = useState(null);
+
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -49,7 +82,7 @@ const NeuralSandbox = () => {
 
   const fetchArchives = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/archives/${selectedPatient.id}/`, {
+      const res = await fetch(`${API_BASE}/archives/${selectedPatient.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setArchives(await res.json());
@@ -75,8 +108,8 @@ const NeuralSandbox = () => {
       const high = region.risk === 'HIGH';
       setTestResults({
         status: high ? 'abnormal' : 'normal',
-        diagnosis: `Localized source: ${region.label ?? '—'} (${region.territory ?? '—'})`,
-        narrative: res.disclaimer || 'ผลจาก CardiacLocalizer (ของจริง) — ใช้ช่วยตัดสินใจ ไม่ใช่การวินิจฉัยขั้นสุดท้าย',
+        diagnosis: `Triage source estimate: ${region.label ?? '—'} (${region.territory ?? '—'})`,
+        narrative: res.disclaimer || 'ผลจาก CardiacLocalizer ใช้เป็นข้อมูลช่วยคัดกรองและสนับสนุนการส่งต่อ ไม่ใช่คำวินิจฉัยสุดท้าย',
         metrics: {
           hr:  res.heart_rate_bpm ? Math.round(res.heart_rate_bpm) : '—',
           qtc: '—', pr: '—', qrs: '—',
@@ -97,7 +130,7 @@ const NeuralSandbox = () => {
   const handleExport = () => {
     if (!testResults) return;
     const blob = new Blob([JSON.stringify({
-      title: 'Bioelectric PINN Diagnostic Report',
+      title: 'Bioelectric PINN Referral Support Report',
       patient: selectedPatient?.name,
       timestamp: new Date().toLocaleString(),
       ...testResults,
@@ -129,8 +162,8 @@ const NeuralSandbox = () => {
   }) : null;
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
-      <div className="max-w-[1800px] mx-auto flex flex-col gap-5">
+    <div className="min-h-full bg-[var(--bg-main)] px-2 py-3 text-[var(--text-main)] transition-colors duration-300 sm:px-4 lg:px-6">
+      <div className="clinical-page flex flex-col gap-4 lg:gap-5">
 
         {/* ── Header ───────────────────────────────────────────── */}
         <header className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border p-4 ${surface}`}>
@@ -145,9 +178,9 @@ const NeuralSandbox = () => {
                 <h1 className={`text-sm font-bold ${mainText}`}>{t('sandbox_title')}</h1>
                 <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
                   dk ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                }`}>REAL MODEL</span>
+                }`}>REFERRAL SUPPORT</span>
               </div>
-              <p className={`mt-0.5 text-xs ${subText}`}>{t('sandbox_subtitle')} · CardiacLocalizer จริง บนข้อมูล ECG จริง</p>
+              <p className={`mt-0.5 text-xs ${subText}`}>{t('sandbox_subtitle')} · CardiacLocalizer จริง บนข้อมูล ECG จริง เพื่อประกอบการคัดกรอง</p>
             </div>
           </div>
 
@@ -244,7 +277,7 @@ const NeuralSandbox = () => {
                   className={`rounded-2xl border p-4 ${diagTokens.bg} ${diagTokens.ring}`}
                 >
                   <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${diagTokens.text} opacity-70`}>
-                    AI Confidence
+                    AI Support Confidence
                   </p>
                   <p className={`text-4xl font-bold leading-none mb-3 ${diagTokens.text}`}>
                     {testResults.metrics.confidence}%
@@ -271,12 +304,12 @@ const NeuralSandbox = () => {
                   exit={{ opacity: 0 }}
                   className="flex flex-col gap-5"
                 >
-                  {/* Diagnosis banner */}
+                  {/* Referral-support banner */}
                   <div className={`flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border px-5 py-4 ${diagTokens.bg} ${diagTokens.ring}`}>
                     <span className={diagTokens.text}>{diagTokens.icon}</span>
                     <div className="flex-1 min-w-0">
                       <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${diagTokens.text} opacity-70`}>
-                        Clinical Diagnosis
+                        Referral Decision Support
                       </p>
                       <p className={`text-base font-bold ${diagTokens.text}`}>{testResults.diagnosis}</p>
                       <p className={`mt-1 text-xs leading-relaxed ${dk ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -322,7 +355,7 @@ const NeuralSandbox = () => {
                       <div className={`rounded-2xl border p-4 flex-1 ${surface}`}>
                         <div className={`flex items-center gap-2 mb-3`}>
                           <Heart size={14} className="text-rose-400" />
-                          <span className={`text-xs font-semibold ${secLabel}`}>Clinical Vitals</span>
+                      <span className={`text-xs font-semibold ${secLabel}`}>Screening Vitals</span>
                         </div>
                         <VitalRow dk={dk} label="Heart Rate" value={testResults.metrics.hr} unit="BPM"
                           status={testResults.metrics.hr > 100 ? 'high' : testResults.metrics.hr < 60 ? 'low' : 'normal'} />

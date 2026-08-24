@@ -1,12 +1,12 @@
 import axios from 'axios';
+import { API_BASE } from '../utils/constants';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = API_BASE;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': '69420',
   },
 });
 
@@ -25,17 +25,19 @@ api.interceptors.request.use(
 );
 
 export const ecgService = {
-  upload: async (file) => {
+  // Upload a standard ECG file (npy/csv/WFDB/DICOM) and get real measurements +
+  // waveform + honest localization gating in one call.
+  analyzeFile: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post('/ecg/upload', formData, {
+    const response = await api.post('/ecg/analyze', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
-  
-  getAnalysis: async (sessionId) => {
-    const response = await api.get(`/ecg/analyze/${sessionId}`);
+
+  supportedFormats: async () => {
+    const response = await api.get('/ecg/formats');
     return response.data;
   },
 };

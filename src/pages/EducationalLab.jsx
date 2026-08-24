@@ -129,8 +129,8 @@ const EducationalLab = () => {
   const subText  = dk ? 'text-slate-400'                    : 'text-slate-500';
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
-      <div className="max-w-[1800px] mx-auto flex flex-col gap-5">
+    <div className="min-h-full bg-[var(--bg-main)] px-2 py-3 text-[var(--text-main)] transition-colors duration-300 sm:px-4 lg:px-6">
+      <div className="clinical-page flex flex-col gap-4 lg:gap-5">
 
         {/* Header */}
         <header className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border p-4 ${surface}`}>
@@ -185,7 +185,7 @@ const EducationalLab = () => {
             <VitalCard icon={Activity} label="QRS Duration" value={qrs} unit="ms"  normal={[60, 120]}  sublabel="QRS" />
             <VitalCard icon={Clock}    label="PR Interval" value={pr}  unit="ms"  normal={[120, 200]} sublabel="PR" />
             <VitalCard icon={Zap}      label="Corrected QT" value={qtc} unit="ms"  normal={[350, 450]} sublabel="QTc" />
-            <VitalCard             label="AI Confidence" value={conf} unit="%"   color="#0ea5e9"     sublabel="PINN" />
+            <VitalCard             label="Support Confidence" value={conf} unit="%"   color="#0ea5e9"     sublabel="PINN" />
           </div>
         </div>
 

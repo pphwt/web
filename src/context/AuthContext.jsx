@@ -1,21 +1,55 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { modelApi } from '../services/modelApi';
 
 const AuthContext = createContext();
 
+const getStoredItem = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const setStoredItem = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Auth state still updates in memory for the current tab.
+  }
+};
+
+const removeStoredItem = (key) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures so render can continue.
+  }
+};
+
 const readStoredToken = () => {
-  const stored = localStorage.getItem('bio_token');
+  const stored = getStoredItem('bio_token');
   if (!stored) return null;
   try {
     const payload = JSON.parse(atob(stored.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem('bio_token');
+      removeStoredItem('bio_token');
       return null;
     }
     return stored;
   } catch {
-    localStorage.removeItem('bio_token');
+    removeStoredItem('bio_token');
     return null;
   }
+};
+
+const userFromToken = (value) => {
+  const payload = JSON.parse(atob(value.split('.')[1]));
+  return {
+    username: payload.sub || 'user',
+    role: payload.role || 'health_officer',
+    full_name: payload.full_name || payload.sub || 'User',
+  };
 };
 
 export const AuthProvider = ({ children }) => {
@@ -24,25 +58,55 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser({ username: payload.sub || 'user' });
-      } catch {
-        setToken(null);
-      }
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return undefined;
+    }
+
+    let refreshTimer;
+    try {
+      const parsedUser = userFromToken(token);
+      setUser(parsedUser);
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const refreshDelay = Math.max(30_000, (payload.exp * 1000) - Date.now() - (5 * 60 * 1000));
+      refreshTimer = window.setTimeout(async () => {
+        try {
+          const refreshed = await modelApi.refreshAccessToken();
+          setStoredItem('bio_token', refreshed.access_token);
+          setToken(refreshed.access_token);
+          setUser(userFromToken(refreshed.access_token));
+        } catch {
+          // A revoked token must end the browser session rather than retrying
+          // indefinitely or keeping a stale role in memory.
+          removeStoredItem('bio_token');
+          setToken(null);
+          setUser(null);
+        }
+      }, refreshDelay);
+    } catch {
+      removeStoredItem('bio_token');
+      setToken(null);
+      setUser(null);
     }
     setIsLoading(false);
+    return () => {
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+    };
   }, [token]);
 
   const login = (newToken, userData) => {
-    localStorage.setItem('bio_token', newToken);
+    setStoredItem('bio_token', newToken);
     setToken(newToken);
-    setUser(userData);
+    try {
+      setUser({ ...userFromToken(newToken), ...userData });
+    } catch {
+      setUser(userData);
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem('bio_token');
+    removeStoredItem('bio_token');
     setToken(null);
     setUser(null);
   };

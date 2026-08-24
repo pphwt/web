@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE } from '../utils/constants';
 
 export const PatientContext = createContext();
 
@@ -13,7 +14,7 @@ export const PatientProvider = ({ children }) => {
     if (!token) return;
     try {
       setIsLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/patients/`, {
+      const response = await fetch(`${API_BASE}/patients/`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -39,7 +40,7 @@ export const PatientProvider = ({ children }) => {
 
   const addPatient = async (patientData) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/patients/`, {
+      const response = await fetch(`${API_BASE}/patients/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,13 +49,14 @@ export const PatientProvider = ({ children }) => {
         body: JSON.stringify(patientData)
       });
       if (response.ok) {
+        const data = await response.json();
         await fetchPatients(); // Refresh list
-        return true;
+        return data;
       }
-      return false;
+      return null;
     } catch (error) {
       console.error('Failed to add patient:', error);
-      return false;
+      return null;
     }
   };
 
