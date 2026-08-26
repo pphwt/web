@@ -174,17 +174,28 @@ export const Sidebar = ({ onClose }) => {
       </nav>
 
       {/* ── Footer: system documentation link ───────────────── */}
-      <div className={`px-3 pb-1 border-t ${divider} pt-2`}>
+      <div className={`px-3 pb-1 border-t ${divider} pt-2 space-y-0.5`}>
         <a
           href="/docs/system-explainer.html"
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] transition-colors ${
+          className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] transition-colors ${
             dk ? 'text-slate-500 hover:text-sky-400 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-sky-600 hover:bg-slate-50'
           }`}
         >
           <BookOpen size={13} className="opacity-70 shrink-0" />
           <span className="truncate">เอกสารระบบ (System Docs)</span>
+        </a>
+        <a
+          href="/docs/ptbxl-model-explainer.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] transition-colors ${
+            dk ? 'text-slate-500 hover:text-teal-400 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-teal-600 hover:bg-slate-50'
+          }`}
+        >
+          <Database size={13} className="opacity-70 shrink-0 text-teal-500" />
+          <span className="truncate">โมเดล PTB-XL (Model Docs)</span>
         </a>
       </div>
 
