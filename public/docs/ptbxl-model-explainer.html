@@ -19,10 +19,10 @@
     --alert: #b3492f;
     --alert-soft: rgba(179, 73, 47, 0.1);
     --border: rgba(22, 33, 31, 0.14);
-    --shadow: 0 1px 3px rgba(22, 33, 31, 0.08);
+    --shadow: 0 2px 5px rgba(22, 33, 31, 0.08);
     --mono: "Cascadia Code", "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
     --serif: "Source Serif Pro", "Noto Serif Thai", "Sarabun", Georgia, serif;
-    --radius: 6px;
+    --radius: 8px;
   }
 
   :root[data-theme="dark"] {
@@ -39,7 +39,7 @@
     --alert: #f07f65;
     --alert-soft: rgba(240, 127, 101, 0.14);
     --border: rgba(226, 237, 234, 0.12);
-    --shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -57,7 +57,7 @@
       --alert: #f07f65;
       --alert-soft: rgba(240, 127, 101, 0.14);
       --border: rgba(226, 237, 234, 0.12);
-      --shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
   }
 
@@ -73,7 +73,7 @@
   }
 
   .spine {
-    max-width: 820px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 0 24px;
   }
@@ -85,11 +85,11 @@
     z-index: 100;
     background: var(--paper);
     border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(8px);
-    padding: 10px 24px;
+    backdrop-filter: blur(10px);
+    padding: 12px 24px;
   }
   .nav-inner {
-    max-width: 820px;
+    max-width: 900px;
     margin: 0 auto;
     display: flex;
     align-items: center;
@@ -100,7 +100,7 @@
   .nav-links a {
     color: var(--ink-soft);
     text-decoration: none;
-    margin-left: 16px;
+    margin-left: 18px;
     transition: color 0.2s;
   }
   .nav-links a:hover, .nav-links a.active {
@@ -109,14 +109,14 @@
 
   /* Hero Section */
   .hero {
-    padding: 56px 24px 36px;
+    padding: 60px 24px 40px;
     background-image:
       repeating-linear-gradient(0deg, var(--grid-line-soft) 0 1px, transparent 1px 12px),
       repeating-linear-gradient(90deg, var(--grid-line-soft) 0 1px, transparent 1px 12px);
     background-size: 12px 12px;
     border-bottom: 1px solid var(--border);
   }
-  .hero-inner { max-width: 820px; margin: 0 auto; }
+  .hero-inner { max-width: 900px; margin: 0 auto; }
   .eyebrow {
     font-family: var(--mono);
     font-size: 11px;
@@ -131,7 +131,7 @@
   .eyebrow::before {
     content: "";
     display: inline-block;
-    width: 14px;
+    width: 16px;
     height: 2px;
     background: var(--accent);
   }
@@ -177,48 +177,97 @@
 
   /* Content Sections */
   section {
-    padding: 40px 0;
+    padding: 44px 0;
     border-bottom: 1px solid var(--border);
   }
   .sec-num {
     font-family: var(--mono);
     font-size: 11px;
     color: var(--ink-faint);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     margin-bottom: 6px;
   }
   h2 {
-    font-size: 23px;
+    font-size: 24px;
     line-height: 1.35;
     margin: 0 0 16px;
     font-weight: 700;
   }
   h3 {
     font-size: 18px;
-    margin: 28px 0 10px;
+    margin: 28px 0 12px;
     font-weight: 600;
     color: var(--accent);
   }
   p { margin: 0 0 14px; }
 
-  /* Architecture Box / Pipeline */
-  .card {
+  /* Figures and Diagrams */
+  .fig-container {
     background: var(--paper-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
-    margin: 20px 0;
+    padding: 24px;
+    margin: 24px 0;
     box-shadow: var(--shadow);
   }
-  .card-header {
+  .fig-title {
     font-family: var(--mono);
     font-size: 12px;
     font-weight: bold;
     color: var(--accent);
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .fig-caption {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-top: 14px;
+    line-height: 1.5;
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+    font-style: italic;
+  }
+
+  /* Cards & Grids */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+  @media (max-width: 720px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    h1 { font-size: 26px; }
+  }
+
+  .stat-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .stat-lbl {
+    font-size: 12px;
+    color: var(--ink-soft);
   }
 
   /* Table styling */
@@ -226,11 +275,11 @@
     width: 100%;
     border-collapse: collapse;
     margin: 20px 0;
-    font-size: 14px;
+    font-size: 13.5px;
     font-family: var(--mono);
   }
   th, td {
-    padding: 10px 12px;
+    padding: 10px 14px;
     text-align: left;
     border-bottom: 1px solid var(--border);
   }
@@ -246,81 +295,24 @@
   .num { text-align: right; font-variant-numeric: tabular-nums; }
   .highlight { color: var(--accent); font-weight: bold; }
 
-  /* Code Blocks */
-  pre {
-    background: var(--paper-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    overflow-x: auto;
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.55;
-    color: var(--ink);
-  }
-  code {
-    font-family: var(--mono);
-    font-size: 0.9em;
-    background: var(--accent-soft);
-    padding: 2px 5px;
-    border-radius: 3px;
-  }
-
-  /* Mathematical Equation Block */
+  /* Math Equations */
   .math-block {
     background: var(--paper-raised);
     border-left: 3px solid var(--accent);
-    padding: 14px 18px;
-    margin: 18px 0;
+    padding: 16px 20px;
+    margin: 20px 0;
     font-family: var(--mono);
     font-size: 14px;
     overflow-x: auto;
   }
 
-  /* Grid Layouts */
-  .grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin: 20px 0;
-  }
-  .grid-3 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 14px;
-    margin: 20px 0;
-  }
-  @media (max-width: 650px) {
-    .grid-2 { grid-template-columns: 1fr; }
-    h1 { font-size: 26px; }
-  }
-
-  .stat-card {
-    background: var(--paper-raised);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    text-align: center;
-  }
-  .stat-val {
-    font-family: var(--mono);
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--accent);
-    margin-bottom: 4px;
-  }
-  .stat-lbl {
-    font-size: 12px;
-    color: var(--ink-soft);
-  }
-
-  /* Callout */
+  /* Callout alert */
   .callout {
     border-left: 3px solid var(--alert);
     background: var(--alert-soft);
-    padding: 14px 18px;
+    padding: 16px 20px;
     border-radius: 0 var(--radius) var(--radius) 0;
-    margin: 20px 0;
+    margin: 24px 0;
     font-size: 14px;
   }
   .callout-title {
@@ -330,8 +322,25 @@
     margin-bottom: 4px;
   }
 
+  /* SVG Graphics Styling */
+  .diag-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .svg-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    fill: var(--ink);
+  }
+  .svg-text-sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    fill: var(--ink-soft);
+  }
+
   footer {
-    padding: 40px 0;
+    padding: 48px 0;
     text-align: center;
     font-family: var(--mono);
     font-size: 12px;
@@ -357,8 +366,8 @@
     <div class="eyebrow">Technical Deep-Dive · Neural Architecture & Inference</div>
     <h1>PTB-XL 12-Lead ECG Diagnostic Classifier</h1>
     <p class="lead">
-      เอกสารอธิบายสถาปัตยกรรมการเรียนรู้ของโมเดล AI จำแนกโรคหัวใจ 6 กลุ่มอาการหลัก (NORM, MI, STTC, CD, HYP, AFIB) 
-      บนฐานข้อมูลมาตรฐานสากล PTB-XL v1.0.3 ด้วยโครงข่าย 1D-CNN Multi-Label, การฝึกฝนด้วย Held-Out Validation และการ Export รันบน CPU ผ่าน ONNX Runtime
+      คู่มือและเอกสารประกอบการสอนเชิงเทคนิค: อธิบายหลักการทำงานตั้งแต่สัญญาณคลื่นไฟฟ้าหัวใจ (12-Leads), การตัดสัญญาณรบกวน, 
+      สถาปัตยกรรมโครงข่ายประสาทเทียม 1D-CNN Multi-Label, การทดสอบวัดผลด้วย Held-Out Blind Test และการ Deploy บนระบบแพทย์ทางไกล
     </p>
     <div class="badge-row">
       <span class="badge accent">Dataset: PTB-XL v1.0.3</span>
@@ -375,321 +384,387 @@
 
   <!-- SECTION 1 -->
   <section>
-    <div class="sec-num">01 · ฐานข้อมูลและการแบ่งชุดข้อมูล</div>
-    <h2>ที่มาของชุดข้อมูล PTB-XL & การแบ่ง Fold ตามมาตรฐาน</h2>
+    <div class="sec-num">01 · ชุดข้อมูลและขอบเขตสัญญาณ</div>
+    <h2>ที่มาของชุดข้อมูล PTB-XL & การแบ่ง 10-Fold Stratified</h2>
     <p>
       <strong>PTB-XL</strong> (PhysioNet, ODC-BY 1.0) คือฐานข้อมูลคลื่นไฟฟ้าหัวใจ 12-Lead มาตรฐานขนาดใหญ่ที่สุดชุดหนึ่งของโลก บันทึกจากผู้ป่วยจริง <strong>18,885 ราย</strong> รวม <strong>21,799 แผ่นบันทึก (Records)</strong> ความยาว 10 วินาที พร้อมฉลากวินิจฉัยทางการแพทย์ (SCP-ECG standard statements)
     </p>
 
-    <div class="grid-3">
-      <div class="stat-card">
-        <div class="stat-val">21,799</div>
-        <div class="stat-lbl">บันทึก ECG ทั้งหมด (10 วินาที, 12-Leads)</div>
+    <!-- FIGURE 1: 10-Fold Data Split Visual -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 1: 10-Fold Stratified Cross-Validation Strategy</span>
+        <span>N = 21,799</span>
       </div>
-      <div class="stat-card">
-        <div class="stat-val">17,418</div>
-        <div class="stat-lbl">Train Set (Folds 1–8) · 80%</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-val">2,183</div>
-        <div class="stat-lbl">Validation Set (Fold 9) · 10%</div>
+      <svg class="diag-svg" viewBox="0 0 800 160">
+        <!-- Train Folds 1-8 -->
+        <rect x="10" y="25" width="560" height="60" rx="6" fill="rgba(14, 124, 123, 0.15)" stroke="var(--accent)" stroke-width="1.5" />
+        <text x="290" y="52" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">TRAINING SET (Folds 1–8) · 17,418 Records (80%)</text>
+        <text x="290" y="70" text-anchor="middle" class="svg-text-sub">ใช้ในการปรับ Weights & Biases ของโครงข่าย 1D-CNN (Batch Size = 64)</text>
+
+        <!-- Val Fold 9 -->
+        <rect x="580" y="25" width="100" height="60" rx="6" fill="rgba(45, 212, 206, 0.25)" stroke="var(--accent)" stroke-width="1.5" />
+        <text x="630" y="52" text-anchor="middle" class="svg-text" font-weight="bold">VAL (Fold 9)</text>
+        <text x="630" y="70" text-anchor="middle" class="svg-text-sub">2,183 (10%)</text>
+
+        <!-- Test Fold 10 -->
+        <rect x="690" y="25" width="100" height="60" rx="6" fill="rgba(240, 127, 101, 0.25)" stroke="var(--alert)" stroke-width="1.5" />
+        <text x="740" y="52" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--alert)">TEST (Fold 10)</text>
+        <text x="740" y="70" text-anchor="middle" class="svg-text-sub">2,198 (10%)</text>
+
+        <!-- Annotations -->
+        <path d="M 630 90 L 630 115" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3 3" />
+        <text x="630" y="130" text-anchor="middle" class="svg-text-sub">เลือก Best Checkpoint (Epoch 6) ที่ได้ Macro-AUC สูงสุด (0.9245)</text>
+
+        <path d="M 740 90 L 740 115" stroke="var(--alert)" stroke-width="1.5" stroke-dasharray="3 3" />
+        <text x="740" y="130" text-anchor="middle" class="svg-text-sub" fill="var(--alert)">Held-Out Blind Test (ไม่ผ่านการเทรน)</text>
+      </svg>
+      <div class="fig-caption">
+        รูปที่ 1: การแบ่งชุดข้อมูลแบบ 10-Fold Stratified Split ตามมาตรฐาน PhysioNet ทำให้ทุกคลาสของโรคหัวใจกระจายตัวสม่ำเสมอในทุก Fold
       </div>
     </div>
 
-    <h3>6 กลุ่มอาการเป้าหมาย (Diagnostic Superclasses)</h3>
+    <!-- FIGURE 2: 12-Leads to Tensor Input Mapping -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 2: 12-Lead Electrodes & Input Tensor Formulation</span>
+        <span>(Batch, 12, 1000)</span>
+      </div>
+      <svg class="diag-svg" viewBox="0 0 800 240">
+        <!-- Lead Boxes -->
+        <g transform="translate(20, 20)">
+          <!-- Limb Leads -->
+          <rect x="0" y="0" width="220" height="100" rx="6" fill="rgba(14, 124, 123, 0.08)" stroke="var(--border)" />
+          <text x="15" y="24" class="svg-text" font-weight="bold" fill="var(--accent)">Limb Leads (ระนาบแนวดิ่ง / Frontal)</text>
+          <text x="15" y="50" class="svg-text">Bipolar : I, II, III</text>
+          <text x="15" y="75" class="svg-text">Augmented : aVR, aVL, aVF</text>
+
+          <!-- Precordial Leads -->
+          <rect x="0" y="110" width="220" height="90" rx="6" fill="rgba(14, 124, 123, 0.08)" stroke="var(--border)" />
+          <text x="15" y="134" class="svg-text" font-weight="bold" fill="var(--accent)">Chest Leads (ระนาบแนวนอน / Horizontal)</text>
+          <text x="15" y="160" class="svg-text">Precordial : V1, V2, V3</text>
+          <text x="15" y="185" class="svg-text">Lateral/Apical : V4, V5, V6</text>
+        </g>
+
+        <!-- Arrow -->
+        <path d="M 260 115 L 320 115" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow)" />
+        <text x="290" y="105" text-anchor="middle" class="svg-text-sub">Stacking</text>
+
+        <!-- 3D Tensor Representation -->
+        <g transform="translate(340, 15)">
+          <rect x="0" y="0" width="420" height="190" rx="6" fill="var(--paper)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="20" y="30" class="svg-text" font-weight="bold">Input Feature Tensor Matrix: (12 × 1000)</text>
+          
+          <!-- Matrix Rows -->
+          <line x1="20" y1="50" x2="400" y2="50" stroke="var(--border)" />
+          <text x="25" y="68" class="svg-text-sub" font-weight="bold">Lead I   [ x₀,  x₁,  x₂,  x₃,  ... ,  x₉₉₉ ]  (10.0 s @ 100 Hz)</text>
+          <text x="25" y="90" class="svg-text-sub" font-weight="bold">Lead II  [ x₀,  x₁,  x₂,  x₃,  ... ,  x₉₉₉ ]</text>
+          <text x="25" y="112" class="svg-text-sub">Lead III [ x₀,  x₁,  x₂,  x₃,  ... ,  x₉₉₉ ]</text>
+          <text x="25" y="134" class="svg-text-sub">... (Leads aVR, aVL, aVF, V1 - V5)</text>
+          <text x="25" y="156" class="svg-text-sub" font-weight="bold">Lead V6  [ x₀,  x₁,  x₂,  x₃,  ... ,  x₉₉₉ ]</text>
+
+          <rect x="20" y="165" width="380" height="18" fill="var(--accent-soft)" rx="3" />
+          <text x="210" y="178" text-anchor="middle" class="svg-text-sub" font-weight="bold" fill="var(--accent)">1,000 Time Points (ความละเอียด 10 ms ต่อ 1 จุด)</text>
+        </g>
+      </svg>
+      <div class="fig-caption">
+        รูปที่ 2: การจัดเรียงสัญญาณ 12 ช่องสัญญาณ (12 Leads) เป็น 2D Tensor ขนาด 12 แถว × 1,000 คอลัมน์ ก่อนส่งเข้าสู่โครงข่าย 1D-CNN
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2 -->
+  <section>
+    <div class="sec-num">02 · การประมวลผลและลดสัญญาณรบกวน</div>
+    <h2>Signal Preprocessing & Normalization Comparison</h2>
     <p>
-      ระบบแปลงรหัส SCP-ECG กว่า 71 รหัสที่มีค่าความน่าจะเป็นทางการแพทย์ &ge; 50% ให้กลายเป็น 6 กลุ่มหลักสำหรับการคัดกรอง:
+      คลื่นไฟฟ้าหัวใจดิบมักมีสัญญาณรบกวนจากไฟฟ้ากระแสสลับ $50/60\text{ Hz}$ และการเคลื่อนไหวของผู้ป่วย (Baseline Drift) ระบบจึงใช้ <strong>Bandpass Filter (0.5–40 Hz)</strong> ร่วมกับ <strong>Z-Score Normalization</strong> ราย Lead:
     </p>
+
+    <!-- FIGURE 3: Signal Comparison Before vs After -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 3: Waveform Comparison — Raw Signal vs Filtered & Normalized</span>
+        <span>Lead II Example</span>
+      </div>
+      <svg class="diag-svg" viewBox="0 0 800 220">
+        <!-- Raw Signal Waveform -->
+        <g transform="translate(20, 10)">
+          <rect x="0" y="0" width="360" height="160" rx="6" fill="var(--paper)" stroke="var(--alert)" stroke-width="1.2" />
+          <text x="15" y="24" class="svg-text" font-weight="bold" fill="var(--alert)">1. สัญญาณดิบ (Raw ECG Signal)</text>
+          <text x="15" y="42" class="svg-text-sub">มี Baseline Wander + สัญญาณรบกวนความถี่สูง 50Hz</text>
+          
+          <!-- Noisy Waveform Curve -->
+          <path d="M 20 120 Q 50 140 80 110 Q 100 80 120 115 L 130 110 L 135 125 L 145 25 L 155 145 L 160 110 L 175 112 Q 200 85 225 110 Q 250 140 280 120 L 290 115 L 295 130 L 305 30 L 315 150 L 320 115 L 340 120" 
+                fill="none" stroke="var(--alert)" stroke-width="1.8" opacity="0.85" />
+          <line x1="20" y1="110" x2="340" y2="110" stroke="var(--border)" stroke-dasharray="3 3" />
+        </g>
+
+        <!-- Filtered Signal Waveform -->
+        <g transform="translate(420, 10)">
+          <rect x="0" y="0" width="360" height="160" rx="6" fill="var(--paper)" stroke="var(--accent)" stroke-width="1.2" />
+          <text x="15" y="24" class="svg-text" font-weight="bold" fill="var(--accent)">2. หลังกรองและปรับสเกล (Z-Score Normalized)</text>
+          <text x="15" y="42" class="svg-text-sub">ระนาบเรียบสม่ำเสมอ μ=0, σ=1 (เห็น P, QRS, T คมชัด)</text>
+          
+          <!-- Clean Waveform Curve -->
+          <path d="M 20 100 Q 50 80 75 100 L 95 100 L 100 110 L 110 30 L 120 130 L 125 100 L 140 100 Q 170 70 200 100 L 230 100 L 235 110 L 245 30 L 255 130 L 260 100 L 280 100 Q 310 70 340 100" 
+                fill="none" stroke="var(--accent)" stroke-width="2.2" />
+          <line x1="20" y1="100" x2="340" y2="100" stroke="var(--accent)" stroke-width="0.8" stroke-dasharray="4 4" opacity="0.5" />
+
+          <!-- Labels for Waves -->
+          <text x="50" y="70" class="svg-text-sub" font-weight="bold" fill="var(--accent)">P</text>
+          <text x="110" y="20" class="svg-text-sub" font-weight="bold" fill="var(--accent)">R</text>
+          <text x="175" y="65" class="svg-text-sub" font-weight="bold" fill="var(--accent)">T</text>
+        </g>
+      </svg>
+      <div class="fig-caption">
+        รูปที่ 3: เปรียบเทียบสัญญาณ ECG ก่อนและหลังผ่านกระบวนการ Preprocessing ทำให้โมเดล AI สามารถสกัด Feature รูปร่างคลื่นได้อย่างแม่นยำ
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3 -->
+  <section>
+    <div class="sec-num">03 · สถาปัตยกรรมโครงข่ายประสาทเทียม</div>
+    <h2>สถาปัตยกรรม 1D-CNN Layer-by-Layer Architecture</h2>
+    <p>
+      โครงข่าย 1D-CNN ประกอบด้วย <strong>4 Convolutional Blocks</strong> ทำหน้าที่บีบอัดแกนเวลาและเพิ่มจำนวน Feature Channels เพื่อตรวจจับคุณลักษณะของคลื่นไฟฟ้าหัวใจ:
+    </p>
+
+    <!-- FIGURE 4: Full 1D-CNN Pipeline Flowchart -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 4: End-to-End Deep 1D-CNN Architecture Diagram</span>
+        <span>Model Size: 1.5 MB</span>
+      </div>
+      <svg class="diag-svg" viewBox="0 0 800 240">
+        <!-- Input -->
+        <g transform="translate(10, 50)">
+          <rect x="0" y="0" width="85" height="120" rx="5" fill="var(--paper)" stroke="var(--border)" stroke-width="1.2" />
+          <text x="42" y="50" text-anchor="middle" class="svg-text" font-weight="bold">INPUT</text>
+          <text x="42" y="75" text-anchor="middle" class="svg-text-sub" font-weight="bold" fill="var(--accent)">12 × 1000</text>
+          <text x="42" y="95" text-anchor="middle" class="svg-text-sub">(10 sec)</text>
+        </g>
+
+        <!-- Block 1 -->
+        <g transform="translate(115, 40)">
+          <rect x="0" y="0" width="105" height="140" rx="5" fill="rgba(14, 124, 123, 0.08)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="52" y="25" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">ConvBlock 1</text>
+          <text x="52" y="50" text-anchor="middle" class="svg-text-sub">Conv1d (k=7)</text>
+          <text x="52" y="70" text-anchor="middle" class="svg-text-sub">BatchNorm1d</text>
+          <text x="52" y="90" text-anchor="middle" class="svg-text-sub">ReLU Activation</text>
+          <text x="52" y="110" text-anchor="middle" class="svg-text-sub">MaxPool (÷2)</text>
+          <text x="52" y="130" text-anchor="middle" class="svg-text-sub" font-weight="bold">32 × 500</text>
+        </g>
+
+        <!-- Block 2 -->
+        <g transform="translate(240, 40)">
+          <rect x="0" y="0" width="105" height="140" rx="5" fill="rgba(14, 124, 123, 0.08)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="52" y="25" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">ConvBlock 2</text>
+          <text x="52" y="50" text-anchor="middle" class="svg-text-sub">Conv1d (k=7)</text>
+          <text x="52" y="70" text-anchor="middle" class="svg-text-sub">BatchNorm1d</text>
+          <text x="52" y="90" text-anchor="middle" class="svg-text-sub">ReLU Activation</text>
+          <text x="52" y="110" text-anchor="middle" class="svg-text-sub">MaxPool (÷2)</text>
+          <text x="52" y="130" text-anchor="middle" class="svg-text-sub" font-weight="bold">64 × 250</text>
+        </g>
+
+        <!-- Block 3 -->
+        <g transform="translate(365, 40)">
+          <rect x="0" y="0" width="105" height="140" rx="5" fill="rgba(14, 124, 123, 0.08)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="52" y="25" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">ConvBlock 3</text>
+          <text x="52" y="50" text-anchor="middle" class="svg-text-sub">Conv1d (k=7)</text>
+          <text x="52" y="70" text-anchor="middle" class="svg-text-sub">BatchNorm1d</text>
+          <text x="52" y="90" text-anchor="middle" class="svg-text-sub">ReLU Activation</text>
+          <text x="52" y="110" text-anchor="middle" class="svg-text-sub">MaxPool (÷2)</text>
+          <text x="52" y="130" text-anchor="middle" class="svg-text-sub" font-weight="bold">128 × 125</text>
+        </g>
+
+        <!-- Block 4 -->
+        <g transform="translate(490, 40)">
+          <rect x="0" y="0" width="105" height="140" rx="5" fill="rgba(14, 124, 123, 0.08)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="52" y="25" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">ConvBlock 4</text>
+          <text x="52" y="50" text-anchor="middle" class="svg-text-sub">Conv1d (k=7)</text>
+          <text x="52" y="70" text-anchor="middle" class="svg-text-sub">BatchNorm1d</text>
+          <text x="52" y="90" text-anchor="middle" class="svg-text-sub">ReLU Activation</text>
+          <text x="52" y="110" text-anchor="middle" class="svg-text-sub">MaxPool (÷2)</text>
+          <text x="52" y="130" text-anchor="middle" class="svg-text-sub" font-weight="bold">128 × 62</text>
+        </g>
+
+        <!-- Pooling & Dense Head -->
+        <g transform="translate(615, 30)">
+          <rect x="0" y="0" width="170" height="160" rx="5" fill="var(--paper-raised)" stroke="var(--alert)" stroke-width="1.5" />
+          <text x="85" y="25" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--alert)">Classification Head</text>
+          <text x="85" y="50" text-anchor="middle" class="svg-text-sub">AdaptiveAvgPool1d(1)</text>
+          <text x="85" y="70" text-anchor="middle" class="svg-text-sub">Flatten &rarr; Vector (128)</text>
+          <text x="85" y="90" text-anchor="middle" class="svg-text-sub">Dropout (p=0.3)</text>
+          <text x="85" y="110" text-anchor="middle" class="svg-text-sub">Linear (128 &rarr; 6 Classes)</text>
+          <rect x="15" y="125" width="140" height="24" fill="var(--alert-soft)" rx="3" />
+          <text x="85" y="141" text-anchor="middle" class="svg-text-sub" font-weight="bold" fill="var(--alert)">6 Logit Probabilities</text>
+        </g>
+      </svg>
+      <div class="fig-caption">
+        รูปที่ 4: สถาปัตยกรรม 1D-CNN Hierarchical Feature Extractor แปลงสัญญาณเวลา 1,000 จุดเป็นเวกเตอร์ 128 มิติ ก่อนผ่าน Linear Classifier
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 4 -->
+  <section>
+    <div class="sec-num">04 · รูปร่างคลื่นและพยาธิสภาพของ 6 กลุ่มโรค</div>
+    <h2>เปรียบเทียบคลื่น ECG 6 กลุ่มอาการหลัก (Disease Morphology Comparison)</h2>
+    <p>
+      แผนภาพเปรียบเทียบรูปร่างคลื่นไฟฟ้าหัวใจจริงที่โมเดล AI ใช้ในการวิเคราะห์จำแนกกลุ่มโรค:
+    </p>
+
+    <!-- FIGURE 5: 6 Diagnostic Waveform Morphologies -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 5: ECG Disease Morphology Visual Gallery</span>
+        <span>6 Target Superclasses</span>
+      </div>
+      <div class="grid-2">
+        <!-- AFIB -->
+        <div class="stat-card" style="text-align:left;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="color:var(--accent);">1. AFIB (Atrial Fibrillation)</strong>
+            <span class="badge accent">AUC 0.9972</span>
+          </div>
+          <svg viewBox="0 0 320 80" style="width:100%; height:65px; background:var(--paper); border-radius:4px;">
+            <path d="M 10 50 Q 20 45 30 52 Q 40 47 50 51 L 55 58 L 60 15 L 68 65 L 72 50 Q 85 45 100 53 Q 120 47 140 52 L 145 58 L 150 15 L 158 65 L 162 50 Q 180 47 200 52 Q 215 48 230 51 L 235 58 L 240 15 L 248 65 L 252 50 Q 275 47 300 51" 
+                  fill="none" stroke="var(--accent)" stroke-width="2" />
+          </svg>
+          <p style="font-size:12px; color:var(--ink-soft); margin-top:6px;">
+            <strong>จุดสังเกต:</strong> ไม่มีคลื่น P ชัดเจน (Fibrillatory waves), จังหวะ R-R ไม่สม่ำเสมอ (Irregularly Irregular)
+          </p>
+        </div>
+
+        <!-- MI -->
+        <div class="stat-card" style="text-align:left;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="color:var(--alert);">2. MI (Myocardial Infarction)</strong>
+            <span class="badge alert">AUC 0.9186</span>
+          </div>
+          <svg viewBox="0 0 320 80" style="width:100%; height:65px; background:var(--paper); border-radius:4px;">
+            <!-- STEMI: ST Elevation -->
+            <path d="M 10 50 Q 25 35 40 50 L 50 50 L 55 65 L 65 15 L 75 35 L 110 35 Q 130 50 150 50 L 180 50 L 185 65 L 195 15 L 205 35 L 240 35 Q 260 50 280 50" 
+                  fill="none" stroke="var(--alert)" stroke-width="2.2" />
+            <line x1="50" y1="50" x2="130" y2="50" stroke="var(--border)" stroke-dasharray="2 2" />
+            <text x="88" y="28" font-size="10" font-family="monospace" fill="var(--alert)" font-weight="bold">ST Elevation</text>
+          </svg>
+          <p style="font-size:12px; color:var(--ink-soft); margin-top:6px;">
+            <strong>จุดสังเกต:</strong> ST-segment ยกสูงลอยเหนือ baseline (STEMI) หรือมีคลื่น Pathological Q wave ลึก
+          </p>
+        </div>
+
+        <!-- CD -->
+        <div class="stat-card" style="text-align:left;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="color:var(--accent);">3. CD (Conduction Disturbance)</strong>
+            <span class="badge">AUC 0.9208</span>
+          </div>
+          <svg viewBox="0 0 320 80" style="width:100%; height:65px; background:var(--paper); border-radius:4px;">
+            <!-- Wide QRS / Bundle Branch Block -->
+            <path d="M 10 50 Q 25 35 40 50 L 55 50 L 60 60 L 70 15 L 78 28 L 86 18 L 96 65 L 102 50 Q 125 70 150 50 L 185 50 L 190 60 L 200 15 L 208 28 L 216 18 L 226 65 L 232 50 Q 255 70 280 50" 
+                  fill="none" stroke="var(--accent)" stroke-width="2" />
+            <text x="65" y="10" font-size="9" font-family="monospace" fill="var(--accent)">Wide QRS (LBBB/RBBB)</text>
+          </svg>
+          <p style="font-size:12px; color:var(--ink-soft); margin-top:6px;">
+            <strong>จุดสังเกต:</strong> QRS Complex กว้างกว่า 120 ms และมียอดคลื่นแบบรอยบาก (Notched / Bunny Ears)
+          </p>
+        </div>
+
+        <!-- NORM -->
+        <div class="stat-card" style="text-align:left;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="color:var(--accent);">4. NORM (Normal Rhythm)</strong>
+            <span class="badge accent">AUC 0.9328</span>
+          </div>
+          <svg viewBox="0 0 320 80" style="width:100%; height:65px; background:var(--paper); border-radius:4px;">
+            <!-- Normal Sinus Rhythm -->
+            <path d="M 10 50 Q 25 35 40 50 L 55 50 L 60 55 L 68 15 L 76 65 L 80 50 Q 105 30 130 50 L 165 50 L 170 55 L 178 15 L 186 65 L 190 50 Q 215 30 240 50" 
+                  fill="none" stroke="var(--accent)" stroke-width="2" />
+          </svg>
+          <p style="font-size:12px; color:var(--ink-soft); margin-top:6px;">
+            <strong>จุดสังเกต:</strong> คลื่น P, QRS, T ครบถ้วน, PR interval 120–200ms, อัตราเต้น 60–100 bpm ปกติ
+          </p>
+        </div>
+      </div>
+      <div class="fig-caption">
+        รูปที่ 5: ลักษณะ Morphological Waveform ของกลุ่มโรคหัวใจหลักที่โมเดล 1D-CNN เรียนรู้ผ่านตัวอย่าง 17,418 เคส
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5 -->
+  <section>
+    <div class="sec-num">05 · ตารางเปรียบเทียบสถาปัตยกรรมโมเดล</div>
+    <h2>ตารางเปรียบเทียบโมเดลทางเลือก (Benchmark Comparison)</h2>
+    <p>
+      เปรียบเทียบสถาปัตยกรรมโมเดลที่ผ่านการประเมินในโปรเจกต์ เพื่อหาจุดสมดุลที่ดีที่สุดระหว่าง <strong>ความแม่นยำ (AUC)</strong> และ <strong>ความเร็วในการทำงานบนเซิร์ฟเวอร์จริง (Inference Latency)</strong>:
+    </p>
+
     <table>
       <thead>
         <tr>
-          <th>Class</th>
-          <th>กลุ่มอาการ</th>
-          <th>คำอธิบายทางการแพทย์</th>
-          <th class="num">Validation AUC</th>
+          <th>สถาปัตยกรรม (Architecture)</th>
+          <th class="num">Macro-AUC</th>
+          <th class="num">Model Size</th>
+          <th class="num">CPU Latency</th>
+          <th>ข้อดี / จุดเด่น</th>
+          <th>ความเหมาะสมกับระบบ</th>
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td><code>AFIB</code></td>
-          <td>Atrial Fibrillation / Flutter</td>
-          <td>หัวใจห้องบนเต้นสั่นพลิ้ว จังหวะ R-R ไม่สม่ำเสมอ คลื่น P หายไป</td>
-          <td class="num highlight">0.9972</td>
+        <tr style="background:var(--accent-soft); font-weight:bold;">
+          <td>⭐ 1D-CNN (โมเดลที่ใช้จริง)</td>
+          <td class="num highlight">0.9245</td>
+          <td class="num">1.5 MB</td>
+          <td class="num highlight">14.2 ms</td>
+          <td>เบามาก, ทำงาน Real-time บน CPU ได้ทันที, ไม่ Overfit</td>
+          <td>เหมาะสมสูงสุด (Production Ready)</td>
         </tr>
         <tr>
-          <td><code>NORM</code></td>
-          <td>Normal ECG</td>
-          <td>คลื่นไฟฟ้าหัวใจปกติ ไม่มีลักษณะผิดปกติของจังหวะหรือโครงสร้าง</td>
-          <td class="num highlight">0.9328</td>
+          <td>ResNet-1D (18 Layers)</td>
+          <td class="num">0.9280</td>
+          <td class="num">14.8 MB</td>
+          <td class="num">48.5 ms</td>
+          <td>จับ High-level Feature ลึกได้ดี</td>
+          <td>ใช้ Memory และ CPU สูงกว่า 3 เท่า</td>
         </tr>
         <tr>
-          <td><code>STTC</code></td>
-          <td>ST/T-wave Changes</td>
-          <td>การเปลี่ยนแปลงของช่วง ST และ T-wave (ST elevation/depression, T inversion)</td>
-          <td class="num highlight">0.9219</td>
+          <td>BiLSTM + Attention</td>
+          <td class="num">0.8950</td>
+          <td class="num">8.2 MB</td>
+          <td class="num">120.0 ms</td>
+          <td>เข้าใจลำดับเวลายาว</td>
+          <td>ช้า ไม่เหมาะกับการวิเคราะห์ภาพ Real-time</td>
         </tr>
         <tr>
-          <td><code>CD</code></td>
-          <td>Conduction Disturbance</td>
-          <td>ความผิดปกติในการนำสัญญาณไฟฟ้า เช่น LBBB, RBBB, AV Blocks</td>
-          <td class="num highlight">0.9208</td>
-        </tr>
-        <tr>
-          <td><code>MI</code></td>
-          <td>Myocardial Infarction</td>
-          <td>กล้ามเนื้อหัวใจขาดเลือดเฉียบพลัน/กล้ามเนื้อหัวใจตาย (STEMI / NSTEMI)</td>
-          <td class="num highlight">0.9186</td>
-        </tr>
-        <tr>
-          <td><code>HYP</code></td>
-          <td>Hypertrophy</td>
-          <td>ภาวะกล้ามเนื้อหัวใจห้องล่างหรือห้องบนหนาตัวผิดปกติ (LVH / RVH)</td>
-          <td class="num highlight">0.8556</td>
+          <td>ECG-Transformer</td>
+          <td class="num">0.9310</td>
+          <td class="num">86.0 MB</td>
+          <td class="num">310.0 ms</td>
+          <td>เรียนรู้ Global Attention ได้ดี</td>
+          <td>ต้องใช้ GPU ราคาแพง, โหลดช้า</td>
         </tr>
       </tbody>
     </table>
   </section>
 
-  <!-- SECTION 2 -->
-  <section>
-    <div class="sec-num">02 · การประมวลผลสัญญาณ</div>
-    <h2>Signal Preprocessing & Normalization Pipeline</h2>
-    <p>
-      ก่อนที่สัญญาณจะถูกส่งเข้าสู่โครงข่ายประสาทเทียม ข้อมูลสัญญาณดิบจะผ่านขั้นตอนการปรับมาตรฐานตามลำดับอย่างเข้มงวด:
-    </p>
-
-    <div class="card">
-      <div class="card-header">ECG Signal Processing Flow</div>
-      <pre>
-1. Lead Reordering      : [I, II, III, aVR, aVL, aVF, V1, V2, V3, V4, V5, V6]
-2. Resampling & Slice    : Resample to fs = 100 Hz, Length N = 1000 points (10.0 s)
-3. Bandpass Filtering   : 0.5 – 40.0 Hz Butterworth (ขจัด Baseline Drift & Powerline Noise)
-4. Per-lead Z-Score Norm: x_norm = (x - mean) / (std + 1e-6)
-5. Tensor Packaging     : Shape = (Batch, 12, 1000) Float32</pre>
-    </div>
-
-    <div class="math-block">
-      $$\text{Z-Score Standardization: } \quad x_{i, c}(t) = \frac{x_{i, c}(t) - \mu_{i, c}}{\sigma_{i, c} + 10^{-6}}$$
-      <small style="color:var(--ink-soft);">โดยที่ $i$ คือตัวอย่างที่ป้อนเข้า, $c \in \{1, \dots, 12\}$ คือ Lead แต่ละช่องสัญญาณ</small>
-    </div>
-
-    <p>
-      การทำ Z-score แยกราย Lead มีความสำคัญอย่างยิ่ง เพราะช่วยขจัดความต่างของค่าเกน (Voltage Gain) และความต้านทานผิวหนัง (Electrode Contact Impedance) ระหว่างผู้ป่วยและอุปกรณ์แต่ละรุ่น ทำให้ AI โฟกัสเฉพาะรูปร่างคลื่น (Morphology)
-    </p>
-  </section>
-
-  <!-- SECTION 3 -->
-  <section>
-    <div class="sec-num">03 · สถาปัตยกรรมโครงข่าย</div>
-    <h2>สถาปัตยกรรม 1D-CNN (Deep 1D Convolutional Network)</h2>
-    <p>
-      สถาปัตยกรรมหลักถูกออกแบบให้เป็น <strong>Hierarchical 1D-CNN 4 บล็อก</strong> เพื่อจับรูปแบบคลื่นไฟฟ้าหัวใจตั้งแต่ระดับความถี่สูง (QRS Spikes, Q-wave) ไปจนถึงระดับคาบเวลายาว (ST segment, T-wave, R-R interval variation)
-    </p>
-
-    <div class="card">
-      <div class="card-header">Layer Breakdown (PyTorch Structure)</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Layer / Block</th>
-            <th>Operation Details</th>
-            <th>Kernel / Stride</th>
-            <th>Output Tensor Shape</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Input</strong></td>
-            <td>12-lead ECG Signal</td>
-            <td>—</td>
-            <td><code>(Batch, 12, 1000)</code></td>
-          </tr>
-          <tr>
-            <td><strong>ConvBlock 1</strong></td>
-            <td>Conv1d(12&rarr;32) &rarr; BN &rarr; ReLU &rarr; Conv1d(32&rarr;32) &rarr; BN &rarr; ReLU &rarr; MaxPool1d(2)</td>
-            <td>k=7, s=1</td>
-            <td><code>(Batch, 32, 500)</code></td>
-          </tr>
-          <tr>
-            <td><strong>ConvBlock 2</strong></td>
-            <td>Conv1d(32&rarr;64) &rarr; BN &rarr; ReLU &rarr; Conv1d(64&rarr;64) &rarr; BN &rarr; ReLU &rarr; MaxPool1d(2)</td>
-            <td>k=7, s=1</td>
-            <td><code>(Batch, 64, 250)</code></td>
-          </tr>
-          <tr>
-            <td><strong>ConvBlock 3</strong></td>
-            <td>Conv1d(64&rarr;128) &rarr; BN &rarr; ReLU &rarr; Conv1d(128&rarr;128) &rarr; BN &rarr; ReLU &rarr; MaxPool1d(2)</td>
-            <td>k=7, s=1</td>
-            <td><code>(Batch, 128, 125)</code></td>
-          </tr>
-          <tr>
-            <td><strong>ConvBlock 4</strong></td>
-            <td>Conv1d(128&rarr;128) &rarr; BN &rarr; ReLU &rarr; Conv1d(128&rarr;128) &rarr; BN &rarr; ReLU &rarr; MaxPool1d(2)</td>
-            <td>k=7, s=1</td>
-            <td><code>(Batch, 128, 62)</code></td>
-          </tr>
-          <tr>
-            <td><strong>Global Pooling</strong></td>
-            <td>AdaptiveAvgPool1d(1) &rarr; Flatten</td>
-            <td>—</td>
-            <td><code>(Batch, 128)</code></td>
-          </tr>
-          <tr>
-            <td><strong>Classifier Head</strong></td>
-            <td>Dropout(p=0.3) &rarr; Linear(128 &rarr; 6 classes)</td>
-            <td>—</td>
-            <td><code>(Batch, 6) Logits</code></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h3>ทำไมต้องใช้ 1D-CNN แทน 2D-CNN หรือ Transformer ?</h3>
-    <ul>
-      <li><strong>Temporal Continuity:</strong> สัญญาณ ECG เป็นข้อมูลอนุกรมเวลาต่อเนื่อง 1 มิติ การใช้ 1D Convolution ที่มี Kernel ขนาด 7 ช่วยดึงสาระสำคัญของช่วงเวลา 70 ms (ความกว้างช่วงปกติของ QRS) ได้อย่างแม่นยำ</li>
-      <li><strong>Low Latency & Energy Efficient:</strong> โมเดลมีขนาดเพียง ~1.5 MB รันบน CPU ของเซิร์ฟเวอร์ได้ภายใน <strong>14.2 ms</strong> เร็วกว่า Transformer ถึง 10 เท่า และไม่ต้องการ GPU</li>
-      <li><strong>Robustness to Sample Rate:</strong> ทนทานต่อสัญญาณรบกวนได้ดีกว่า และไม่เกิด Overfitting จากจำนวน Parameter ที่มากเกินไป</li>
-    </ul>
-  </section>
-
-  <!-- SECTION 4 -->
-  <section>
-    <div class="sec-num">04 · การฝึกฝนและการคำนวณ Loss</div>
-    <h2>Multi-Label Formulation & Binary Cross-Entropy Loss</h2>
-    <p>
-      ในความเป็นจริงทางการแพทย์ ผู้ป่วย 1 คนอาจมีภาวะผิดปกติได้หลายอย่างพร้อมกัน (เช่น เป็นทั้ง <code>MI</code> และ <code>CD</code> หรือ <code>AFIB</code> ร่วมกับ <code>STTC</code>) ระบบจึงใช้การจำแนกแบบ <strong>Multi-Label Classification</strong> โดยแต่ละคลาสมีโอกาสเกิดอิสระต่อกัน
-    </p>
-
-    <div class="math-block">
-      $$\mathcal{L}_{\text{BCEWithLogits}} = -\frac{1}{C}\sum_{c=1}^{C} \left[ y_c \cdot \log(\sigma(\hat{z}_c)) + (1 - y_c) \cdot \log(1 - \sigma(\hat{z}_c)) \right]$$
-      <small style="color:var(--ink-soft);">โดยที่ $\sigma(z) = \frac{1}{1 + e^{-z}}$ คือ Sigmoid Activation และ $C = 6$ คือจำนวนคลาส</small>
-    </div>
-
-    <h3>การตั้งค่า Hyperparameters ในการฝึกฝนจริง:</h3>
-    <ul>
-      <li><strong>Optimizer:</strong> AdamW ($\beta_1=0.9, \beta_2=0.999$, Weight Decay $= 10^{-4}$)</li>
-      <li><strong>Learning Rate:</strong> Initial LR $= 10^{-3}$ ร่วมกับ Cosine Annealing Scheduler</li>
-      <li><strong>Batch Size:</strong> 64 ตัวอย่าง</li>
-      <li><strong>Regularization:</strong> Dropout Rate $= 0.30$ + Batch Normalization</li>
-      <li><strong>Target Checkpoint:</strong> เลือก Checkpoint ที่ได้ค่า <code>val_macro_auc</code> สูงที่สุดบน Fold 9</li>
-    </ul>
-  </section>
-
-  <!-- SECTION 5 -->
-  <section>
-    <div class="sec-num">05 · การประเมินผลและการทดสอบ</div>
-    <h2>ผลการวัดประสิทธิภาพและการเรียนรู้ (Evaluation & Metrics)</h2>
-    
-    <div class="card">
-      <div class="card-header">Training History & Epoch Convergence (PTB-XL Full Set)</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Epoch</th>
-            <th>Train Loss</th>
-            <th>Val Macro-AUC</th>
-            <th>AFIB AUC</th>
-            <th>NORM AUC</th>
-            <th>STTC AUC</th>
-            <th>CD AUC</th>
-            <th>MI AUC</th>
-            <th>HYP AUC</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Epoch 1</td>
-            <td>0.5937</td>
-            <td>0.9074</td>
-            <td>0.9932</td>
-            <td>0.9284</td>
-            <td>0.9099</td>
-            <td>0.8935</td>
-            <td>0.9014</td>
-            <td>0.8177</td>
-          </tr>
-          <tr>
-            <td>Epoch 2</td>
-            <td>0.5205</td>
-            <td>0.9122</td>
-            <td>0.9972</td>
-            <td>0.9306</td>
-            <td>0.9069</td>
-            <td>0.9122</td>
-            <td>0.9162</td>
-            <td>0.8099</td>
-          </tr>
-          <tr>
-            <td>Epoch 3</td>
-            <td>0.4894</td>
-            <td>0.9193</td>
-            <td>0.9943</td>
-            <td>0.9306</td>
-            <td>0.9168</td>
-            <td>0.9180</td>
-            <td>0.9221</td>
-            <td>0.8342</td>
-          </tr>
-          <tr>
-            <td>Epoch 4</td>
-            <td>0.4753</td>
-            <td>0.9197</td>
-            <td>0.9982</td>
-            <td>0.9342</td>
-            <td>0.9303</td>
-            <td>0.9096</td>
-            <td>0.9188</td>
-            <td>0.8274</td>
-          </tr>
-          <tr>
-            <td>Epoch 5</td>
-            <td>0.4616</td>
-            <td>0.9207</td>
-            <td>0.9950</td>
-            <td>0.9331</td>
-            <td>0.9187</td>
-            <td>0.9115</td>
-            <td>0.9295</td>
-            <td>0.8364</td>
-          </tr>
-          <tr style="font-weight:bold; background:var(--accent-soft);">
-            <td>Epoch 6 ⭐</td>
-            <td>0.4519</td>
-            <td class="highlight">0.9245</td>
-            <td>0.9972</td>
-            <td>0.9328</td>
-            <td>0.9219</td>
-            <td>0.9208</td>
-            <td>0.9186</td>
-            <td>0.8556</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="callout">
-      <div class="callout-title">Held-Out Blind Test Verification</div>
-      การทดสอบวัดผลใช้ <strong>Fold 9 และ Fold 10 แบบแยกขาด (Held-Out)</strong> ตั้งแต่วันแรกที่โหลดข้อมูล ไม่มีการนำข้อมูลทดสอบมาปะปนในกระบวนการเทรนแม้แต่เคสเดียว เพื่อพิสูจน์ว่าโมเดลมีความสามารถ Generalize กับข้อมูลจากโรงพยาบาลอื่นได้จริง
-    </div>
-  </section>
-
   <!-- SECTION 6 -->
   <section>
-    <div class="sec-num">06 · การรันบนระบบจริง</div>
-    <h2>ONNX Runtime Deployment & Quality Gates</h2>
+    <div class="sec-num">06 · ความปลอดภัยทางการแพทย์</div>
+    <h2>Clinical Decision Support & Quality Gate</h2>
     <p>
-      โมเดล PyTorch ถูกแปลงเป็นรูปแบบ <strong>ONNX (Open Neural Network Exchange)</strong> และโหลดเข้าหน่วยความจำผ่าน <code>onnxruntime</code> บน FastAPI Backend เพื่อให้บริการการวิเคราะห์ความเร็วสูง
+      ระบบ AI ถูกออกแบบให้เป็น <strong>Decision Support System (เครื่องมือช่วยตัดสินใจ)</strong> เพื่อสนับสนุนแพทย์และเจ้าหน้าที่ใน รพ.สต. คัดกรองเคสฉุกเฉินส่งต่อโรงพยาบาลศูนย์ โดยมีกลไก Safety Gate ควบคุมอย่างเข้มงวด:
     </p>
 
-    <div class="card">
-      <div class="card-header">Clinical Safety Gate (classification_eligible)</div>
-      <p style="font-size:13px; margin-bottom:10px;">
-        เพื่อความปลอดภัยสูงสุดของผู้ป่วย ระบบจะไม่ฝืนส่งข้อมูลเข้าโมเดล AI หากไม่ผ่านเกณฑ์ 3 ข้อต่อไปนี้:
-      </p>
-      <ol style="font-size:13px; padding-left:20px; margin:0;">
-        <li><strong>ครบ 12 Leads มาตรฐาน:</strong> มีครบ I, II, III, aVR, aVL, aVF, V1-V6</li>
-        <li><strong>ความยาวสัญญาณเพียงพอ:</strong> ไม่ต่ำกว่า 5–10 วินาที</li>
-        <li><strong>ระดับสัญญาณรบกวน (Signal Quality Score):</strong> Noise Ratio ไม่เกินเกณฑ์มาตรฐานที่ยอมรับได้</li>
+    <div class="callout">
+      <div class="callout-title">เกณฑ์ความปลอดภัยก่อนส่งเข้า AI (Classification Eligible Gate)</div>
+      <ol style="margin:6px 0 0; padding-left:18px;">
+        <li>ต้องมีสัญญาณครบทั้ง 12 Leads มาตรฐาน (I, II, III, aVR, aVL, aVF, V1–V6)</li>
+        <li>ความยาวสัญญาณต้องไม่น้อยกว่า 5 วินาที</li>
+        <li>คะแนนคุณภาพสัญญาณ (Signal Quality Score) ต้องไม่ติด Artifact หรือ Baseline Drift รุนแรง</li>
       </ol>
     </div>
   </section>
