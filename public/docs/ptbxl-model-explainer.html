@@ -314,7 +314,7 @@
     overflow-x: auto;
   }
 
-  /* Callout alert */
+  /* Callouts & Triage flags */
   .callout {
     border-left: 3px solid var(--alert);
     background: var(--alert-soft);
@@ -323,12 +323,22 @@
     margin: 24px 0;
     font-size: 14.5px;
   }
+  .callout.green {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+  }
+  .callout.yellow {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+  }
   .callout-title {
     font-family: var(--mono);
     font-weight: bold;
     color: var(--alert);
     margin-bottom: 4px;
   }
+  .callout.green .callout-title { color: #10b981; }
+  .callout.yellow .callout-title { color: #f59e0b; }
 
   /* SVG Graphics Styling */
   .diag-svg {
@@ -376,7 +386,8 @@
     <p class="lead">
       คู่มือฉบับสมบูรณ์พร้อมภาพประกอบจริง: อธิบายหลักการทำงานตั้งแต่สัญญาณคลื่นไฟฟ้าหัวใจจริง 12-Leads, 
       การขจัดสัญญาณรบกวน (Noise Filtering), โครงข่ายประสาทเทียม 1D-CNN Multi-Label, 
-      การวิเคราะห์เคสจริง 4 กลุ่มโรค, ผลทดสอบด้วย Held-Out Blind Test และการประมวลผลบนเซิร์ฟเวอร์แบบ Real-time
+      การอธิบายการตัดสินใจของ AI (Explainable AI / 1D-GradCAM), การตรวจวัดค่าคลื่นทางการแพทย์, 
+      การเชื่อมโยงสู่โมเดลหัวใจ 3D และขั้นตอนการคัดกรองผู้ป่วยส่งต่อในระดับสาธารณสุข
     </p>
     <div class="badge-row">
       <span class="badge accent">Dataset: PTB-XL v1.0.3</span>
@@ -569,18 +580,64 @@
     </div>
   </section>
 
-  <!-- SECTION 5 -->
+  <!-- SECTION 5 (NEW): DATA AUGMENTATION -->
   <section>
-    <div class="sec-num">05 · ผลการทดสอบและการประเมินประสิทธิภาพจริง</div>
+    <div class="sec-num">05 · เทคนิคเพิ่มความแกร่งของโมเดล (Data Augmentation)</div>
+    <h2>การสังเคราะห์และแปลงสัญญาณระหว่างการฝึกฝน</h2>
+    <p>
+      เพื่อป้องกันไม่ให้โครงข่ายประสาทเทียมจำข้อผิดพลาดเฉพาะตัวของผู้ป่วย (Overfitting) และทนต่อสภาพแวดล้อมห้องตรวจจริง โมเดลได้ใช้เทคนิค <strong>Data Augmentation 4 รูปแบบ</strong> ระหว่างการเทรน:
+    </p>
+
+    <!-- FIGURE 6: DATA AUGMENTATION -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 5: ECG Data Augmentation Strategies</span>
+        <span>Training Robustness</span>
+      </div>
+      <img src="/docs/assets/ptbxl_data_augmentation.png" alt="ECG Data Augmentation Strategies" class="fig-img" />
+      <div class="fig-caption">
+        <strong>รูปที่ 5 (เทคนิคการ Augment สัญญาณ):</strong> 
+        (1) คลื่นเดิม $\rightarrow$ 
+        (2) Gaussian Jitter จำลองสัญญาณรบกวนทางไฟฟ้า $\rightarrow$ 
+        (3) Baseline Wander Synthesis จำลองการขยับตัว/หายใจของผู้ป่วย $\rightarrow$ 
+        (4) Random Lead Segment Drop จำลองกรณีขั้วไฟฟ้าหลวมชั่วขณะ
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 6 (NEW): EXPLAINABLE AI (XAI) -->
+  <section>
+    <div class="sec-num">06 · ปัญญาประดิษฐ์ที่อธิบายเหตุผลได้ (Explainable AI)</div>
+    <h2>1D-GradCAM: AI มองเห็นและตัดสินใจจากจุดไหนของคลื่น ?</h2>
+    <p>
+      ระบบใช้เทคนิค <strong>1D Gradient-weighted Class Activation Mapping (1D-GradCAM)</strong> ในการคำนวณ Gradient ของชั้นสุดท้ายย้อนกลับมาที่สัญญาณเวลา เพื่อแสดงว่า AI ให้ความสำคัญกับตำแหน่งใดในคลื่น ECG:
+    </p>
+
+    <!-- FIGURE 7: 1D-GRADCAM XAI -->
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 6: 1D-GradCAM Saliency Attribution for STEMI Case</span>
+        <span>Feature Attribution Map</span>
+      </div>
+      <img src="/docs/assets/ptbxl_xai_gradcam_real.png" alt="1D-GradCAM Saliency Map on Real ECG" class="fig-img" />
+      <div class="fig-caption">
+        <strong>รูปที่ 6 (ความโปร่งใสของ AI):</strong> กราฟความเข้มข้นสีแดง (Attention Heatmap) แสดงให้เห็นว่าโมเดลโฟกัสที่บริเวณ <strong>ST-Elevation และ T-Wave</strong> อย่างแม่นยำ ตรงตามเกณฑ์ที่แพทย์โรคหัวใจใช้ในการวินิจฉัยภาวะกล้ามเนื้อหัวใจขาดเลือดเฉียบพลัน
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 7 -->
+  <section>
+    <div class="sec-num">07 · ผลการทดสอบและการประเมินประสิทธิภาพจริง</div>
     <h2>กราฟการเรียนรู้ (Training Loss) และ Multi-Label ROC Curves</h2>
     <p>
       ผลการเทรน 6 Epochs บนชุดข้อมูลเต็ม 17,418 เคส และผลการวัดประสิทธิภาพด้วยค่า **Area Under ROC Curve (AUC)** บนชุดทดสอบแบบแยกขาด (Fold 10):
     </p>
 
-    <!-- FIGURE 5: LOSS CONVERGENCE & ROC CURVES -->
+    <!-- FIGURE 8: LOSS CONVERGENCE & ROC CURVES -->
     <div class="fig-container">
       <div class="fig-title">
-        <span>Figure 5: Training Convergence & Multi-Label ROC Evaluation Curves</span>
+        <span>Figure 7: Training Convergence & Multi-Label ROC Evaluation Curves</span>
         <span>Validation Macro-AUC: 0.9245</span>
       </div>
       <div class="grid-2">
@@ -588,7 +645,7 @@
         <img src="/docs/assets/ptbxl_roc_curves.png" alt="Multi-Class ROC Curves" class="fig-img" />
       </div>
       <div class="fig-caption">
-        <strong>รูปที่ 5 (ผลลัพธ์จริงจากการเทรน):</strong> 
+        <strong>รูปที่ 7 (ผลลัพธ์จริงจากการเทรน):</strong> 
         (ซ้าย) กราฟแสดงค่า Loss ลู่เข้าสู่ 0.4519 และค่า Macro-AUC เพิ่มขึ้นต่อเนื่องถึง 0.9245 ใน Epoch 6 · 
         (ขวา) ROC Curves แยกรายโรค: AFIB ได้ AUC สูงสุดถึง <strong>0.9972</strong>, NORM <strong>0.9328</strong>, STTC <strong>0.9219</strong>, CD <strong>0.9208</strong>, MI <strong>0.9186</strong>, และ HYP <strong>0.8556</strong>
       </div>
@@ -638,22 +695,153 @@
     </table>
   </section>
 
-  <!-- SECTION 6 -->
+  <!-- SECTION 8 (NEW): CLINICAL CHEAT-SHEET -->
   <section>
-    <div class="sec-num">06 · การ Deploy และความปลอดภัยทางการแพทย์</div>
-    <h2>ONNX Runtime CPU Serving & Safety Gate</h2>
+    <div class="sec-num">08 · คู่มือเกณฑ์ค่าปกติทางการแพทย์ (ECG Measurement Cheat-Sheet)</div>
+    <h2>สรุปเกณฑ์มาตรฐานและการวัดค่าช่วงคลื่น (Clinical Intervals)</h2>
     <p>
-      โมเดล PyTorch ถูก Export ออกเป็นไฟล์ <strong>ONNX (Open Neural Network Exchange)</strong> และโหลดเข้าหน่วยความจำเซิร์ฟเวอร์เพื่อความเร็วและความเสถียรสูงสุด:
+      สรุปเกณฑ์มาตรฐานสากลที่แพทย์และระบบ AI ใช้ในการประเมินความผิดปกติของคลื่นไฟฟ้าหัวใจ:
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>พารามิเตอร์ (Parameter)</th>
+          <th>ช่วงค่าปกติ (Normal Range)</th>
+          <th>ความหมายเมื่อผิดปกติ (Clinical Significance)</th>
+          <th>สูตร / วิธีการวัด</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Heart Rate (อัตราเต้น)</strong></td>
+          <td>60 – 100 ครั้ง/นาที (bpm)</td>
+          <td>&lt; 60: Bradycardia (เต้นช้า)<br>&gt; 100: Tachycardia (เต้นเร็ว)</td>
+          <td>$HR = \frac{1500}{\text{จำนวนช่องเล็กระหว่าง R-R}}$</td>
+        </tr>
+        <tr>
+          <td><strong>PR Interval</strong></td>
+          <td>120 – 200 มิลลิวินาที (3–5 ช่องเล็ก)</td>
+          <td>&gt; 200 ms: First-degree AV Block<br>&lt; 120 ms: WPW Syndrome (Pre-excitation)</td>
+          <td>จุดเริ่มคลื่น P ถึงจุดเริ่ม QRS Complex</td>
+        </tr>
+        <tr>
+          <td><strong>QRS Duration</strong></td>
+          <td>70 – 110 มิลลิวินาที (&lt; 3 ช่องเล็ก)</td>
+          <td>&gt; 120 ms: Bundle Branch Block (LBBB / RBBB) หรือ Ventricular Origin</td>
+          <td>จุดเริ่มคลื่น Q ถึงจุดสิ้นสุดคลื่น S</td>
+        </tr>
+        <tr>
+          <td><strong>QTc (Corrected QT)</strong></td>
+          <td>350 – 450 มิลลิวินาที</td>
+          <td>&gt; 460 ms (ช) / &gt; 470 ms (ญ): เสี่ยงต่อ Arrhythmia / Torsades de Pointes</td>
+          <td>$\text{QTc} = \frac{\text{QT}}{\sqrt{\text{RR}}}$ (สูตร Bazett)</td>
+        </tr>
+        <tr>
+          <td><strong>Cardiac Axis (แกนไฟฟ้า)</strong></td>
+          <td>-30° ถึง +90° (Normal Axis)</td>
+          <td>&lt; -30°: Left Axis Deviation (LAD)<br>&gt; +90°: Right Axis Deviation (RAD)</td>
+          <td>ประเมินทิศทาง Vector สุทธิใน Lead I และ aVF</td>
+        </tr>
+        <tr>
+          <td><strong>Sokolow-Lyon (LVH)</strong></td>
+          <td>&lt; 35 มิลลิเมตร (mV)</td>
+          <td>$\ge 35\text{ mm}$: บ่งชี้ภาวะกล้ามเนื้อหัวใจห้องล่างซ้ายโต (LVH)</td>
+          <td>$S_{\text{V1}} + R_{\text{V5/V6}} \ge 35\text{ mm}$</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- SECTION 9 (NEW): 3D PINN INTEGRATION -->
+  <section>
+    <div class="sec-num">09 · การเชื่อมโยงสู่โมเดลหัวใจ 3 มิติ (3D PINN Integration)</div>
+    <h2>สถาปัตยกรรมต่อเนื่อง: PTB-XL Classifier สู่ 3D Heart Mesh</h2>
+    <p>
+      ระบบ <strong>Bioelectric Neural Suite</strong> ผสานการทำงานระหว่างโมเดลจำแนกคลื่น 2D และโมเดลจำลองสนามไฟฟ้า 3D:
+    </p>
+
+    <div class="fig-container">
+      <div class="fig-title">
+        <span>Figure 8: End-to-End Multimodal Clinical Pipeline</span>
+        <span>1D Signal &rarr; Diagnostic Classifier &rarr; 3D Cardiac Mesh</span>
+      </div>
+      <svg class="diag-svg" viewBox="0 0 820 160">
+        <!-- Step 1 -->
+        <g transform="translate(10, 20)">
+          <rect x="0" y="0" width="170" height="110" rx="6" fill="rgba(14, 124, 123, 0.08)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="85" y="30" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">1. ECG Signal Ingestion</text>
+          <text x="85" y="55" text-anchor="middle" class="svg-text-sub">12-Leads Digitization</text>
+          <text x="85" y="75" text-anchor="middle" class="svg-text-sub">Sampling 100 Hz</text>
+          <text x="85" y="95" text-anchor="middle" class="svg-text-sub">Z-Score Normalization</text>
+        </g>
+
+        <!-- Arrow 1 -->
+        <path d="M 190 75 L 220 75" stroke="var(--accent)" stroke-width="2" />
+
+        <!-- Step 2 -->
+        <g transform="translate(230, 20)">
+          <rect x="0" y="0" width="170" height="110" rx="6" fill="rgba(14, 124, 123, 0.08)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="85" y="30" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">2. PTB-XL Classifier</text>
+          <text x="85" y="55" text-anchor="middle" class="svg-text-sub">1D-CNN Multi-Label</text>
+          <text x="85" y="75" text-anchor="middle" class="svg-text-sub">AUC 0.9245 Accuracy</text>
+          <text x="85" y="95" text-anchor="middle" class="svg-text-sub">6 Diagnostic Classes</text>
+        </g>
+
+        <!-- Arrow 2 -->
+        <path d="M 410 75 L 440 75" stroke="var(--accent)" stroke-width="2" />
+
+        <!-- Step 3 -->
+        <g transform="translate(450, 20)">
+          <rect x="0" y="0" width="170" height="110" rx="6" fill="rgba(240, 127, 101, 0.08)" stroke="var(--alert)" stroke-width="1.5" />
+          <text x="85" y="30" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--alert)">3. PINN 3D Localizer</text>
+          <text x="85" y="55" text-anchor="middle" class="svg-text-sub">Inverse Problem Solver</text>
+          <text x="85" y="75" text-anchor="middle" class="svg-text-sub">Electrophysiology ODE</text>
+          <text x="85" y="95" text-anchor="middle" class="svg-text-sub">AHA 17-Segment Map</text>
+        </g>
+
+        <!-- Arrow 3 -->
+        <path d="M 630 75 L 660 75" stroke="var(--alert)" stroke-width="2" />
+
+        <!-- Step 4 -->
+        <g transform="translate(670, 20)">
+          <rect x="0" y="0" width="140" height="110" rx="6" fill="var(--paper-raised)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="70" y="30" text-anchor="middle" class="svg-text" font-weight="bold" fill="var(--accent)">4. 3D Web Viewer</text>
+          <text x="70" y="55" text-anchor="middle" class="svg-text-sub">Three.js Heart Mesh</text>
+          <text x="70" y="75" text-anchor="middle" class="svg-text-sub">Interactive Rotate</text>
+          <text x="70" y="95" text-anchor="middle" class="svg-text-sub">Ischemic Heatmap</text>
+        </g>
+      </svg>
+      <div class="fig-caption">
+        <strong>รูปที่ 8 (โฟลว์การทำงานรวมทั้งระบบ):</strong> จากสัญญาณคลื่นไฟฟ้าหัวใจ 2D เข้าสู่การจำแนกโรคด้วย PTB-XL 1D-CNN แล้วส่งพิกัดไฟฟ้าไปยัง PINN 3D Localizer เพื่อแสดงผลเป็นแผนที่ความร้อน 3 มิติบนกล้ามเนื้อหัวใจจริง
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 10 (NEW): CLINICAL TRIAGE WORKFLOW -->
+  <section>
+    <div class="sec-num">10 · แนวทางปฏิบัติคัดกรองผู้ป่วย (Clinical Triage & Safety Protocol)</div>
+    <h2>ระบบสัญญาณไฟคัดกรองผู้ป่วยระดับปฐมภูมิ (Primary Care Triage)</h2>
+    <p>
+      ระบบช่วยคัดกรองความเร่งด่วนเพื่อสนับสนุนเจ้าหน้าที่ใน รพ.สต. ในการตัดสินใจส่งต่อผู้ป่วยเข้าสู่โรงพยาบาลศูนย์:
     </p>
 
     <div class="callout">
-      <div class="callout-title">Clinical Quality Gate (classification_eligible)</div>
-      เพื่อความปลอดภัยของผู้ป่วย ระบบจะไม่ส่งข้อมูลเข้าโมเดล AI หากไม่ผ่านเงื่อนไข:
-      <ol style="margin:8px 0 0; padding-left:18px;">
-        <li>ต้องมีครบทั้ง 12 Leads มาตรฐาน (I, II, III, aVR, aVL, aVF, V1–V6)</li>
-        <li>ความยาวคลื่นต้องไม่ต่ำกว่า 5–10 วินาที</li>
-        <li>คะแนนคุณภาพสัญญาณ (Signal Quality Score) ต้องไม่ติดสัญญาณรบกวนจนรูปคลื่นผิดเพี้ยน</li>
-      </ol>
+      <div class="callout-title">🔴 Red Flag — ภาวะฉุกเฉินวิกฤต (Immediate Emergency Transfer)</div>
+      <strong>เงื่อนไข:</strong> ตรวจพบ Acute STEMI (MI Probability &gt; 0.60) หรือ High-rate AFIB ร่วมกับความดันโลหิตผิดปกติ<br>
+      <strong>แนวทางปฏิบัติ:</strong> ส่งตัวผู้ป่วยเข้าห้องฉุกเฉิน (ER) ทันที เพื่อเข้าสู่กระบวนการฉีดสีสวนหลอดเลือดหัวใจ (Primary PCI) ภายใน 90 นาที (Door-to-Balloon Time)
+    </div>
+
+    <div class="callout yellow">
+      <div class="callout-title">🟡 Yellow Flag — เฝ้าระวังและนัดพบแพทย์เฉพาะทาง (Specialist Referral)</div>
+      <strong>เงื่อนไข:</strong> ตรวจพบ ST-T Abnormality (STTC), Conduction Disturbance (CD / LBBB), หรือ Hypertrophy (HYP)<br>
+      <strong>แนวทางปฏิบัติ:</strong> นัดหมายแพทย์อายุรกรรมหัวใจ ตรวจเลือดดูระดับ Cardiac Enzymes (Troponin-T) และตรวจคลื่นเสียงสะท้อนหัวใจ (Echocardiogram)
+    </div>
+
+    <div class="callout green">
+      <div class="callout-title">🟢 Green Flag — ปกติ (Routine Follow-up)</div>
+      <strong>เงื่อนไข:</strong> คลื่น Normal Sinus Rhythm (NORM Probability &gt; 0.85) และไม่มีอาการเจ็บแน่นหน้าอก<br>
+      <strong>แนวทางปฏิบัติ:</strong> บันทึกประวัติในระบบสุขภาพชุมชน นัดตรวจสุขภาพประจำปีตามรอบปกติ
     </div>
   </section>
 
